@@ -1,0 +1,180 @@
+567:NS_CONTENT_SRCS := $(addprefix $(NS_DIR)/content/,$(NS_CONTENT_FILES))
+578:# libnsbmp is fully vendored with NetSurf and has no hosted codec dependency.
+582:NS_CONTENT_ALL_SRCS := $(NS_CONTENT_SRCS) $(NS_FETCHER_SRCS) $(NS_HTML_SRCS) $(NS_CSSHANDLER_SRCS) $(NS_JAVASCRIPT_HANDLER_SRCS) $(NS_IMAGE_HANDLER_SRCS)
+584:# handler when libnsbmp pixels are normalised for the C-OS plotter.
+587:NS_CONTENT_OBJS := $(patsubst $(NS_DIR)/content/%.c,$(OBJ_DIR)/ns_content/%.o,$(NS_CONTENT_ALL_SRCS))
+594:NS_CONTENT_LIB = $(BUILD_DIR)/libns_content.a
+595:NS_CONTENT_INCLUDES = -I$(NS_DIR) -I$(NS_DIR)/include -I$(NS_DIR)/content -I$(NS_DIR)/content/handlers -I$(LDOM_DIR)/include -I$(LHUBBUB_DIR)/include -I$(LCSS_DIR)/include -I$(LWAPCAPLET_DIR)/include -I$(LPARSERUTILS_DIR)/include -I$(LUTF8PROC_DIR)/include/libutf8proc -I$(LNSUTILS_DIR)/include -I$(NSALL_DIR)/libnsbmp/include
+600:NSBMP_DIR = $(NSALL_DIR)/libnsbmp
+601:NSBMP_SRC = $(NSBMP_DIR)/src/libnsbmp.c
+602:NSBMP_OBJ = $(OBJ_DIR)/nsbmp/libnsbmp.o
+603:NSBMP_LIB = $(BUILD_DIR)/libnsbmp.a
+627:COS_NETSURF_INCLUDES = $(NS_CONTENT_INCLUDES) -I$(COS_NETSURF_DIR) -I$(QUICKJS_DIR) -I$(NS_DIR)/frontends \
+1427:	$(CC) $(CFLAGS) $(INCLUDES) $(NS_CONTENT_INCLUDES) -c $< -o $@
+1431:	$(CC) $(CFLAGS) $(INCLUDES) $(NS_CONTENT_INCLUDES) -c $< -o $@
+1433:$(NSBMP_LIB): $(NSBMP_OBJ)
+1434:	@echo "[BUILD] Archiving NetSurf libnsbmp..."
+1439:	$(CC) $(CFLAGS) $(INCLUDES) $(NS_CONTENT_INCLUDES) -c $< -o $@
+1441:$(NS_CONTENT_LIB): $(NS_CONTENT_OBJS) $(NS_DESKTOP_OBJS)
+1509:$(KERNEL): $(OBJS) $(BEARSSL_LIB) $(NGHTTP2_LIB) $(ACPICA_LIB) $(COMPAT_LIB) $(QUICKJS_LIB) $(LWAPCAPLET_LIB) $(LPARSERUTILS_LIB) $(LUTF8PROC_LIB) $(LHUBBUB_LIB) $(LCSS_LIB) $(LDOM_LIB) $(LNSUTILS_LIB) $(NS_UTILS_LIB) $(NSBMP_LIB) $(NS_CONTENT_LIB) $(NSJS_QUICKJS_LIB)
+1513:		$(BEARSSL_LIB) $(NGHTTP2_LIB) $(ACPICA_LIB) $(COMPAT_LIB) $(QUICKJS_LIB) $(LWAPCAPLET_LIB) $(LPARSERUTILS_LIB) $(LUTF8PROC_LIB) $(LHUBBUB_LIB) $(LCSS_LIB) $(LDOM_LIB) $(LNSUTILS_LIB) $(NS_UTILS_LIB) $(NSBMP_LIB) $(NS_CONTENT_LIB) $(NSJS_QUICKJS_LIB) \
+--- content object recipe ---
+579-# Enable its upstream content handler so image/bmp resources in ordinary HTML
+580-# are decoded into the frontend bitmap API and redrawn by the real plotter.
+581-NS_IMAGE_HANDLER_SRCS = $(NS_DIR)/content/handlers/image/bmp.c
+582-NS_CONTENT_ALL_SRCS := $(NS_CONTENT_SRCS) $(NS_FETCHER_SRCS) $(NS_HTML_SRCS) $(NS_CSSHANDLER_SRCS) $(NS_JAVASCRIPT_HANDLER_SRCS) $(NS_IMAGE_HANDLER_SRCS)
+583-# bitmap.c supplies bitmap_format_convert(), used by the upstream BMP
+584-# handler when libnsbmp pixels are normalised for the C-OS plotter.
+585-NS_DESKTOP_FILES = scrollbar.c textarea.c textinput.c plot_style.c bitmap.c browser_window.c browser_history.c frames.c knockout.c download.c
+586-NS_DESKTOP_SRCS := $(addprefix $(NS_DIR)/desktop/,$(NS_DESKTOP_FILES))
+587:NS_CONTENT_OBJS := $(patsubst $(NS_DIR)/content/%.c,$(OBJ_DIR)/ns_content/%.o,$(NS_CONTENT_ALL_SRCS))
+588:NS_HTML_OBJS := $(patsubst $(NS_DIR)/content/handlers/html/%.c,$(OBJ_DIR)/ns_content/handlers/html/%.o,$(NS_HTML_SRCS))
+589-# Transitional ABI guard: private.h owns struct html_content.  Until every
+590-# existing object has emitted its first .d file, make this critical layout
+591-# dependency explicit as well.  It limits rebuilds to the real HTML cluster.
+592-$(NS_HTML_OBJS): $(NS_DIR)/content/handlers/html/private.h
+593-NS_DESKTOP_OBJS := $(patsubst $(NS_DIR)/desktop/%.c,$(OBJ_DIR)/ns_desktop/%.o,$(NS_DESKTOP_SRCS))
+594-NS_CONTENT_LIB = $(BUILD_DIR)/libns_content.a
+595-NS_CONTENT_INCLUDES = -I$(NS_DIR) -I$(NS_DIR)/include -I$(NS_DIR)/content -I$(NS_DIR)/content/handlers -I$(LDOM_DIR)/include -I$(LHUBBUB_DIR)/include -I$(LCSS_DIR)/include -I$(LWAPCAPLET_DIR)/include -I$(LPARSERUTILS_DIR)/include -I$(LUTF8PROC_DIR)/include/libutf8proc -I$(LNSUTILS_DIR)/include -I$(NSALL_DIR)/libnsbmp/include
+596-
+597-# NetSurf's BMP parser/decoder is vendored C code.  Keep it as a dedicated
+598-# archive, matching the other NetSurf support libraries, so the final grouped
+599-# link resolves bitmap/content cross-references deterministically.
+600-NSBMP_DIR = $(NSALL_DIR)/libnsbmp
+601-NSBMP_SRC = $(NSBMP_DIR)/src/libnsbmp.c
+602-NSBMP_OBJ = $(OBJ_DIR)/nsbmp/libnsbmp.o
+603-NSBMP_LIB = $(BUILD_DIR)/libnsbmp.a
+604-
+605-# The native (not vendored/ported - hand-written for C-OS) driver
+606-# code living on top of everything above: the fetcher registry/
+607-# dispatch (cos_fetch.c) and engine init + synchronous page-load
+608-# driver (cos_netsurf.c). See both files' header comments. Needs the
+609-# same include set as the content library above, plus its own
+610-# directory (for cos_netsurf.h) and third_party/quickjs (for
+611-# javascript/js.h's jsheap/jsthread types via quickjs_port.h's
+612-# JSRuntime/JSContext).
+613-COS_NETSURF_DIR = $(SRCROOT)/netsurf
+614-# C-OS 4.0.8 second alpha: cos_fetch_http.c (real http:/https: fetcher)
+615-# and cos_netsurf_render.c (real-DOM-to-display-lines) added - see
+616-# those files' headers. This list is explicit, not a wildcard, so any
+617-# new file under src/netsurf/ must be added here by hand or it will
+618-# silently never be compiled.
+619-COS_NETSURF_SRCS = $(COS_NETSURF_DIR)/cos_fetch.c $(COS_NETSURF_DIR)/cos_fetch_file.c $(COS_NETSURF_DIR)/cos_fetch_http.c $(COS_NETSURF_DIR)/cos_netsurf.c $(COS_NETSURF_DIR)/cos_netsurf_render.c $(COS_NETSURF_DIR)/cos_gui_table.c $(COS_NETSURF_DIR)/cos_netsurf_adapter.c $(COS_NETSURF_DIR)/cos_netsurf_browser.c $(COS_NETSURF_DIR)/cos_netsurf_png.c $(COS_NETSURF_DIR)/cos_netsurf_jpeg.c $(COS_NETSURF_DIR)/cos_urldb_stub.c $(COS_NETSURF_DIR)/cos_nsoptions.c $(COS_NETSURF_DIR)/cos_netsurf_tierb_stubs.c $(COS_NETSURF_DIR)/cos_parserutils_filter_stub.c
+620-COS_NETSURF_OBJS := $(patsubst $(COS_NETSURF_DIR)/%.c,$(OBJ_DIR)/netsurf/%.o,$(COS_NETSURF_SRCS))
+621-# NOTE: COS_NETSURF_OBJS above is NOT what the final kernel.elf link
+622-# uses - it's currently unreferenced elsewhere in this file. The real
+623-# link-time object list is the hardcoded OBJS variable near the top of
+624-# this Makefile (search for "cos_fetch.o"). Confirmed the hard way:
+--
+1417-$(OBJ_DIR)/ns_utils/%.o: $(NS_DIR)/utils/%.c | $(OBJ_DIR)
+1418-	mkdir -p $(dir $@)
+1419-	$(CC) $(CFLAGS) $(INCLUDES) $(NS_UTILS_INCLUDES) -c $< -o $@
+1420-
+1421-$(NS_UTILS_LIB): $(NS_UTILS_OBJS)
+1422-	@echo "[BUILD] Archiving NetSurf utils..."
+1423-	ar rcs $@ $^
+1424-
+1425:$(OBJ_DIR)/ns_content/%.o: $(NS_DIR)/content/%.c | $(OBJ_DIR)
+1426-	mkdir -p $(dir $@)
+1427-	$(CC) $(CFLAGS) $(INCLUDES) $(NS_CONTENT_INCLUDES) -c $< -o $@
+1428-
+1429-$(NSBMP_OBJ): $(NSBMP_SRC) | $(OBJ_DIR)
+1430-	mkdir -p $(dir $@)
+1431-	$(CC) $(CFLAGS) $(INCLUDES) $(NS_CONTENT_INCLUDES) -c $< -o $@
+1432-
+1433-$(NSBMP_LIB): $(NSBMP_OBJ)
+1434-	@echo "[BUILD] Archiving NetSurf libnsbmp..."
+1435-	ar rcs $@ $^
+1436-
+1437-$(OBJ_DIR)/ns_desktop/%.o: $(NS_DIR)/desktop/%.c | $(OBJ_DIR)
+1438-	mkdir -p $(dir $@)
+1439-	$(CC) $(CFLAGS) $(INCLUDES) $(NS_CONTENT_INCLUDES) -c $< -o $@
+1440-
+1441-$(NS_CONTENT_LIB): $(NS_CONTENT_OBJS) $(NS_DESKTOP_OBJS)
+1442-	@echo "[BUILD] Archiving NetSurf content core + html/css handlers..."
+1443-	ar rcs $@ $^
+1444-
+1445-$(OBJ_DIR)/netsurf/%.o: $(COS_NETSURF_DIR)/%.c | $(OBJ_DIR)
+1446-	mkdir -p $(dir $@)
+1447-	$(CC) $(CFLAGS) $(INCLUDES) $(COS_NETSURF_INCLUDES) -c $< -o $@
+1448-
+1449-$(OBJ_DIR)/ns_js_quickjs/%.o: $(NSJS_QUICKJS_DIR)/%.c | $(OBJ_DIR)
+1450-	mkdir -p $(dir $@)
+1451-	$(CC) $(CFLAGS) $(INCLUDES) $(NSJS_QUICKJS_INCLUDES) -c $< -o $@
+1452-
+1453-$(NSJS_QUICKJS_LIB): $(NSJS_QUICKJS_OBJS)
+1454-	@echo "[BUILD] Archiving NetSurf QuickJS backend..."
+1455-	ar rcs $@ $^
+1456-
+1457-# ---- Compatibility object files ----
+1458-$(OBJ_DIR)/compat/memory_stubs.o: $(SRCROOT)/kernel/memory_stubs.c | $(OBJ_DIR)
+1459-	mkdir -p $(dir $@)
+1460-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+1461-
+--- top-level linker section ---
+ISO       = C-OS_4.0.8_alpha.iso
+# Secure Boot output is intentionally separate from the conventional hybrid
+# ISO. Signing credentials must be supplied explicitly from outside this tree.
+SECUREBOOT_DIR ?= $(BUILD_DIR)/secureboot
+SECUREBOOT_KEY ?=
+SECUREBOOT_CERT ?=
+STORAGE_IMG = $(BUILD_DIR)/storage.img
+STORAGE_SIZE_MB = 1536
+GRUB_DIR  = iso/boot/grub
+GRUB_CFG  = iso/boot/grub/grub.cfg
+
+
+# ---- MicroPython build tools ----
+PYTHON ?= python3
+CAT ?= cat
+SED ?= sed
+CPP ?= cpp
+
+# Define before any object prerequisites use it
+MP_SRC_DIR = $(SRCROOT)/third_party/micropython
+MP_SRC_PY = $(MP_SRC_DIR)/py
+MICROPY_GENHDR_DIR = $(BUILD_DIR)/genhdr
+MICROPY_INC := -Isrc/third_party/micropython -Isrc/third_party/micropython/py -Isrc/kernel/ai -Isrc/kernel/python
+
+MPCONFIGPORT_MK = $(wildcard mpconfigport.mk)
+
+
+# ---- Object files ----
+OBJS = \
+	$(OBJ_DIR)/netsurf/cos_fetch.o \
+	$(OBJ_DIR)/netsurf/cos_fetch_file.o \
+	$(OBJ_DIR)/netsurf/cos_fetch_http.o \
+	$(OBJ_DIR)/netsurf/cos_netsurf.o \
+	$(OBJ_DIR)/netsurf/cos_gui_table.o \
+	$(OBJ_DIR)/netsurf/cos_netsurf_adapter.o \
+	$(OBJ_DIR)/netsurf/cos_netsurf_browser.o \
+		$(OBJ_DIR)/netsurf/cos_netsurf_render.o \
+		$(OBJ_DIR)/netsurf/cos_netsurf_png.o \
+	$(OBJ_DIR)/netsurf/cos_netsurf_jpeg.o \
+	$(OBJ_DIR)/netsurf/cos_urldb_stub.o \
+		$(OBJ_DIR)/netsurf/cos_nsoptions.o \
+		$(OBJ_DIR)/netsurf/cos_netsurf_tierb_stubs.o \
+		$(OBJ_DIR)/netsurf/cos_parserutils_filter_stub.o \
+	$(OBJ_DIR)/boot/boot.o \
+	$(OBJ_DIR)/boot/irq.o \
+	$(OBJ_DIR)/boot/isr.o \
+	$(OBJ_DIR)/boot/storage_blob.o \
+	$(OBJ_DIR)/boot/smp_trampoline.o \
+	$(OBJ_DIR)/kernel/context_switch.o \
+	$(OBJ_DIR)/kernel/kernel.o \
+	$(OBJ_DIR)/kernel/io.o \
+	$(OBJ_DIR)/kernel/idt.o \
+	$(OBJ_DIR)/kernel/syscall.o \
+	$(OBJ_DIR)/kernel/userspace_demo.o \
+	$(OBJ_DIR)/kernel/serial.o \
+	$(OBJ_DIR)/kernel/timer.o \
+	$(OBJ_DIR)/kernel/scheduler.o \
+	$(OBJ_DIR)/kernel/smp.o \
+	$(OBJ_DIR)/kernel/task.o \
+	$(OBJ_DIR)/kernel/sync.o \
+	$(OBJ_DIR)/kernel/ipc.o \
+	$(OBJ_DIR)/kernel/mm/paging.o \
+	$(OBJ_DIR)/kernel/rtc.o \
+	$(OBJ_DIR)/kernel/api/cos_api.o \
+	$(OBJ_DIR)/kernel/api/fs_api.o \
+	$(OBJ_DIR)/kernel/api/net_api.o \

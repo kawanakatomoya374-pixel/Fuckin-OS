@@ -1,0 +1,97 @@
+--- Web API bindings ---
+src/third_party/quickjs/quickjs_port.c:27: * the separate origin-aware Web API module (fetch, XMLHttpRequest,
+src/third_party/quickjs/quickjs_port.c:463:    /* `__all__` is not a CSS property, so fetch the raw attribute explicitly. */
+src/third_party/quickjs/quickjs_port.c:1308:        return JS_ThrowTypeError(ctx, "dispatchEvent requires an Event object");
+src/third_party/quickjs/quickjs_port.c:1320:    /* EventTarget.dispatchEvent() returns false only when cancellation is
+src/third_party/quickjs/quickjs_port.c:1377:    JS_SetPropertyStr(ctx, proto, "addEventListener",
+src/third_party/quickjs/quickjs_port.c:1378:                      JS_NewCFunction(ctx, cos_dom_node_add_event_listener, "addEventListener", 3));
+src/third_party/quickjs/quickjs_port.c:1381:    JS_SetPropertyStr(ctx, proto, "dispatchEvent",
+src/third_party/quickjs/quickjs_port.c:1382:                      JS_NewCFunction(ctx, cos_dom_node_dispatch_event, "dispatchEvent", 1));
+src/third_party/quickjs/quickjs_port.c:1474:    JS_SetPropertyStr(ctx, proto, "addEventListener",
+src/third_party/quickjs/quickjs_port.c:1475:                      JS_NewCFunction(ctx, cos_dom_node_add_event_listener, "addEventListener", 3));
+src/third_party/quickjs/quickjs_port.c:1478:    JS_SetPropertyStr(ctx, proto, "dispatchEvent",
+src/third_party/quickjs/quickjs_port.c:1479:                      JS_NewCFunction(ctx, cos_dom_node_dispatch_event, "dispatchEvent", 1));
+src/third_party/quickjs/quickjs_port.c:1964:    /* A saturated queue is a normal resource limit, not a kernel allocation
+src/third_party/quickjs/quickjs_port.c:2136:    JS_SetPropertyStr(ctx, media, "addEventListener",
+src/third_party/quickjs/quickjs_port.c:2137:                      JS_NewCFunction(ctx, cos_web_noop, "addEventListener", 2));
+src/third_party/quickjs/quickjs_port.c:2160:    JS_SetPropertyStr(ctx, element, "addEventListener",
+src/third_party/quickjs/quickjs_port.c:2161:                      JS_NewCFunction(ctx, cos_web_noop, "addEventListener", 2));
+src/third_party/quickjs/quickjs_port.c:2422:    JSValue navigator = JS_NewObject(ctx);
+src/third_party/quickjs/quickjs_port.c:2423:    JSValue location = JS_NewObject(ctx);
+src/third_party/quickjs/quickjs_port.c:2428:    /* MediaWiki startup reads document.cookie.match(...). Supplying a stable
+src/third_party/quickjs/quickjs_port.c:2429:     * empty cookie jar is standards-compatible before page cookies are set and
+src/third_party/quickjs/quickjs_port.c:2431:    JS_SetPropertyStr(ctx, document, "cookie", JS_NewString(ctx, ""));
+src/third_party/quickjs/quickjs_port.c:2454:    JS_SetPropertyStr(ctx, document, "addEventListener",
+src/third_party/quickjs/quickjs_port.c:2455:                      JS_NewCFunction(ctx, cos_web_noop, "addEventListener", 2));
+src/third_party/quickjs/quickjs_port.c:2459:    JS_SetPropertyStr(ctx, navigator, "userAgent",
+src/third_party/quickjs/quickjs_port.c:2461:    JS_SetPropertyStr(ctx, navigator, "language", JS_NewString(ctx, "ja-JP"));
+src/third_party/quickjs/quickjs_port.c:2462:    JS_SetPropertyStr(ctx, navigator, "onLine", JS_NewBool(ctx, true));
+src/third_party/quickjs/quickjs_port.c:2464:     * legitimately call location.search.indexOf(...) even on a URL without a
+src/third_party/quickjs/quickjs_port.c:2466:     * undefined. cos_js_set_page_location later replaces these with the real
+src/third_party/quickjs/quickjs_port.c:2468:    JS_SetPropertyStr(ctx, location, "href", JS_NewString(ctx, ""));
+src/third_party/quickjs/quickjs_port.c:2469:    JS_SetPropertyStr(ctx, location, "protocol", JS_NewString(ctx, ""));
+src/third_party/quickjs/quickjs_port.c:2470:    JS_SetPropertyStr(ctx, location, "host", JS_NewString(ctx, ""));
+src/third_party/quickjs/quickjs_port.c:2471:    JS_SetPropertyStr(ctx, location, "hostname", JS_NewString(ctx, ""));
+src/third_party/quickjs/quickjs_port.c:2472:    JS_SetPropertyStr(ctx, location, "pathname", JS_NewString(ctx, ""));
+src/third_party/quickjs/quickjs_port.c:2473:    JS_SetPropertyStr(ctx, location, "search", JS_NewString(ctx, ""));
+src/third_party/quickjs/quickjs_port.c:2474:    JS_SetPropertyStr(ctx, location, "hash", JS_NewString(ctx, ""));
+src/third_party/quickjs/quickjs_port.c:2475:    JS_SetPropertyStr(ctx, location, "origin", JS_NewString(ctx, ""));
+src/third_party/quickjs/quickjs_port.c:2480:    JS_SetPropertyStr(ctx, global, "navigator", navigator);
+src/third_party/quickjs/quickjs_port.c:2481:    JS_SetPropertyStr(ctx, global, "location", location);
+src/third_party/quickjs/quickjs_port.c:2493:    JS_SetPropertyStr(ctx, global, "setTimeout",
+src/third_party/quickjs/quickjs_port.c:2494:                      JS_NewCFunction(ctx, cos_web_set_timeout, "setTimeout", 2));
+src/third_party/quickjs/quickjs_port.c:2495:    JS_SetPropertyStr(ctx, global, "setInterval",
+src/third_party/quickjs/quickjs_port.c:2496:                      JS_NewCFunction(ctx, cos_web_set_interval, "setInterval", 2));
+src/third_party/quickjs/quickjs_port.c:2501:    JS_SetPropertyStr(ctx, global, "requestAnimationFrame",
+src/third_party/quickjs/quickjs_port.c:2502:                      JS_NewCFunction(ctx, cos_web_request_animation_frame, "requestAnimationFrame", 1));
+src/third_party/quickjs/quickjs_port.c:2505:    JS_SetPropertyStr(ctx, global, "addEventListener",
+src/third_party/quickjs/quickjs_port.c:2506:                      JS_NewCFunction(ctx, cos_web_noop, "addEventListener", 2));
+src/third_party/quickjs/quickjs_port.c:2522:        "document.addEventListener=add;document.removeEventListener=rem;"
+src/third_party/quickjs/quickjs_port.c:2523:        "window.addEventListener=add;window.removeEventListener=rem;})();";
+src/third_party/quickjs/quickjs_port.c:2531: * assignments to location.href do not navigate until browser-window navigation
+src/third_party/quickjs/quickjs_port.c:2533:void cos_js_set_page_location(JSContext *ctx, const char *url)
+src/third_party/quickjs/quickjs_port.c:2566:    JSValue location = JS_GetPropertyStr(ctx, global, "location");
+src/third_party/quickjs/quickjs_port.c:2568:    if (JS_IsObject(location)) {
+src/third_party/quickjs/quickjs_port.c:2570:        JS_SetPropertyStr(ctx, location, name, JS_NewStringLen(ctx, ptr, len))
+src/third_party/quickjs/quickjs_port.c:2590:    JS_FreeValue(ctx, location);
+src/third_party/quickjs/quickjs_port.c:2763:/* Every allocation QuickJS makes (runtime, contexts, every JS object,
+src/third_party/quickjs/quickjs_port.c:2820:        /* The document URL is authoritative for relative fetch resolution and
+src/third_party/quickjs/quickjs_port.c:2833:                cos_js_set_page_location(ctx, page_url);
+src/third_party/quickjs/quickjs_port.c:3094:     * document.addEventListener('DOMContentLoaded', init)`) must see the new
+src/third_party/quickjs/quickjs_port.c:3111:/* Feed desktop keyboard input to ordinary window.addEventListener('keydown',
+src/third_party/quickjs/cos_js_web_api.c:195:     * only through the bounded NetSurf file fetcher.  Give them one explicit
+src/third_party/quickjs/cos_js_web_api.c:636:    if (argc < 2) return JS_ThrowTypeError(ctx, "XMLHttpRequest.open requires method and URL");
+src/third_party/quickjs/cos_js_web_api.c:647:        return JS_ThrowTypeError(ctx, "synchronous XMLHttpRequest is not supported");
+src/third_party/quickjs/cos_js_web_api.c:653:    if (!valid) return JS_ThrowTypeError(ctx, "XMLHttpRequest supports only HTTP(S) URLs");
+src/third_party/quickjs/cos_js_web_api.c:681:    if (ready != 1) return JS_ThrowTypeError(ctx, "XMLHttpRequest must be opened before send");
+src/third_party/quickjs/cos_js_web_api.c:694:        return JS_ThrowTypeError(ctx, "XMLHttpRequest has no valid URL");
+src/third_party/quickjs/cos_js_web_api.c:710:            return JS_ThrowRangeError(ctx, "XMLHttpRequest body is too large");
+src/third_party/quickjs/cos_js_web_api.c:745:static JSValue web_fetch(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
+src/third_party/quickjs/cos_js_web_api.c:748:    serial_puts("[QJS/Web] fetch() called\n");
+src/third_party/quickjs/cos_js_web_api.c:749:    if (argc < 1) return JS_ThrowTypeError(ctx, "fetch requires a URL");
+src/third_party/quickjs/cos_js_web_api.c:755:    if (!valid) return JS_ThrowTypeError(ctx, "fetch supports only HTTP(S) URLs");
+src/third_party/quickjs/cos_js_web_api.c:779:                return JS_ThrowRangeError(ctx, "fetch body is too large");
+src/third_party/quickjs/cos_js_web_api.c:796:    serial_puts("[QJS/Web] fetch() queued\n");
+src/third_party/quickjs/cos_js_web_api.c:800:static void web_finish_fetch(cos_web_request_t *request, bool success, int status,
+src/third_party/quickjs/cos_js_web_api.c:806:        serial_puts("[QJS/Web] fetch() fulfilled\n");
+src/third_party/quickjs/cos_js_web_api.c:892:            web_finish_fetch(request, request->transport_success, request->status,
+src/third_party/quickjs/cos_js_web_api.c:977:    JS_SetPropertyStr(ctx, global, "fetch", JS_NewCFunction(ctx, web_fetch, "fetch", 2));
+src/third_party/quickjs/cos_js_web_api.c:978:    JSValue xhr_ctor = JS_NewCFunction2(ctx, web_xhr_factory, "XMLHttpRequest", 0,
+src/third_party/quickjs/cos_js_web_api.c:980:    JS_SetPropertyStr(ctx, global, "XMLHttpRequest", xhr_ctor);
+--- public port API ---
+src/third_party/quickjs/quickjs_port.h:33: * runaway script cannot exhaust the shared browser/kernel allocation pool.
+src/third_party/quickjs/quickjs_port.h:34: * Returns NULL on allocation failure. */
+src/third_party/quickjs/quickjs_port.h:53: * location.href/protocol/host/hostname/pathname/search/hash/origin) with the
+src/third_party/quickjs/quickjs_port.h:56:void cos_js_set_page_location(JSContext *ctx, const char *url);
+src/third_party/quickjs/quickjs_port.h:77:/* Dispatches a browser-style named event to listeners registered by the
+src/third_party/quickjs/quickjs_port.h:79:bool cos_js_dispatch_event(JSContext *ctx, const char *event_type);
+src/third_party/quickjs/quickjs_port.h:80:/* Dispatches a GUI-originated keydown event to the active page window. */
+src/third_party/quickjs/quickjs_port.h:82:/* Dispatches an event to listeners registered on a real libdom target node. */
+src/third_party/quickjs/quickjs_port.h:83:bool cos_js_dispatch_dom_event(JSContext *ctx, void *target_node, const char *event_type);
+src/third_party/quickjs/quickjs_port.h:84:/* Dispatches a real libdom event through the active page context and walks
+src/third_party/quickjs/quickjs_port.h:86:bool cos_js_dispatch_bound_dom_event(void *target_node, const char *event_type);
+src/third_party/quickjs/quickjs_port.h:93:/* Release every bounded web timer owned by a context before that context is
+src/third_party/quickjs/quickjs_port.h:95:void cos_js_cancel_context_timers(JSContext *ctx);
+src/third_party/quickjs/quickjs_port.h:96:/* Release queued fetch/XMLHttpRequest work and page-session storage before
+src/third_party/quickjs/cos_js_web_api.h:5: * pump for fetch/XMLHttpRequest completion, origin binding and storage
+src/third_party/quickjs/cos_js_web_api.h:18:/* Install fetch, XMLHttpRequest, localStorage and sessionStorage in ctx. */

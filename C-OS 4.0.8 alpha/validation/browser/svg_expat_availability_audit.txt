@@ -1,0 +1,69 @@
+--- Expat sources/libraries ---
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c
+--- existing XML parser symbols ---
+--- libdom source list in root Makefile ---
+468-# entirely: it offers a choice of expat or libxml2 for parsing XML
+469-# documents (as opposed to HTML, which goes through the hubbub
+470-# binding instead), and neither expat nor libxml2 is part of this
+471-# build - not needed for ordinary HTML browsing, and skipping it
+472-# avoids taking on a whole new external dependency. If XML document
+473-# support (as opposed to HTML) ever matters, that's the place to
+474-# start, and expat would need porting first.
+475-LDOM_DIR = $(NSALL_DIR)/libdom
+476:LDOM_SRCS := $(wildcard $(LDOM_DIR)/src/*.c $(LDOM_DIR)/src/*/*.c) $(LDOM_DIR)/bindings/hubbub/parser.c
+477:LDOM_OBJS := $(patsubst $(LDOM_DIR)/%.c,$(OBJ_DIR)/libdom/%.o,$(LDOM_SRCS))
+478-LDOM_LIB = $(BUILD_DIR)/libldom.a
+479-LDOM_INCLUDES = -I$(LDOM_DIR)/include -I$(LDOM_DIR)/src -I$(LDOM_DIR)/bindings/hubbub -I$(LHUBBUB_DIR)/include -I$(LWAPCAPLET_DIR)/include -I$(LPARSERUTILS_DIR)/include
+480-
+481-# libnsutils: just base64.c (RFC4648, fully self-contained). Its
+482-# siblings time.c/unistd.c are themselves thin wrappers *around* real
+483-# <unistd.h>/<time.h> (not portable replacements for them, despite
+484-# the library's name), so they're skipped here rather than pulled in
+485-# for functionality nothing needs yet.
+486-LNSUTILS_DIR = $(NSALL_DIR)/libnsutils
+487-LNSUTILS_SRCS = $(LNSUTILS_DIR)/src/base64.c $(LNSUTILS_DIR)/src/time_cos.c
+488-LNSUTILS_OBJS := $(patsubst $(LNSUTILS_DIR)/src/%.c,$(OBJ_DIR)/libnsutils/%.o,$(LNSUTILS_SRCS))
+489-LNSUTILS_LIB = $(BUILD_DIR)/liblnsutils.a
+490-LNSUTILS_INCLUDES = -I$(LNSUTILS_DIR)/include
+491-
+492-# NetSurf's own utils/ subsystem (not a third-party dependency - this
+493-# is the first piece of NetSurf's actual source, as opposed to a
+494-# library it depends on). Deliberately an explicit file list rather
+495-# than a wildcard: several files in this directory are excluded on
+496-# purpose because they need things this build doesn't have -
+497-# documented in full in PORTING_NOTES.md, summarized here:
+498-#   - file.c, filename.c, filepath.c, utils.c: real POSIX filesystem
+499-#     calls (stat/opendir/fopen) for resolving local resource/cache
+500-#     paths - fundamentally tied to a hosted filesystem layout this
+501-#     kernel doesn't have. A C-OS frontend will need its own take on
+502-#     "where do resources live" against fs_api instead.
+503-#   - time.c: needs curl (curl_getdate, for parsing HTTP date
+504-#     headers) - a small hand-written date parser could replace this
+505-#     cheaply later without needing curl at all.
+506-#   - utf8.c: needs iconv pervasively (legacy non-UTF-8 charset
+507-#     conversion) - not required for modern (UTF-8) content; the
+508-#     already-ported libparserutils/libutf8proc cover the common case.
+509-#   - hashtable.c: needs zlib for one optional feature (loading a
+510-#     gzip-compressed hash table from disk) that's separable but not
+511-#     yet trimmed out.
+512-#   - log.c: wants real hosted FILE*/fprintf/stderr for NSLOG - this
+513-#     kernel logs via serial_puts instead (see the quickjs.c backend's
+514-#     comments for the same call made there).
+515-#   - nsoption.c: entangled with desktop/options.h and per-frontend
+516-#     option tables (riscos/gtk/...) that don't exist in this tree.
+517-# messages.c *is* included despite loading translations from a file
+518-# upstream - the parts compiled here don't pull in real file I/O
+519-# (nothing accesses a filesystem path yet), and content/handlers/html
+520-# will want its localised-string lookups.
+521-NS_UTILS_FILES = bloom.c corestrings.c hashtable.c idna.c libdom.c nscolour.c \
+522-	punycode.c ssl_certs.c talloc.c url.c useragent.c messages.c \
+523-	http/parameter.c http/challenge.c http/strict-transport-security.c \
+524-	http/primitives.c http/cache-control.c http/generics.c \
+525-	http/www-authenticate.c http/content-type.c http/content-disposition.c \
+526-	nsurl/nsurl.c nsurl/parse.c
+527-NS_UTILS_SRCS := $(addprefix $(NS_DIR)/utils/,$(NS_UTILS_FILES))
+528-NS_UTILS_OBJS := $(patsubst $(NS_DIR)/utils/%.c,$(OBJ_DIR)/ns_utils/%.o,$(NS_UTILS_SRCS))
+529-NS_UTILS_LIB = $(BUILD_DIR)/libns_utils.a
+530-NS_UTILS_INCLUDES = -I$(NS_DIR) -I$(NS_DIR)/include -I$(LDOM_DIR)/include -I$(LHUBBUB_DIR)/include -I$(LCSS_DIR)/include -I$(LWAPCAPLET_DIR)/include -I$(LPARSERUTILS_DIR)/include -I$(LUTF8PROC_DIR)/include/libutf8proc -I$(LNSUTILS_DIR)/include
+531-
+532-# NetSurf's content/ core, plus the html and css content handlers -

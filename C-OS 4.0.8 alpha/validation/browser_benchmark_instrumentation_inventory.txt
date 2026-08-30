@@ -1,0 +1,148 @@
+--- existing browser performance markers ---
+src/netsurf/cos_fetch_http.c:798:    serial_puts("[NetSurf/PERF] body bytes=");
+src/netsurf/cos_fetch_http.c:1074:     * the bounded HTTP keep-alive pool, and starved first paint. */
+src/third_party/quickjs/quickjs_port.h:54: * document URL that NetSurf is loading. This never performs navigation; page
+src/third_party/netsurf-all-3.11/netsurf/desktop/download.c:231:			guit->download->error(ctx->window, event->data.error.msg);
+src/third_party/netsurf-all-3.11/netsurf/desktop/browser_window.c:3492:		memcpy(&bw->loading_parameters, &params, sizeof(params));
+src/third_party/netsurf-all-3.11/netsurf/desktop/browser_window.c:4230:	if (loading && ((ms_now - bw->last_action) < 1000)) {
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/javascript/duktape/duktape.c:31110:	 *     preservation of the NaN payload so using a half-float seems
+src/third_party/netsurf-all-3.11/netsurf/content/llcache.c:2828: * \param elapsed The time in ms it took to complete the write to backing store.
+src/third_party/netsurf-all-3.11/netsurf/content/llcache.c:2884:	*elapsed = endms - startms;
+src/third_party/netsurf-all-3.11/netsurf/content/llcache.c:2945:	unsigned long total_elapsed = 1; /* total ms used to write bytes */
+src/third_party/netsurf-all-3.11/netsurf/include/netsurf/download.h:39:	void (*error)(struct gui_download_window *dw, const char *error_msg);
+src/gui/apps/ui/modern_ui.c:1376:            anim->progress = (float)elapsed / anim->duration_ms;
+src/gui/apps/music/gui_apps_music.c:683:    if (!g_music.loaded || g_music.duration_ms == 0 || bar_w <= 0) return;
+src/gui/core/window/gui_windows.c:1176:        bool hov_load = (ms && ms->x >= lb_x && ms->x < lb_x + 120 && ms->y >= lb_y && ms->y < lb_y + 28);
+src/kernel/drivers/http.c:1045:    serial_puts("[HTTP/PERF] transport_connect_ms=");
+src/kernel/drivers/http.c:1508:    serial_puts("[HTTP/PERF] connect+send_ms=");
+src/kernel/drivers/tls_backend.c:668:    serial_puts("[TLS/PERF] write_all_ms=");
+--- JS execution + DOM mutation/rebox paths ---
+src/netsurf/cos_netsurf_browser.c:127:void cos_netsurf_browser_notify_dom_mutation(void)
+src/netsurf/cos_netsurf_browser.c:358:            html_rebuild_layout_after_dom_mutation(htmlc)) {
+src/netsurf/cos_netsurf_browser.h:23:void cos_netsurf_browser_notify_dom_mutation(void);
+src/third_party/quickjs/quickjs.h:446:/* JS_Eval() flags */
+src/third_party/quickjs/quickjs.h:457:   with JS_EvalFunction(). */
+src/third_party/quickjs/quickjs.h:461:/* allow top-level await in normal script. JS_Eval() returns a
+src/third_party/quickjs/quickjs.h:1035:JS_EXTERN JSValue JS_Eval(JSContext *ctx, const char *input, size_t input_len,
+src/third_party/quickjs/quickjs.h:1037:JS_EXTERN JSValue JS_Eval2(JSContext *ctx, const char *input, size_t input_len,
+src/third_party/quickjs/quickjs.h:1039:JS_EXTERN JSValue JS_EvalThis(JSContext *ctx, JSValueConst this_obj,
+src/third_party/quickjs/quickjs.h:1042:JS_EXTERN JSValue JS_EvalThis2(JSContext *ctx, JSValueConst this_obj,
+src/third_party/quickjs/quickjs.h:1265:JS_EXTERN JSValue JS_EvalFunction(JSContext *ctx, JSValue fun_obj);
+src/third_party/quickjs/quickjs.c:1293:static JSValue JS_EvalObject(JSContext *ctx, JSValueConst this_obj,
+src/third_party/quickjs/quickjs.c:1472:static JSValue JS_EvalInternal(JSContext *ctx, JSValueConst this_obj,
+src/third_party/quickjs/quickjs.c:9007:    fun = JS_EvalFunction(ctx, obj);
+src/third_party/quickjs/quickjs.c:18750:                    ret_val = JS_EvalObject(ctx, JS_UNDEFINED, obj,
+src/third_party/quickjs/quickjs.c:18784:                    ret_val = JS_EvalObject(ctx, JS_UNDEFINED, obj,
+src/third_party/quickjs/quickjs.c:31368:           the module was loaded with JS_EvalBinary() */
+src/third_party/quickjs/quickjs.c:31862:    evaluate_promise = JS_EvalFunction(ctx, func_obj);
+src/third_party/quickjs/quickjs.c:38106:static JSValue JS_EvalFunctionInternal(JSContext *ctx, JSValue fun_obj,
+src/third_party/quickjs/quickjs.c:38138:JSValue JS_EvalFunction(JSContext *ctx, JSValue fun_obj)
+src/third_party/quickjs/quickjs.c:38140:    return JS_EvalFunctionInternal(ctx, fun_obj, ctx->global_obj, NULL, NULL);
+src/third_party/quickjs/quickjs.c:38147:static JSValue __JS_EvalInternal(JSContext *ctx, JSValueConst this_obj,
+src/third_party/quickjs/quickjs.c:38251:        ret_val = JS_EvalFunctionInternal(ctx, fun_obj, this_obj, var_refs, sf);
+src/third_party/quickjs/quickjs.c:38264:static JSValue JS_EvalInternal(JSContext *ctx, JSValueConst this_obj,
+src/third_party/quickjs/quickjs.c:38281:static JSValue JS_EvalObject(JSContext *ctx, JSValueConst this_obj,
+src/third_party/quickjs/quickjs.c:38293:    ret = JS_EvalInternal(ctx, this_obj, str, len, "<input>", 1, flags, scope_idx);
+src/third_party/quickjs/quickjs.c:38299:JSValue JS_EvalThis(JSContext *ctx, JSValueConst this_obj,
+src/third_party/quickjs/quickjs.c:38309:    return JS_EvalThis2(ctx, this_obj, input, input_len, &options);
+src/third_party/quickjs/quickjs.c:38312:JSValue JS_EvalThis2(JSContext *ctx, JSValueConst this_obj,
+src/third_party/quickjs/quickjs.c:38332:    ret = JS_EvalInternal(ctx, this_obj, input, input_len, filename, line,
+src/third_party/quickjs/quickjs.c:38337:JSValue JS_Eval(JSContext *ctx, const char *input, size_t input_len,
+src/third_party/quickjs/quickjs.c:38346:    return JS_EvalThis2(ctx, ctx->global_obj, input, input_len, &options);
+src/third_party/quickjs/quickjs.c:38349:JSValue JS_Eval2(JSContext *ctx, const char *input, size_t input_len, JSEvalOptions *options)
+src/third_party/quickjs/quickjs.c:38351:    return JS_EvalThis2(ctx, ctx->global_obj, input, input_len, options);
+src/third_party/quickjs/quickjs.c:41014:    return JS_EvalObject(ctx, ctx->global_obj, argv[0], JS_EVAL_TYPE_INDIRECT, -1);
+src/third_party/quickjs/quickjs.c:42386:    obj = JS_EvalObject(ctx, ctx->global_obj, s, JS_EVAL_TYPE_INDIRECT, -1);
+src/third_party/quickjs/quickjs.c:58092:    ctx->eval_internal = __JS_EvalInternal;
+src/third_party/quickjs/quickjs.c:63153:    /* filename is UTF-8 encoded if needed (original argument to __JS_EvalInternal()) */
+src/third_party/quickjs/quickjs.c:64463:    val = __JS_EvalInternal(ctx, JS_UNDEFINED, input, input_len, "<unnamed>", 1,
+src/third_party/quickjs/quickjs_port.h:101:void cos_js_pump_pending_jobs(void);
+src/third_party/quickjs/quickjs_port.c:64:extern void cos_netsurf_browser_notify_dom_mutation(void);
+src/third_party/quickjs/quickjs_port.c:70:    cos_netsurf_browser_notify_dom_mutation();
+src/third_party/quickjs/quickjs_port.c:2064:void cos_js_pump_pending_jobs(void)
+src/third_party/quickjs/quickjs_port.c:2850: * callers still own freeing the JSValue they got from JS_Eval. */
+src/third_party/quickjs/quickjs_port.c:2875:    JSValue result = JS_Eval(ctx, script, strlen(script), filename ? filename : "<eval>",
+src/third_party/quickjs/quickjs_port.c:2893:    JSValue result = JS_Eval(ctx, script, script_len, filename ? filename : "<script>",
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/html.c:479:bool html_rebuild_layout_after_dom_mutation(html_content *htmlc)
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/private.h:249:bool html_rebuild_layout_after_dom_mutation(html_content *htmlc);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/javascript/quickjs/quickjs.c:270:    serial_puts("[NetSurf/QuickJS] executing page script bytes=");
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/javascript/quickjs/quickjs.c:277:         * than executed synchronously by JS_Eval.  Drain a bounded batch so a
+src/gui/core/gui_lifecycle.c:451:    cos_js_pump_pending_jobs();
+--- benchmark assets ---
+validation/2026-08-27_smp_gui_google_performance_plan.md
+validation/autostart_browser_file_quickjs_smp2_launcher.log
+validation/browser/local_quickjs_file_module.js
+validation/browser/local_quickjs_file_selftest.html
+validation/browser/performance_design_2026-08-26.md
+validation/browser/performance_regression_2026-08-26.md
+validation/browser/quickjs_dom_css_performance_selftest.html
+validation/browser/quickjs_dom_storage_selftest.html
+validation/browser/quickjs_netsurf_attachment_compat_audit_2026-08-26.md
+validation/browser_benchmark_instrumentation_inventory.txt
+validation/browser_perf_final_smp/smp2.debug.log
+validation/browser_perf_final_smp/smp2.launcher.log
+validation/browser_perf_final_smp/smp2.serial.log
+validation/browser_perf_final_smp/smp4.debug.log
+validation/browser_perf_final_smp/smp4.launcher.log
+validation/browser_perf_final_smp/smp4.serial.log
+validation/browser_perf_final_smp/smp8.debug.log
+validation/browser_perf_final_smp/smp8.launcher.log
+validation/browser_perf_final_smp/smp8.serial.log
+validation/browser_perf_smp/smp2.debug.log
+validation/browser_perf_smp/smp2.launcher.log
+validation/browser_perf_smp/smp2.serial.log
+validation/browser_perf_smp/smp4.debug.log
+validation/browser_perf_smp/smp4.launcher.log
+validation/browser_perf_smp/smp4.serial.log
+validation/browser_perf_smp/smp8.debug.log
+validation/browser_perf_smp/smp8.launcher.log
+validation/browser_perf_smp/smp8.serial.log
+validation/browser_perf_storage.img
+validation/dual_storage_local_file_quickjs_smp2_launcher.log
+validation/external_web/google_home_host_snapshot.html
+validation/external_web/google_inline_scripts_excerpt.txt
+validation/fat32_legacy_ide_quickjs_smp2_launcher.log
+validation/fat32_local_file_quickjs_smp2_launcher.log
+validation/file_ui_fixed_quickjs_selftest_smp2_launcher.log
+validation/google_external_capture.qmp.log
+validation/google_external_smp2_launcher.log
+validation/google_external_smp4_launcher.log
+validation/google_external_smp4_summary.log
+validation/google_location_api_fix_smp2_launcher.log
+validation/google_location_api_fix_smp2_summary.log
+validation/google_search_input.qmp.log
+validation/google_smp4_usb2_mouse_launcher.log
+validation/google_smp4_usb2_mouse_summary.log
+validation/local_file_quickjs_smp2_serial.log
+validation/local_quickjs_storage.img
+validation/qmp_file_quickjs_body_pass_reply.log
+validation/qmp_file_quickjs_pass_screendump_reply.log
+validation/qmp_file_quickjs_selftest_screendump_reply.log
+validation/qmp_file_quickjs_storage_pass_reply.log
+validation/qmp_google_mouse_calibrate.log
+validation/secureboot_smp2_file_quickjs_body_pass.png
+validation/secureboot_smp2_file_quickjs_body_pass.ppm
+validation/secureboot_smp2_file_quickjs_pass.png
+validation/secureboot_smp2_file_quickjs_pass.ppm
+validation/secureboot_smp2_file_quickjs_selftest.png
+validation/secureboot_smp2_file_quickjs_selftest.ppm
+validation/secureboot_smp2_file_quickjs_storage_pass.png
+validation/secureboot_smp2_file_quickjs_storage_pass.ppm
+validation/secureboot_smp2_file_quickjs_ui_fixed.png
+validation/secureboot_smp2_file_quickjs_ui_fixed.ppm
+validation/secureboot_smp2_google_external_http2.png
+validation/secureboot_smp2_google_external_http2.ppm
+validation/secureboot_smp2_google_search_text_input.png
+validation/secureboot_smp2_google_search_text_input.ppm
+validation/secureboot_smp2_quickjs_document_title.png
+validation/secureboot_smp2_quickjs_document_title.ppm
+validation/secureboot_smp2_quickjs_title_bridge.png
+validation/secureboot_smp2_quickjs_title_bridge.ppm
+validation/secureboot_smp4_google_mouse_calibrated.png
+validation/secureboot_smp4_google_mouse_calibrated.ppm
+validation/secureboot_smp4_google_tiled_present.png
+validation/secureboot_smp4_google_tiled_present.ppm
+validation/smp4_tiled_vga_google_capture.qmp.log
+validation/smp4_tiled_vga_google_launcher.log
+validation/smp4_tiled_vga_google_summary.log
+validation/title_bridge_quickjs_selftest_smp2_launcher.log

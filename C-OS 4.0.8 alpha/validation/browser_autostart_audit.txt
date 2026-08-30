@@ -1,0 +1,136 @@
+--- WIN_BROWSER references ---
+src/netsurf/cos_netsurf_tierb_stubs.c:473: * WIN_BROWSER window is a C-OS GUI window, not this) - see
+src/gui/apps/browser/gui_apps_browser.c:2969:    if (w->kind != WIN_BROWSER || !w->visible || w->minimized) return;
+src/gui/apps/browser/gui_apps_browser.c:2984:    if (w->kind != WIN_BROWSER || !w->visible || w->minimized) return;
+src/gui/apps/common/gui_apps_common.c:357:        int ex = gui_find_window(WIN_BROWSER);
+src/gui/apps/common/gui_apps_common.c:359:            gui_open_window(WIN_BROWSER, gui_text("NetSurf 3.11", "NetSurf 3.11"), 180, 160, 1040, 700);
+src/gui/apps/common/gui_apps_common.c:360:            ex = gui_find_window(WIN_BROWSER);
+src/gui/apps/common/gui_apps_common.c:384:        case WIN_BROWSER: return gui_text("NetSurf", "NetSurf");
+src/gui/apps/core/gui_apps_core.c:566:    desktop_icons[desktop_icon_count++] = (desktop_icon_t){x, y, "NetSurf",    "", WIN_BROWSER,    false, 0, false, false};
+src/gui/apps/core/gui_apps_core.c:608:        case WIN_BROWSER: return gui_text("NetSurf 3.11", "NetSurf 3.11");
+src/gui/apps/core/gui_apps_core.c:649:        if (strcmp(name, gui_text("NetSurf", "NetSurf")) == 0 && desktop_icons[i].win_kind == WIN_BROWSER) return i;
+src/gui/apps/core/gui_apps_core.c:841:    if (strstr(probe, "Browser") || strstr(probe, "NetSurf") || strstr(probe, "ブラウザ")) return WIN_BROWSER;
+src/gui/apps/core/gui_apps_core.c:1310:        int ex = gui_find_window(WIN_BROWSER);
+src/gui/apps/core/gui_apps_core.c:1312:            gui_open_window(WIN_BROWSER, gui_text("NetSurf 3.11", "NetSurf 3.11"), 180, 160, 1040, 700);
+src/gui/apps/core/gui_apps_core.c:1313:            ex = gui_find_window(WIN_BROWSER);
+src/gui/core/gui_render_loop.c:115:        else if (w->kind == WIN_BROWSER)    draw_browser_app(i);
+src/gui/core/gui_render_loop.c:308:    if (kind == WIN_BROWSER) {
+src/gui/core/gui_lifecycle.c:461:        (void)gui_open_window(WIN_BROWSER, "NetSurf file:// self-test", 90, 70, 820, 600);
+src/gui/core/gui_lifecycle.c:537:                } else if (w->kind == WIN_BROWSER) {
+src/gui/core/window/gui_menus.c:397:    { START_ENTRY_APP, WIN_BROWSER,      "NetSurf",         "NetSurf" },
+src/gui/core/window/gui_menus.c:534:        case WIN_BROWSER: return 15;
+src/gui/core/window/gui_menus.c:646:        case WIN_BROWSER:      gui_open_window(WIN_BROWSER, gui_text("NetSurf", "NetSurf"), 96, 64, 1160, 760); break;
+src/gui/core/window/gui_menus.c:1248:    if (menu_label_matches(sel, "NetSurf", "NetSurf")) return WIN_BROWSER;
+src/gui/core/window/gui_menus.c:1364:                        gui_open_window(WIN_BROWSER, gui_text("NetSurf", "NetSurf"), 96, 64, 1160, 760);
+src/gui/core/window/gui_menus.c:1585:                gui_open_window(WIN_BROWSER, gui_text("NetSurf", "NetSurf"), 96, 64, 1160, 760);
+src/gui/core/window/gui_settings.c:916:        gui_open_window(WIN_BROWSER, gui_text("NetSurf 3.11", "NetSurf 3.11"), 180, 160, 1040, 700);
+src/gui/core/input/gui_input.c:861:        } else if (w->kind == WIN_BROWSER) {
+src/gui/core/input/gui_input.c:1035:                int ex = gui_find_window(WIN_BROWSER);
+src/gui/core/input/gui_input.c:1040:                    gui_open_window(WIN_BROWSER, gui_text("NetSurf", "NetSurf"),
+src/gui/core/input/gui_input.c:1188:                } else if (w->kind == WIN_BROWSER) {
+src/gui/core/input/gui_input.c:1268:                if (windows[i].kind == WIN_BROWSER) {
+src/gui/core/input/gui_input.c:1478:                int existing = gui_find_window(WIN_BROWSER);
+src/gui/core/input/gui_input.c:1483:                    gui_open_window(WIN_BROWSER, gui_text("NetSurf", "NetSurf"),
+src/gui/core/output/gui_desktop_render.c:198:        case WIN_BROWSER:         top = rgb(94, 162, 238);  bot = rgb(34, 111, 199);  break;
+src/gui/core/output/gui_desktop_render.c:638:        case WIN_BROWSER:         gui_glyph_browser(x, y, size, badge);  break;
+src/gui/core/output/gui_desktop_render.c:704:        case 15: gui_draw_app_icon(WIN_BROWSER,     x, y, 16, hov); return;
+src/gui/core/output/gui_taskbar_frame.c:234:     * WIN_BROWSER opens the NetSurf window (gui_apps_browser.c) which
+src/gui/core/output/gui_taskbar_frame.c:237:        { WIN_BROWSER },
+src/kernel/api/cos_api.c:186:        case COS_OSWIDE_APP_BROWSER:       return WIN_BROWSER;
+src/kernel/shell.c:1588:    else if (strcmp(argv[1], "browser") == 0 || strcmp(argv[1], "netsurf") == 0) { gui_open_window(WIN_BROWSER, "NetSurf", 120, 80, 1100, 760); }
+--- window restore/autostart references ---
+src/gui/apps/common/gui_apps_common.c:267:    gui_restore_window(ex);
+src/gui/apps/common/gui_apps_common.c:294:    gui_restore_window(ex);
+src/gui/apps/common/gui_apps_common.c:364:            gui_restore_window(ex);
+src/gui/apps/settings/gui_apps_settings.c:122:    "startup autostart boot launch login",
+src/gui/apps/settings/gui_apps_settings.c:448:            settings_draw_toggle_button(cont_x + 18, iy, 210, 32, gui_get_autostart_terminal(), "Terminal autostart: On", "Terminal autostart: Off"); iy += 46;
+src/gui/apps/settings/gui_apps_settings.c:449:            settings_draw_toggle_button(cont_x + 18, iy, 230, 32, gui_get_autostart_file_manager(), "File Manager autostart: On", "File Manager autostart: Off"); iy += 46;
+src/gui/apps/settings/gui_apps_settings.c:450:            settings_draw_toggle_button(cont_x + 18, iy, 220, 32, gui_get_autostart_browser(), "Browser autostart: On", "Browser autostart: Off");
+src/gui/apps/settings/gui_apps_settings.c:707:                gui_set_autostart_terminal(!gui_get_autostart_terminal());
+src/gui/apps/settings/gui_apps_settings.c:708:                gui_notify(gui_get_autostart_terminal() ? "Terminal autostart enabled" : "Terminal autostart disabled", 1500);
+src/gui/apps/settings/gui_apps_settings.c:712:                gui_set_autostart_file_manager(!gui_get_autostart_file_manager());
+src/gui/apps/settings/gui_apps_settings.c:713:                gui_notify(gui_get_autostart_file_manager() ? "File Manager autostart enabled" : "File Manager autostart disabled", 1500);
+src/gui/apps/settings/gui_apps_settings.c:717:                gui_set_autostart_browser(!gui_get_autostart_browser());
+src/gui/apps/settings/gui_apps_settings.c:718:                gui_notify(gui_get_autostart_browser() ? "Browser autostart enabled" : "Browser autostart disabled", 1500);
+src/gui/apps/core/gui_apps_core.c:132:static void gui_snapshot_save_browser(const window_t* w);
+src/gui/apps/core/gui_apps_core.c:133:static bool gui_snapshot_load_browser(window_t* w);
+src/gui/apps/core/gui_apps_core.c:467:static void gui_snapshot_save_browser(const window_t* w) {
+src/gui/apps/core/gui_apps_core.c:486:static bool gui_snapshot_load_browser(window_t* w) {
+src/gui/apps/core/gui_apps_core.c:507:bool gui_save_window_state_snapshot(const window_t* w) {
+src/gui/apps/core/gui_apps_core.c:521:bool gui_load_window_state_snapshot(window_t* w) {
+src/gui/apps/core/gui_apps_core.c:1317:            gui_restore_window(ex);
+src/gui/core/gui_render_loop.c:367:    (void)gui_save_window_state_snapshot(&windows[idx]);
+src/gui/core/gui_render_loop.c:412:    (void)gui_save_window_state_snapshot(&windows[idx]);
+src/gui/core/gui_render_loop.c:418:        windows[idx].restore_x = windows[idx].x;
+src/gui/core/gui_render_loop.c:419:        windows[idx].restore_y = windows[idx].y;
+src/gui/core/gui_render_loop.c:420:        windows[idx].restore_w = windows[idx].w;
+src/gui/core/gui_render_loop.c:421:        windows[idx].restore_h = windows[idx].h;
+src/gui/core/gui_render_loop.c:427:        (void)gui_save_window_state_snapshot(&windows[idx]);
+src/gui/core/gui_render_loop.c:431:void gui_restore_window(int idx) {
+src/gui/core/gui_render_loop.c:434:        windows[idx].x = windows[idx].restore_x;
+src/gui/core/gui_render_loop.c:435:        windows[idx].y = windows[idx].restore_y;
+src/gui/core/gui_render_loop.c:436:        windows[idx].w = windows[idx].restore_w;
+src/gui/core/gui_render_loop.c:437:        windows[idx].h = windows[idx].restore_h;
+src/gui/core/gui_render_loop.c:441:    (void)gui_save_window_state_snapshot(&windows[idx]);
+src/gui/core/gui_lifecycle.c:112:extern bool gui_load_window_state_snapshot(window_t* w);
+src/gui/core/gui_lifecycle.c:113:extern bool gui_save_window_state_snapshot(const window_t* w);
+src/gui/core/gui_lifecycle.c:657:     * font scale, wallpaper, mouse sensitivity, autostart apps, ...)
+src/gui/core/window/gui_windows.c:1557:    gui_restore_window(ex);
+src/gui/core/window/gui_menus.c:672:        gui_restore_window(existing);
+src/gui/core/window/gui_menus.c:1183:    gui_restore_window(idx);
+src/gui/core/window/gui_menus.c:1448:                            gui_restore_window(ctx_menu.target_window);
+src/gui/core/window/gui_menus.c:1456:                            gui_restore_window(ctx_menu.target_window);
+src/gui/core/window/gui_menus.c:1641:                gui_restore_window(ctx_menu.target_window);
+src/gui/core/window/gui_settings.c:56:static bool gui_autostart_terminal = false;
+src/gui/core/window/gui_settings.c:57:static bool gui_autostart_file_manager = false;
+src/gui/core/window/gui_settings.c:59:static bool gui_autostart_browser = true;
+src/gui/core/window/gui_settings.c:363:void gui_set_autostart_terminal(bool enabled) {
+src/gui/core/window/gui_settings.c:364:    gui_autostart_terminal = enabled ? true : false;
+src/gui/core/window/gui_settings.c:368:void gui_set_autostart_file_manager(bool enabled) {
+src/gui/core/window/gui_settings.c:369:    gui_autostart_file_manager = enabled ? true : false;
+src/gui/core/window/gui_settings.c:373:void gui_set_autostart_browser(bool enabled) {
+src/gui/core/window/gui_settings.c:374:    gui_autostart_browser = enabled ? true : false;
+src/gui/core/window/gui_settings.c:378:bool gui_get_autostart_terminal(void) { return gui_autostart_terminal; }
+src/gui/core/window/gui_settings.c:379:bool gui_get_autostart_file_manager(void) { return gui_autostart_file_manager; }
+src/gui/core/window/gui_settings.c:380:bool gui_get_autostart_browser(void) { return gui_autostart_browser; }
+src/gui/core/window/gui_settings.c:609:        gui_format_int(gui_autostart_terminal ? 1 : 0, buf, sizeof(buf));
+src/gui/core/window/gui_settings.c:610:        config_set_string("gui.autostart_terminal", buf);
+src/gui/core/window/gui_settings.c:612:        gui_format_int(gui_autostart_file_manager ? 1 : 0, buf, sizeof(buf));
+src/gui/core/window/gui_settings.c:613:        config_set_string("gui.autostart_file_manager", buf);
+src/gui/core/window/gui_settings.c:615:        gui_format_int(gui_autostart_browser ? 1 : 0, buf, sizeof(buf));
+src/gui/core/window/gui_settings.c:616:        config_set_string("gui.autostart_browser", buf);
+src/gui/core/window/gui_settings.c:651:    const char* autostart_terminal = config_get_string("gui.autostart_terminal");
+src/gui/core/window/gui_settings.c:652:    const char* autostart_fm = config_get_string("gui.autostart_file_manager");
+src/gui/core/window/gui_settings.c:653:    const char* autostart_browser = config_get_string("gui.autostart_browser");
+src/gui/core/window/gui_settings.c:670:    int autostart_terminal_enabled = gui_parse_int_or_default(autostart_terminal, 0);
+src/gui/core/window/gui_settings.c:671:    int autostart_fm_enabled = gui_parse_int_or_default(autostart_fm, 0);
+src/gui/core/window/gui_settings.c:672:    int autostart_browser_enabled = gui_parse_int_or_default(autostart_browser, 0);
+src/gui/core/window/gui_settings.c:692:    if (autostart_terminal_enabled != 0 && autostart_terminal_enabled != 1) autostart_terminal_enabled = 0;
+src/gui/core/window/gui_settings.c:693:    if (autostart_fm_enabled != 0 && autostart_fm_enabled != 1) autostart_fm_enabled = 0;
+src/gui/core/window/gui_settings.c:694:    if (autostart_browser_enabled != 0 && autostart_browser_enabled != 1) autostart_browser_enabled = 0;
+src/gui/core/window/gui_settings.c:716:    gui_autostart_terminal = autostart_terminal_enabled ? true : false;
+src/gui/core/window/gui_settings.c:717:    gui_autostart_file_manager = autostart_fm_enabled ? true : false;
+src/gui/core/window/gui_settings.c:718:    gui_autostart_browser = autostart_browser_enabled ? true : false;
+src/gui/core/window/gui_settings.c:721:     * autostart lifecycle so the storage-backed file: document exercises the
+src/gui/core/window/gui_settings.c:723:    gui_autostart_browser = true;
+src/gui/core/window/gui_settings.c:908:void gui_launch_autostart_apps(void) {
+src/gui/core/window/gui_settings.c:909:    if (gui_autostart_terminal) {
+src/gui/core/window/gui_settings.c:912:    if (gui_autostart_file_manager) {
+src/gui/core/window/gui_settings.c:915:    if (gui_autostart_browser) {
+src/gui/core/input/gui_input.c:277:static void text_editor_maybe_snapshot(window_t* w) {
+src/gui/core/input/gui_input.c:1024:        // Taskbar window buttons: click to restore/focus minimized windows
+src/gui/core/input/gui_input.c:1292:            (void)gui_save_window_state_snapshot(&windows[active_window]);
+src/gui/core/input/gui_input.c:1523:                    if (windows[target].minimized) gui_restore_window(target);
+src/gui/core/output/gui_taskbar_frame.c:348:        if (w->maximized) gui_restore_window(idx);
+src/kernel/settings_manager.c:42:    uint32_t default_window_x;
+src/kernel/settings_manager.c:43:    uint32_t default_window_y;
+src/kernel/settings_manager.c:44:    uint32_t default_window_w;
+src/kernel/settings_manager.c:45:    uint32_t default_window_h;
+src/kernel/settings_manager.c:107:    g_settings.default_window_x = 100;
+src/kernel/settings_manager.c:108:    g_settings.default_window_y = 100;
+src/kernel/settings_manager.c:109:    g_settings.default_window_w = 640;
+src/kernel/settings_manager.c:110:    g_settings.default_window_h = 480;
+src/kernel/shell.c:905:        const char* keys[] = {"system.name", "system.version", "system.architecture", "system.hostname", "system.timezone", "system.volume", "display.font_resolution", "display.resolution", "gui.theme_idx", "gui.wallpaper_idx", "gui.dark_mode", "gui.font_scale", "gui.window_animations", "gui.notifications_enabled", "gui.terminal_autoscroll", "gui.autostart_terminal", "gui.autostart_file_manager", "gui.autostart_browser", "gui.language", "keyboard.layout", "debug.enabled"};
+src/apps/config_manager.c:367:    if (!config_find_entry("gui.autostart_terminal")) config_add_entry("gui.autostart_terminal", "0", true);
+src/apps/config_manager.c:368:    if (!config_find_entry("gui.autostart_file_manager")) config_add_entry("gui.autostart_file_manager", "0", true);
+src/apps/config_manager.c:369:    if (!config_find_entry("gui.autostart_browser")) config_add_entry("gui.autostart_browser", "0", true);

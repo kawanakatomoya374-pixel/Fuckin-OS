@@ -1,0 +1,419 @@
+--- gfx_blit definitions ---
+src/gui/core/gui_render_loop.c:66:    gfx_blit(&dst, cx + 1, cy + 1, &shadow_surf, 0, 0, 12, 18, GFX_BLIT_COLORKEY, TRANSPARENT);
+src/gui/core/gui_render_loop.c:67:    gfx_blit(&dst, cx, cy, &main_surf, 0, 0, 12, 18, GFX_BLIT_COLORKEY, TRANSPARENT);
+src/drivers/video/gfx_blit.h:74:void gfx_blit(gfx_surface_t* dst, int dx, int dy,
+src/drivers/video/gfx_blit.h:83:void gfx_blit_fill(gfx_surface_t* dst, int x, int y, int w, int h, uint32_t color);
+src/drivers/video/gfx_blit.h:92:void gfx_blit_scaled(gfx_surface_t* dst, int dx, int dy, int dw, int dh,
+src/drivers/video/gfx_blit.h:105:void gfx_blit_bitmap1(gfx_surface_t* dst, int dx, int dy,
+src/drivers/video/gfx_blit.c:59:extern void gfx_blit_avx2_copy_row(uint32_t* dst, const uint32_t* src, int count);
+src/drivers/video/gfx_blit.c:61:void gfx_blit(gfx_surface_t* dst, int dx, int dy,
+src/drivers/video/gfx_blit.c:93:void gfx_blit_fill(gfx_surface_t* dst, int x, int y, int w, int h, uint32_t color) {
+src/drivers/video/gfx_blit.c:102:void gfx_blit_scaled(gfx_surface_t* dst, int dx, int dy, int dw, int dh,
+src/drivers/video/gfx_blit.c:144:void gfx_blit_bitmap1(gfx_surface_t* dst, int dx, int dy,
+src/drivers/video/gfx_blit_avx2.c:3: * gfx_blit()'s GFX_BLIT_COPY path (the memcpy-per-row that backs
+src/drivers/video/gfx_blit_avx2.c:71:static void gfx_blit_avx2_probe(void) {
+src/drivers/video/gfx_blit_avx2.c:116:void gfx_blit_avx2_copy_row(uint32_t* dst, const uint32_t* src, int count) {
+src/drivers/video/vga.c:308:         * instead of going through gfx_blit(). */
+src/drivers/video/vga.c:335:    gfx_blit(&fb_surface, 0, 0, &bb_surface, 0, 0, (int)SCREEN_W, (int)SCREEN_H, GFX_BLIT_COPY, 0);
+src/drivers/video/vga.c:369:    gfx_blit(&fb_surface, x, y, &bb_surface, x, y, w, h, GFX_BLIT_COPY, 0);
+src/drivers/video/vga.c:378:        gfx_blit_fill(&bb, 0, 0, (int)SCREEN_W, (int)SCREEN_H, (uint32_t)color);
+src/drivers/video/vga.c:426:        gfx_blit_fill(&bb, x, y, w, h, (uint32_t)color);
+src/drivers/video/vga.c:456:    gfx_blit(&dst, dx, dy, &src, sx, sy, w, h, GFX_BLIT_COPY, 0);
+src/drivers/video/vga.c:467:    gfx_blit(&dst, dx, dy, &src, 0, 0, w, h, GFX_BLIT_COPY, 0);
+src/drivers/video/vga.c:804:        gfx_blit(&dst, x, y + row, &src_row, 0, 0, width, 1, GFX_BLIT_COPY, 0);
+src/apps/jpeg_viewer.c:1041:    gfx_blit(&dst, 0, 0, &src, 0, 0, (int)w, (int)h, GFX_BLIT_COPY, 0);
+--- SIMD / CPUID support ---
+src/netsurf/cos_netsurf_adapter.c:478:static inline __m128i cos_ns_bgra_to_xrgb4_sse2(__m128i in)
+src/netsurf/cos_netsurf_adapter.c:483:__attribute__((target("avx2")))
+src/netsurf/cos_netsurf_adapter.c:484:static void cos_ns_bgra_to_xrgb_avx2(uint32_t *dst, const uint32_t *src, int count)
+src/netsurf/cos_netsurf_adapter.c:487:    const __m256i mask = _mm256_set1_epi32(0x00ffffff);
+src/netsurf/cos_netsurf_adapter.c:489:        __m256i in = _mm256_loadu_si256((const __m256i *)(src + i));
+src/netsurf/cos_netsurf_adapter.c:490:        _mm256_storeu_si256((__m256i *)(dst + i), _mm256_and_si256(in, mask));
+src/netsurf/cos_netsurf_adapter.c:496:static void cos_ns_bgra_to_xrgb_sse2(uint32_t *dst, const uint32_t *src, int count)
+src/netsurf/cos_netsurf_adapter.c:500:        __m128i in = _mm_loadu_si128((const __m128i *)(src + i));
+src/netsurf/cos_netsurf_adapter.c:501:        _mm_storeu_si128((__m128i *)(dst + i), cos_ns_bgra_to_xrgb4_sse2(in));
+src/netsurf/cos_netsurf_adapter.c:520:extern bool gfx_blit_avx2_available(void);
+src/netsurf/cos_netsurf_adapter.c:541:        bool use_avx2 = gfx_blit_avx2_available();
+src/netsurf/cos_netsurf_adapter.c:546:            if (use_avx2) cos_ns_bgra_to_xrgb_avx2(dst, src, visible_w);
+src/netsurf/cos_netsurf_adapter.c:547:            else cos_ns_bgra_to_xrgb_sse2(dst, src, visible_w);
+src/drivers/video/gfx_blit.c:51:/* Implemented in gfx_blit_avx2.c, isolated behind function-level
+src/drivers/video/gfx_blit.c:52: * target("avx2") attributes there (not a global -mavx2 build flag),
+src/drivers/video/gfx_blit.c:55: * call gfx_blit_avx2_available() unconditionally; it only ever
+src/drivers/video/gfx_blit.c:58:extern bool gfx_blit_avx2_available(void);
+src/drivers/video/gfx_blit.c:59:extern void gfx_blit_avx2_copy_row(uint32_t* dst, const uint32_t* src, int count);
+src/drivers/video/gfx_blit.c:67:    bool use_avx2 = (mode == GFX_BLIT_COPY) && gfx_blit_avx2_available();
+src/drivers/video/gfx_blit.c:79:            if (use_avx2) {
+src/drivers/video/gfx_blit.c:80:                gfx_blit_avx2_copy_row(drow, srow, w);
+src/drivers/video/gfx_blit_avx2.c:2: * gfx_blit_avx2.c - optional AVX2-accelerated row copy for
+src/drivers/video/gfx_blit_avx2.c:9: * __attribute__((target("avx2"))), so *only* those functions ever
+src/drivers/video/gfx_blit_avx2.c:12: * did before this file existed - no -mavx2 is added to the project's
+src/drivers/video/gfx_blit_avx2.c:16: * Nothing in this file may run before gfx_blit_avx2_available() has
+src/drivers/video/gfx_blit_avx2.c:19: * OSXMMEXCPT) but never touches CR4.OSXSAVE or XCR0. Executing any
+src/drivers/video/gfx_blit_avx2.c:20: * VEX-encoded instruction before OSXSAVE/XCR0 are enabled is a
+src/drivers/video/gfx_blit_avx2.c:23: * hardware is capable of. gfx_blit_avx2_probe() below performs and
+src/drivers/video/gfx_blit_avx2.c:37:} gfx_avx2_state_t;
+src/drivers/video/gfx_blit_avx2.c:39:static gfx_avx2_state_t g_avx2_state = GFX_AVX2_UNPROBED;
+src/drivers/video/gfx_blit_avx2.c:41:static inline uint64_t gfx_xgetbv0(void) {
+src/drivers/video/gfx_blit_avx2.c:43:    __asm__ volatile(".byte 0x0f, 0x01, 0xd0" /* xgetbv, ecx=0 selects XCR0 */
+src/drivers/video/gfx_blit_avx2.c:51:    __asm__ volatile(".byte 0x0f, 0x01, 0xd1" /* xsetbv, ecx=0 selects XCR0 */
+src/drivers/video/gfx_blit_avx2.c:68: * from gfx_blit_avx2_available() on first use rather than from
+src/drivers/video/gfx_blit_avx2.c:71:static void gfx_blit_avx2_probe(void) {
+src/drivers/video/gfx_blit_avx2.c:72:    if (g_avx2_state != GFX_AVX2_UNPROBED) return;
+src/drivers/video/gfx_blit_avx2.c:73:    g_avx2_state = GFX_AVX2_UNAVAILABLE; /* pessimistic until proven otherwise */
+src/drivers/video/gfx_blit_avx2.c:83:    if (!__get_cpuid_count(7, 0, &eax, &ebx, &ecx, &edx)) return;
+src/drivers/video/gfx_blit_avx2.c:99:    gfx_xsetbv0(0x7); /* enable x87 + SSE + AVX state in XCR0 */
+src/drivers/video/gfx_blit_avx2.c:100:    if ((gfx_xgetbv0() & 0x7) != 0x7) return; /* didn't take - stay disabled */
+src/drivers/video/gfx_blit_avx2.c:102:    g_avx2_state = GFX_AVX2_AVAILABLE;
+src/drivers/video/gfx_blit_avx2.c:105:bool gfx_blit_avx2_available(void) {
+src/drivers/video/gfx_blit_avx2.c:106:    gfx_blit_avx2_probe();
+src/drivers/video/gfx_blit_avx2.c:107:    return g_avx2_state == GFX_AVX2_AVAILABLE;
+src/drivers/video/gfx_blit_avx2.c:113: * after gfx_blit_avx2_available() has returned true - see the file
+src/drivers/video/gfx_blit_avx2.c:115:__attribute__((target("avx2")))
+src/drivers/video/gfx_blit_avx2.c:116:void gfx_blit_avx2_copy_row(uint32_t* dst, const uint32_t* src, int count) {
+src/drivers/video/gfx_blit_avx2.c:119:        __m256i chunk = _mm256_loadu_si256((const __m256i*)(src + i));
+src/drivers/video/gfx_blit_avx2.c:120:        _mm256_storeu_si256((__m256i*)(dst + i), chunk);
+src/drivers/video/gfx_blit_avx2.c:124:     * legacy SSE (this kernel's default -msse2 float codegen) - skips
+src/third_party/openssl/crypto/bn/rsaz_exp.h:26:void RSAZ_1024_mod_exp_avx2(BN_ULONG result[16],
+src/third_party/openssl/crypto/bn/rsaz_exp.h:31:int rsaz_avx2_eligible(void);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:24: * See crypto/bn/asm/rsaz-avx2.pl for further details.
+src/third_party/openssl/crypto/bn/rsaz_exp.c:26:void rsaz_1024_norm2red_avx2(void *red, const void *norm);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:27:void rsaz_1024_mul_avx2(void *ret, const void *a, const void *b,
+src/third_party/openssl/crypto/bn/rsaz_exp.c:29:void rsaz_1024_sqr_avx2(void *ret, const void *a, const void *n, BN_ULONG k,
+src/third_party/openssl/crypto/bn/rsaz_exp.c:31:void rsaz_1024_scatter5_avx2(void *tbl, const void *val, int i);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:32:void rsaz_1024_gather5_avx2(void *val, const void *tbl, int i);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:33:void rsaz_1024_red2norm_avx2(void *norm, const void *red);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:49:void RSAZ_1024_mod_exp_avx2(BN_ULONG result_norm[16],
+src/third_party/openssl/crypto/bn/rsaz_exp.c:74:    rsaz_1024_norm2red_avx2(m, m_norm);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:75:    rsaz_1024_norm2red_avx2(a_inv, base_norm);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:76:    rsaz_1024_norm2red_avx2(R2, RR);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:78:    rsaz_1024_mul_avx2(R2, R2, R2, m, k0);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:79:    rsaz_1024_mul_avx2(R2, R2, two80, m, k0);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:82:    rsaz_1024_mul_avx2(result, R2, one, m, k0);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:84:    rsaz_1024_mul_avx2(a_inv, a_inv, R2, m, k0);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:86:    rsaz_1024_scatter5_avx2(table_s, result, 0);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:87:    rsaz_1024_scatter5_avx2(table_s, a_inv, 1);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:90:    rsaz_1024_sqr_avx2(result, a_inv, m, k0, 1);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:91:    rsaz_1024_scatter5_avx2(table_s, result, 2);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:95:        rsaz_1024_mul_avx2(result, result, a_inv, m, k0);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:96:        rsaz_1024_scatter5_avx2(table_s, result, index);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:100:    rsaz_1024_sqr_avx2(result, result, m, k0, 1);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:101:    rsaz_1024_scatter5_avx2(table_s, result, 4);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:103:    rsaz_1024_sqr_avx2(result, result, m, k0, 1);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:104:    rsaz_1024_scatter5_avx2(table_s, result, 8);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:106:    rsaz_1024_sqr_avx2(result, result, m, k0, 1);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:107:    rsaz_1024_scatter5_avx2(table_s, result, 16);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:109:    rsaz_1024_mul_avx2(result, result, a_inv, m, k0);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:110:    rsaz_1024_scatter5_avx2(table_s, result, 17);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:113:    rsaz_1024_gather5_avx2(result, table_s, 2);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:114:    rsaz_1024_mul_avx2(result, result, a_inv, m, k0);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:115:    rsaz_1024_scatter5_avx2(table_s, result, 3);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:117:    rsaz_1024_sqr_avx2(result, result, m, k0, 1);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:118:    rsaz_1024_scatter5_avx2(table_s, result, 6);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:120:    rsaz_1024_sqr_avx2(result, result, m, k0, 1);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:121:    rsaz_1024_scatter5_avx2(table_s, result, 12);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:123:    rsaz_1024_sqr_avx2(result, result, m, k0, 1);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:124:    rsaz_1024_scatter5_avx2(table_s, result, 24);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:126:    rsaz_1024_mul_avx2(result, result, a_inv, m, k0);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:127:    rsaz_1024_scatter5_avx2(table_s, result, 25);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:130:    rsaz_1024_gather5_avx2(result, table_s, 4);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:131:    rsaz_1024_mul_avx2(result, result, a_inv, m, k0);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:132:    rsaz_1024_scatter5_avx2(table_s, result, 5);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:134:    rsaz_1024_sqr_avx2(result, result, m, k0, 1);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:135:    rsaz_1024_scatter5_avx2(table_s, result, 10);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:137:    rsaz_1024_sqr_avx2(result, result, m, k0, 1);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:138:    rsaz_1024_scatter5_avx2(table_s, result, 20);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:140:    rsaz_1024_mul_avx2(result, result, a_inv, m, k0);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:141:    rsaz_1024_scatter5_avx2(table_s, result, 21);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:144:    rsaz_1024_gather5_avx2(result, table_s, 6);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:145:    rsaz_1024_mul_avx2(result, result, a_inv, m, k0);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:146:    rsaz_1024_scatter5_avx2(table_s, result, 7);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:148:    rsaz_1024_sqr_avx2(result, result, m, k0, 1);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:149:    rsaz_1024_scatter5_avx2(table_s, result, 14);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:151:    rsaz_1024_sqr_avx2(result, result, m, k0, 1);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:152:    rsaz_1024_scatter5_avx2(table_s, result, 28);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:154:    rsaz_1024_mul_avx2(result, result, a_inv, m, k0);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:155:    rsaz_1024_scatter5_avx2(table_s, result, 29);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:158:    rsaz_1024_gather5_avx2(result, table_s, 8);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:159:    rsaz_1024_mul_avx2(result, result, a_inv, m, k0);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:160:    rsaz_1024_scatter5_avx2(table_s, result, 9);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:162:    rsaz_1024_sqr_avx2(result, result, m, k0, 1);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:163:    rsaz_1024_scatter5_avx2(table_s, result, 18);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:165:    rsaz_1024_mul_avx2(result, result, a_inv, m, k0);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:166:    rsaz_1024_scatter5_avx2(table_s, result, 19);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:169:    rsaz_1024_gather5_avx2(result, table_s, 10);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:170:    rsaz_1024_mul_avx2(result, result, a_inv, m, k0);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:171:    rsaz_1024_scatter5_avx2(table_s, result, 11);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:173:    rsaz_1024_sqr_avx2(result, result, m, k0, 1);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:174:    rsaz_1024_scatter5_avx2(table_s, result, 22);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:176:    rsaz_1024_mul_avx2(result, result, a_inv, m, k0);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:177:    rsaz_1024_scatter5_avx2(table_s, result, 23);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:180:    rsaz_1024_gather5_avx2(result, table_s, 12);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:181:    rsaz_1024_mul_avx2(result, result, a_inv, m, k0);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:182:    rsaz_1024_scatter5_avx2(table_s, result, 13);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:184:    rsaz_1024_sqr_avx2(result, result, m, k0, 1);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:185:    rsaz_1024_scatter5_avx2(table_s, result, 26);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:187:    rsaz_1024_mul_avx2(result, result, a_inv, m, k0);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:188:    rsaz_1024_scatter5_avx2(table_s, result, 27);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:191:    rsaz_1024_gather5_avx2(result, table_s, 14);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:192:    rsaz_1024_mul_avx2(result, result, a_inv, m, k0);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:193:    rsaz_1024_scatter5_avx2(table_s, result, 15);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:195:    rsaz_1024_sqr_avx2(result, result, m, k0, 1);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:196:    rsaz_1024_scatter5_avx2(table_s, result, 30);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:198:    rsaz_1024_mul_avx2(result, result, a_inv, m, k0);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:199:    rsaz_1024_scatter5_avx2(table_s, result, 31);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:205:    rsaz_1024_gather5_avx2(result, table_s, wvalue);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:211:        rsaz_1024_sqr_avx2(result, result, m, k0, 5);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:217:        rsaz_1024_gather5_avx2(a_inv, table_s, wvalue); /* borrow a_inv */
+src/third_party/openssl/crypto/bn/rsaz_exp.c:218:        rsaz_1024_mul_avx2(result, result, a_inv, m, k0);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:222:    rsaz_1024_sqr_avx2(result, result, m, k0, 4);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:226:    rsaz_1024_gather5_avx2(a_inv, table_s, wvalue); /* borrow a_inv */
+src/third_party/openssl/crypto/bn/rsaz_exp.c:227:    rsaz_1024_mul_avx2(result, result, a_inv, m, k0);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:230:    rsaz_1024_mul_avx2(result, result, one, m, k0);
+src/third_party/openssl/crypto/bn/rsaz_exp.c:232:    rsaz_1024_red2norm_avx2(result_norm, result);
+src/third_party/openssl/crypto/bn/bn_exp.c:679:        && rsaz_avx2_eligible()) {
+src/third_party/openssl/crypto/bn/bn_exp.c:682:        RSAZ_1024_mod_exp_avx2(rr->d, a->d, p->d, m->d, mont->RR.d,
+src/third_party/openssl/crypto/ml_dsa/ml_dsa_ntt.c:17:int ml_dsa_ntt_avx2_capable(void);
+src/third_party/openssl/crypto/ml_dsa/ml_dsa_ntt.c:18:void ml_dsa_poly_ntt_avx2(uint32_t *p_coeff, const uint32_t *p_zetas);
+src/third_party/openssl/crypto/ml_dsa/ml_dsa_ntt.c:19:void ml_dsa_poly_ntt_inverse_avx2(uint32_t *p_coeff);
+src/third_party/openssl/crypto/ml_dsa/ml_dsa_ntt.c:20:void ml_dsa_poly_ntt_mult_avx2(const uint32_t *a, const uint32_t *b, uint32_t *out);
+src/third_party/openssl/crypto/ml_dsa/ml_dsa_ntt.c:213:static void poly_ntt_mult_avx2_wrapper(const POLY *lhs, const POLY *rhs,
+src/third_party/openssl/crypto/ml_dsa/ml_dsa_ntt.c:216:    ml_dsa_poly_ntt_mult_avx2(&lhs->coeff[0], &rhs->coeff[0], &out->coeff[0]);
+src/third_party/openssl/crypto/ml_dsa/ml_dsa_ntt.c:219:static void poly_ntt_avx2_wrapper(POLY *p)
+src/third_party/openssl/crypto/ml_dsa/ml_dsa_ntt.c:221:    ml_dsa_poly_ntt_avx2(&p->coeff[0], zetas_montgomery);
+src/third_party/openssl/crypto/ml_dsa/ml_dsa_ntt.c:224:static void poly_ntt_inverse_avx2_wrapper(POLY *p)
+src/third_party/openssl/crypto/ml_dsa/ml_dsa_ntt.c:226:    ml_dsa_poly_ntt_inverse_avx2(&p->coeff[0]);
+src/third_party/openssl/crypto/ml_dsa/ml_dsa_ntt.c:237:    if (ml_dsa_ntt_avx2_capable()) {
+src/third_party/openssl/crypto/ml_dsa/ml_dsa_ntt.c:238:        poly_ntt_impl = poly_ntt_avx2_wrapper;
+src/third_party/openssl/crypto/ml_dsa/ml_dsa_ntt.c:239:        poly_ntt_inverse_impl = poly_ntt_inverse_avx2_wrapper;
+src/third_party/openssl/crypto/ml_dsa/ml_dsa_ntt.c:240:        poly_ntt_mult_impl = poly_ntt_mult_avx2_wrapper;
+src/third_party/openssl/crypto/evp/encode.c:24:#include "enc_b64_avx2.h"
+src/third_party/openssl/crypto/evp/encode.c:181:        j = encode_base64_avx2(ctx,
+src/third_party/openssl/crypto/evp/encode.c:189:            j = encode_base64_avx2(ctx,
+src/third_party/openssl/crypto/evp/encode.c:247:    return (int)encode_base64_avx2(NULL, t, f, dlen, 0, &wrap_cnt);
+src/third_party/openssl/crypto/evp/encode.c:250:        return (int)encode_base64_avx2(NULL, t, f, dlen, 0, &wrap_cnt);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.h:18:size_t encode_base64_avx2(EVP_ENCODE_CTX *ctx,
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:3:#include "enc_b64_avx2.h"
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:38:    OPENSSL_TARGET_REGION("avx2")
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:52:static __m256i lookup_pshufb_std(__m256i input)
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:54:    __m256i result = _mm256_subs_epu8(input, _mm256_set1_epi8(51));
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:55:    const __m256i less = _mm256_cmpgt_epi8(_mm256_set1_epi8(26), input);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:58:    __m256i shift_LUT = _mm256_setr_epi8('a' - 26, '0' - 52, '0' - 52, '0' - 52, '0' - 52,
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:73:static ossl_inline __m256i lookup_pshufb_srp(__m256i input)
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:75:    const __m256i zero = _mm256_setzero_si256();
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:76:    const __m256i hi = _mm256_set1_epi8((char)0x80);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:77:    __m256i invalid = _mm256_or_si256(_mm256_cmpgt_epi8(zero, input),
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:80:    __m256i idx = _mm256_setzero_si256();
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:92:    const __m256i shift_LUT = _mm256_setr_epi8('0' - 0, 'A' - 10, 'a' - 36, '.' - 62, '/' - 63, 0, 0,
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:97:    __m256i shift = _mm256_shuffle_epi8(shift_LUT, idx);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:98:    __m256i ascii = _mm256_add_epi8(shift, input);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:104:static ossl_inline __m256i shift_right_zeros(__m256i v, int n)
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:146:static ossl_inline __m256i shift_left_zeros(__m256i v, int n)
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:212:static ossl_inline __m256i insert_line_feed32(__m256i input, int K)
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:214:    __m256i line_feed_vector = _mm256_set1_epi8('\n');
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:215:    __m128i identity = _mm_setr_epi8(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:218:        __m128i maskhi = _mm_loadu_si128((__m128i *)shuffle_masks[K - 16]);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:219:        __m256i mask = _mm256_set_m128i(maskhi, identity);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:220:        __m256i lf_pos = _mm256_cmpeq_epi8(mask, _mm256_set1_epi8((char)0x80));
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:221:        __m256i shuffled = _mm256_shuffle_epi8(input, mask);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:222:        __m256i result = _mm256_blendv_epi8(shuffled, line_feed_vector, lf_pos);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:227:    __m256i shift = _mm256_alignr_epi8(input, _mm256_permute2x128_si256(input, input, 0x21),
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:230:    __m128i masklo = _mm_loadu_si128((__m128i *)shuffle_masks[K]);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:231:    __m256i mask = _mm256_set_m128i(identity, masklo);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:232:    __m256i lf_pos = _mm256_cmpeq_epi8(mask, _mm256_set1_epi8((char)0x80));
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:233:    __m256i shuffled = _mm256_shuffle_epi8(input, mask);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:234:    __m256i result = _mm256_blendv_epi8(shuffled, line_feed_vector, lf_pos);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:240:static ossl_inline size_t ins_nl_gt32(__m256i v, uint8_t *out, int stride,
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:246:        _mm256_storeu_si256((__m256i *)out, v);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:253:        _mm256_storeu_si256((__m256i *)out, v);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:261:    const __m256i with_lf = insert_line_feed32(v, until_nl);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:262:    _mm256_storeu_si256((__m256i *)out, with_lf);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:271:static ossl_inline size_t insert_nl_gt16(const __m256i v0,
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:277:    _mm256_storeu_si256((__m256i *)(output), v0);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:284:    __m256i all_ff_mask = _mm256_set1_epi8((char)0xFF);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:286:    __m256i mask_second_lane = _mm256_setr_epi8(0, 0, 0, 0, 0, 0, 0, 0,
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:293:    __m256i blended_0L = v0;
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:296:        __m256i shifted_0_L = shift_left_zeros(shift_right_zeros(v0, wrap_rem),
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:298:        __m256i mask_shifted_0_L = shift_left_zeros(all_ff_mask, wrap_rem + surplus_0);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:299:        __m256i mask = _mm256_or_si256(mask_shifted_0_L, mask_second_lane);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:300:        __m256i shifted_1_L = shift_left_zeros(v0, 1);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:301:        __m256i shifted = _mm256_blendv_epi8(shifted_0_L, shifted_1_L, mask);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:304:        _mm256_storeu_si256((__m256i *)(output), blended_0L);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:314:        __m256i shifted_1_L = shift_left_zeros(shift_right_zeros(v0, wrap_rem_1),
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:316:        __m256i mask_shifted_1_L = shift_left_zeros(all_ff_mask, wrap_rem_1 + surplus_0 + surplus_1);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:317:        __m256i mask = _mm256_and_si256(mask_second_lane, mask_shifted_1_L);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:318:        __m256i blended_1L = _mm256_blendv_epi8(blended_0L, shifted_1_L, mask);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:319:        _mm256_storeu_si256((__m256i *)(output), blended_1L);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:349:static ossl_inline size_t insert_nl_2nd_vec_stride_12(const __m256i v0,
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:354:    __m256i shuffling_mask = _mm256_setr_epi8(0, 1, 2, 3, (char)0xFF, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13,
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:358:    __m256i shuffled = _mm256_shuffle_epi8(v0, shuffling_mask);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:360:    _mm256_storeu_si256((__m256i *)(output + 0), shuffled);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:383:static ossl_inline __m256i insert_newlines_by_mask(__m256i data, __m256i mask)
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:385:    __m256i newline = _mm256_set1_epi8('\n');
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:393:static ossl_inline size_t insert_nl_str4(const __m256i v0, uint8_t *output)
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:395:    __m256i shuffling_mask = _mm256_setr_epi8(0, 1, 2, 3, (char)0xFF, 4, 5, 6,
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:399:    __m256i mask_5_bytes = _mm256_setr_epi8(0, 0, 0, 0, (char)0xFF, 0, 0, 0, 0, (char)0xFF,
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:403:    __m256i shuffled_4_bytes = _mm256_shuffle_epi8(v0, shuffling_mask);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:404:    __m256i v0_w_nl = insert_newlines_by_mask(shuffled_4_bytes, mask_5_bytes);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:406:    _mm256_storeu_si256((__m256i *)(output + 0), v0_w_nl);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:415:    __m256i rem_1_L = _mm256_srli_si256(v0, B_LANE - N_RET_1_L);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:418:    __m256i rem_2_L_P1 = _mm256_srli_si256(_mm256_slli_si256(_mm256_srli_si256(v0, B_LANE - N_RET_2_L),
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:423:    __m256i rem_2_L_P2 = _mm256_slli_si256(
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:428:    __m256i rem_2_L = _mm256_or_si256(rem_2_L_P1, rem_2_L_P2);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:451:static ossl_inline size_t insert_nl_str8(const __m256i v0, uint8_t *output)
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:453:    __m256i shuffling_mask = _mm256_setr_epi8(0, 1, 2, 3, 4, 5, 6, 7, (char)0xFF,
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:457:    __m256i shuffled_4_bytes = _mm256_shuffle_epi8(v0, shuffling_mask);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:458:    _mm256_storeu_si256((__m256i *)(output), shuffled_4_bytes);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:481:size_t encode_base64_avx2(EVP_ENCODE_CTX *ctx, unsigned char *dst,
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:492:    const __m256i shuf = _mm256_set_epi8(10, 11, 9, 10, 7, 8, 6, 7, 4, 5, 3, 4, 1, 2, 0, 1,
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:504:        const __m128i lo0 = _mm_loadu_si128((const __m128i *)(input + i + 4 * 3 * 0));
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:505:        const __m128i hi0 = _mm_loadu_si128((const __m128i *)(input + i + 4 * 3 * 1));
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:506:        __m256i in0 = _mm256_shuffle_epi8(_mm256_set_m128i(hi0, lo0), shuf);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:507:        const __m256i t0_0 = _mm256_and_si256(in0, _mm256_set1_epi32(0x0fc0fc00));
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:508:        const __m256i t1_0 = _mm256_mulhi_epu16(t0_0, _mm256_set1_epi32(0x04000040));
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:509:        const __m256i t2_0 = _mm256_and_si256(in0, _mm256_set1_epi32(0x003f03f0));
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:510:        const __m256i t3_0 = _mm256_mullo_epi16(t2_0, _mm256_set1_epi32(0x01000010));
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:511:        const __m256i input0 = _mm256_or_si256(t1_0, t3_0);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:513:        const __m128i lo1 = _mm_loadu_si128((const __m128i *)(input + i + 4 * 3 * 2));
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:514:        const __m128i hi1 = _mm_loadu_si128((const __m128i *)(input + i + 4 * 3 * 3));
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:515:        __m256i in1 = _mm256_shuffle_epi8(_mm256_set_m128i(hi1, lo1), shuf);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:516:        const __m256i t0_1 = _mm256_and_si256(in1, _mm256_set1_epi32(0x0fc0fc00));
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:517:        const __m256i t1_1 = _mm256_mulhi_epu16(t0_1, _mm256_set1_epi32(0x04000040));
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:518:        const __m256i t2_1 = _mm256_and_si256(in1, _mm256_set1_epi32(0x003f03f0));
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:519:        const __m256i t3_1 = _mm256_mullo_epi16(t2_1, _mm256_set1_epi32(0x01000010));
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:520:        const __m256i input1 = _mm256_or_si256(t1_1, t3_1);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:522:        const __m128i lo2 = _mm_loadu_si128((const __m128i *)(input + i + 4 * 3 * 4));
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:523:        const __m128i hi2 = _mm_loadu_si128((const __m128i *)(input + i + 4 * 3 * 5));
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:524:        __m256i in2 = _mm256_shuffle_epi8(_mm256_set_m128i(hi2, lo2), shuf);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:525:        const __m256i t0_2 = _mm256_and_si256(in2, _mm256_set1_epi32(0x0fc0fc00));
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:526:        const __m256i t1_2 = _mm256_mulhi_epu16(t0_2, _mm256_set1_epi32(0x04000040));
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:527:        const __m256i t2_2 = _mm256_and_si256(in2, _mm256_set1_epi32(0x003f03f0));
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:528:        const __m256i t3_2 = _mm256_mullo_epi16(t2_2, _mm256_set1_epi32(0x01000010));
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:529:        const __m256i input2 = _mm256_or_si256(t1_2, t3_2);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:531:        const __m128i lo3 = _mm_loadu_si128((const __m128i *)(input + i + 4 * 3 * 6));
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:532:        const __m128i hi3 = _mm_loadu_si128((const __m128i *)(input + i + 4 * 3 * 7));
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:533:        __m256i in3 = _mm256_shuffle_epi8(_mm256_set_m128i(hi3, lo3), shuf);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:534:        const __m256i t0_3 = _mm256_and_si256(in3, _mm256_set1_epi32(0x0fc0fc00));
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:535:        const __m256i t1_3 = _mm256_mulhi_epu16(t0_3, _mm256_set1_epi32(0x04000040));
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:536:        const __m256i t2_3 = _mm256_and_si256(in3, _mm256_set1_epi32(0x003f03f0));
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:537:        const __m256i t3_3 = _mm256_mullo_epi16(t2_3, _mm256_set1_epi32(0x01000010));
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:538:        const __m256i input3 = _mm256_or_si256(t1_3, t3_3);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:540:        __m256i vec0;
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:541:        __m256i vec1;
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:542:        __m256i vec2;
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:543:        __m256i vec3;
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:559:            _mm256_storeu_si256((__m256i *)out, vec0);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:562:            _mm256_storeu_si256((__m256i *)out, vec1);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:565:            _mm256_storeu_si256((__m256i *)out, vec2);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:568:            _mm256_storeu_si256((__m256i *)out, vec3);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:572:            _mm256_storeu_si256((__m256i *)out, vec0);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:575:            _mm256_storeu_si256((__m256i *)out, vec1);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:580:            _mm256_storeu_si256((__m256i *)out, vec2);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:583:            _mm256_storeu_si256((__m256i *)out, vec3);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:645:            const __m128i lo = _mm_loadu_si128((const __m128i *)(input + i));
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:646:            const __m128i hi = _mm_loadu_si128((const __m128i *)(input + i + 4 * 3));
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:651:            __m256i in = _mm256_shuffle_epi8(_mm256_set_m128i(hi, lo), shuf);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:652:            const __m256i t0 = _mm256_and_si256(in, _mm256_set1_epi32(0x0fc0fc00));
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:653:            const __m256i t1 = _mm256_mulhi_epu16(t0, _mm256_set1_epi32(0x04000040));
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:654:            const __m256i t2 = _mm256_and_si256(in, _mm256_set1_epi32(0x003f03f0));
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:655:            const __m256i t3 = _mm256_mullo_epi16(t2, _mm256_set1_epi32(0x01000010));
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:656:            const __m256i indices = _mm256_or_si256(t1, t3);
+src/third_party/openssl/crypto/evp/enc_b64_avx2.c:657:            _mm256_storeu_si256((__m256i *)out, (use_srp ? lookup_pshufb_srp : lookup_pshufb_std)(indices));
+src/third_party/minimp3/minimp3.h:111:typedef __m128 f4;
+src/third_party/minimp3/minimp3.h:1541:            __m128i pcm8 = _mm_packs_epi32(_mm_cvtps_epi32(_mm_max_ps(_mm_min_ps(a, g_max), g_min)),
+src/third_party/minimp3/minimp3.h:1822:        __m128i pcm8 = _mm_packs_epi32(_mm_cvtps_epi32(_mm_max_ps(_mm_min_ps(a, g_max), g_min)),
+src/third_party/bearssl/src/hash/ghash_pclmul.c:94:		__m128i byteswap1, byteswap2; \
+src/third_party/bearssl/src/hash/ghash_pclmul.c:104:#define BYTESWAP_DECL   __m128i byteswap_index;
+src/third_party/bearssl/src/hash/ghash_pclmul.c:121: * We use a target of "sse2" only, so that Clang may still handle the
+src/third_party/bearssl/src/hash/ghash_pclmul.c:122: * '__m128i' type and allocate SSE2 registers.
+src/third_party/bearssl/src/hash/ghash_pclmul.c:125:BR_TARGET("sse2")
+src/third_party/bearssl/src/hash/ghash_pclmul.c:126:static inline __m128i
+src/third_party/bearssl/src/hash/ghash_pclmul.c:127:pclmulqdq00(__m128i x, __m128i y)
+src/third_party/bearssl/src/hash/ghash_pclmul.c:132:BR_TARGET("sse2")
+src/third_party/bearssl/src/hash/ghash_pclmul.c:133:static inline __m128i
+src/third_party/bearssl/src/hash/ghash_pclmul.c:134:pclmulqdq11(__m128i x, __m128i y)
+src/third_party/bearssl/src/hash/ghash_pclmul.c:220:		__m128i z0, z1, z2, z3; \
+src/third_party/bearssl/src/hash/ghash_pclmul.c:238:	__m128i yw, h1w, h1x;
+src/third_party/bearssl/src/hash/ghash_pclmul.c:273:		__m128i h2w, h2x, h3w, h3x, h4w, h4x;
+src/third_party/bearssl/src/hash/ghash_pclmul.c:274:		__m128i t0, t1, t2, t3;
+src/third_party/bearssl/src/hash/ghash_pclmul.c:301:			__m128i aw0, aw1, aw2, aw3;
+src/third_party/bearssl/src/hash/ghash_pclmul.c:302:			__m128i ax0, ax1, ax2, ax3;
+src/third_party/bearssl/src/hash/ghash_pclmul.c:352:		__m128i aw, ax;
+src/third_party/bearssl/src/hash/ghash_pclmul.c:353:		__m128i t0, t1, t2, t3;
+src/third_party/bearssl/src/inner.h:2445:	_Pragma("GCC target(\"sse2,ssse3,sse4.1,aes,pclmul,rdrnd\")")
+src/third_party/bearssl/src/inner.h:2450:	_Pragma("GCC target(\"sse2,ssse3,sse4.1,aes,pclmul\")")
+src/third_party/bearssl/src/symcipher/aes_x86ni_ctr.c:49:BR_TARGET("sse2,sse4.1,aes")
+src/third_party/bearssl/src/symcipher/aes_x86ni_ctr.c:57:	__m128i sk[15];
+src/third_party/bearssl/src/symcipher/aes_x86ni_ctr.c:58:	__m128i ivx;
+src/third_party/bearssl/src/symcipher/aes_x86ni_ctr.c:69:		__m128i x0, x1, x2, x3;
+src/third_party/bearssl/src/symcipher/aes_x86ni_cbcdec.c:49:BR_TARGET("sse2,aes")
+src/third_party/bearssl/src/symcipher/aes_x86ni_cbcdec.c:56:	__m128i sk[15], ivx;
+src/third_party/bearssl/src/symcipher/aes_x86ni_cbcdec.c:66:		__m128i x0, x1, x2, x3, e0, e1, e2, e3;
+src/third_party/bearssl/src/symcipher/chacha20_sse2.c:37:br_chacha20_sse2_get(void)
+src/third_party/bearssl/src/symcipher/chacha20_sse2.c:47:	return &br_chacha20_sse2_run;
+src/third_party/bearssl/src/symcipher/chacha20_sse2.c:54:		return &br_chacha20_sse2_run;
+src/third_party/bearssl/src/symcipher/chacha20_sse2.c:64:BR_TARGET("sse2")
+src/third_party/bearssl/src/symcipher/chacha20_sse2.c:66:br_chacha20_sse2_run(const void *key,
+src/third_party/bearssl/src/symcipher/chacha20_sse2.c:71:	__m128i kw0, kw1;
+src/third_party/bearssl/src/symcipher/chacha20_sse2.c:72:	__m128i iw, cw;
+src/third_party/bearssl/src/symcipher/chacha20_sse2.c:73:	__m128i one;
+src/third_party/bearssl/src/symcipher/chacha20_sse2.c:92:		__m128i s0, s1, s2, s3;
+src/third_party/bearssl/src/symcipher/chacha20_sse2.c:199:			__m128i b0, b1, b2, b3;
+src/third_party/bearssl/src/symcipher/chacha20_sse2.c:232:br_chacha20_sse2_get(void)
+src/third_party/bearssl/src/symcipher/aes_x86ni_ctrcbc.c:49:BR_TARGET("sse2,sse4.1,aes")
+src/third_party/bearssl/src/symcipher/aes_x86ni_ctrcbc.c:56:	__m128i sk[15];
+src/third_party/bearssl/src/symcipher/aes_x86ni_ctrcbc.c:57:	__m128i ivx0, ivx1, ivx2, ivx3;
+src/third_party/bearssl/src/symcipher/aes_x86ni_ctrcbc.c:58:	__m128i erev, zero, one, four, notthree;
+src/third_party/bearssl/src/symcipher/aes_x86ni_ctrcbc.c:92:		__m128i x0, x1, x2, x3;
+src/third_party/bearssl/src/symcipher/aes_x86ni_ctrcbc.c:255:BR_TARGET("sse2,sse4.1,aes")
+src/third_party/bearssl/src/symcipher/aes_x86ni_ctrcbc.c:262:	__m128i sk[15], ivx;
+src/third_party/bearssl/src/symcipher/aes_x86ni_ctrcbc.c:272:		__m128i x;
+src/third_party/bearssl/src/symcipher/aes_x86ni_ctrcbc.c:306:BR_TARGET("sse2,sse4.1,aes")
+src/third_party/bearssl/src/symcipher/aes_x86ni_ctrcbc.c:313:	__m128i sk[15];
+src/third_party/bearssl/src/symcipher/aes_x86ni_ctrcbc.c:314:	__m128i ivx, cmx;
+src/third_party/bearssl/src/symcipher/aes_x86ni_ctrcbc.c:315:	__m128i erev, zero, one;
+src/third_party/bearssl/src/symcipher/aes_x86ni_ctrcbc.c:341:		__m128i dx, x0, x1;
+src/third_party/bearssl/src/symcipher/aes_x86ni_ctrcbc.c:455:BR_TARGET("sse2,sse4.1,aes")
+src/third_party/bearssl/src/symcipher/aes_x86ni_ctrcbc.c:462:	__m128i sk[15];
+src/third_party/bearssl/src/symcipher/aes_x86ni_ctrcbc.c:463:	__m128i ivx, cmx;
+src/third_party/bearssl/src/symcipher/aes_x86ni_ctrcbc.c:464:	__m128i erev, zero, one;
+src/third_party/bearssl/src/symcipher/aes_x86ni_ctrcbc.c:488:		__m128i dx, x0, x1;
+src/third_party/bearssl/src/symcipher/aes_x86ni_cbcenc.c:49:BR_TARGET("sse2,aes")
+src/third_party/bearssl/src/symcipher/aes_x86ni_cbcenc.c:56:	__m128i sk[15], ivx;
+src/third_party/bearssl/src/symcipher/aes_x86ni_cbcenc.c:66:		__m128i x;
+src/third_party/bearssl/src/symcipher/aes_x86ni.c:49:BR_TARGET("sse2,aes")
+src/third_party/bearssl/src/symcipher/aes_x86ni.c:50:static inline __m128i
+src/third_party/bearssl/src/symcipher/aes_x86ni.c:51:expand_step128(__m128i k, __m128i k2)
+src/third_party/bearssl/src/symcipher/aes_x86ni.c:60:BR_TARGET("sse2,aes")
+src/third_party/bearssl/src/symcipher/aes_x86ni.c:62:expand_step192(__m128i *t1, __m128i *t2, __m128i *t3)
+src/third_party/bearssl/src/symcipher/aes_x86ni.c:64:	__m128i t4;
+src/third_party/bearssl/src/symcipher/aes_x86ni.c:80:BR_TARGET("sse2,aes")
+src/third_party/bearssl/src/symcipher/aes_x86ni.c:82:expand_step256_1(__m128i *t1, __m128i *t2)
+src/third_party/bearssl/src/symcipher/aes_x86ni.c:84:	__m128i t4;
+src/third_party/bearssl/src/symcipher/aes_x86ni.c:96:BR_TARGET("sse2,aes")
+src/third_party/bearssl/src/symcipher/aes_x86ni.c:98:expand_step256_2(__m128i *t1, __m128i *t3)
+src/third_party/bearssl/src/symcipher/aes_x86ni.c:100:	__m128i t2, t4;
+src/third_party/bearssl/src/symcipher/aes_x86ni.c:118:BR_TARGET("sse2,aes")
+src/third_party/bearssl/src/symcipher/aes_x86ni.c:120:x86ni_keysched(__m128i *sk, const void *key, size_t len)
+src/third_party/bearssl/src/symcipher/aes_x86ni.c:154:		__m128i t1, t2, t3;
+src/third_party/bearssl/src/symcipher/aes_x86ni.c:208:BR_TARGET("sse2,aes")
+src/third_party/bearssl/src/symcipher/aes_x86ni.c:212:	__m128i sk[15];
+src/third_party/bearssl/src/symcipher/aes_x86ni.c:221:BR_TARGET("sse2,aes")
+src/third_party/bearssl/src/symcipher/aes_x86ni.c:225:	__m128i sk[15];
+src/third_party/bearssl/src/ssl/ssl_engine_default_chapol.c:42:	bc = br_chacha20_sse2_get();
+src/third_party/bearssl/src/config.h:178: * algorithm implementations that use them (e.g. chacha20_sse2). If this
+src/third_party/bearssl/inc/bearssl_block.h:365: * `chacha20_sse2` leverages SSE2 opcodes (on x86 architectures that
+src/third_party/bearssl/inc/bearssl_block.h:2466: * at all, then it can run). Use `br_chacha20_sse2_get()` to safely obtain
+src/third_party/bearssl/inc/bearssl_block.h:2477:uint32_t br_chacha20_sse2_run(const void *key,
+src/third_party/bearssl/inc/bearssl_block.h:2481: * \brief Obtain the `sse2` ChaCha20 implementation, if available.
+src/third_party/bearssl/inc/bearssl_block.h:2483: * This function returns a pointer to `br_chacha20_sse2_run`, if
+src/third_party/bearssl/inc/bearssl_block.h:2488: * \return  the `sse2` ChaCha20 implementation, or `0`.
+src/third_party/bearssl/inc/bearssl_block.h:2490:br_chacha20_run br_chacha20_sse2_get(void);
+src/third_party/nghttp2/third-party/llhttp/src/llhttp.c:2633:        __m128i ranges;
+src/third_party/nghttp2/third-party/llhttp/src/llhttp.c:2634:        __m128i input;
+src/third_party/nghttp2/third-party/llhttp/src/llhttp.c:2639:        input = _mm_loadu_si128((__m128i const*) p);
+src/third_party/nghttp2/third-party/llhttp/src/llhttp.c:2640:        ranges = _mm_loadu_si128((__m128i const*) llparse_blob6);
+src/third_party/nghttp2/third-party/llhttp/src/llhttp.c:2863:        __m128i ranges;
+src/third_party/nghttp2/third-party/llhttp/src/llhttp.c:2864:        __m128i input;
+src/third_party/nghttp2/third-party/llhttp/src/llhttp.c:2869:        input = _mm_loadu_si128((__m128i const*) p);
+src/third_party/nghttp2/third-party/llhttp/src/llhttp.c:2870:        ranges = _mm_loadu_si128((__m128i const*) llparse_blob7);
+src/third_party/nghttp2/third-party/llhttp/src/llhttp.c:2882:        ranges = _mm_loadu_si128((__m128i const*) llparse_blob8);

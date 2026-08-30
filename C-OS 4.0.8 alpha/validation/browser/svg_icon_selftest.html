@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>C-OS SVG / ICO self-test</title>
+  <style>
+    body { font: 18px sans-serif; margin: 28px; background: #f4f7fb; color: #18212f; }
+    main { width: 720px; padding: 24px; border-radius: 14px; background: #fff; }
+    h1 { margin-top: 0; color: #193d73; }
+    .row { display: flex; gap: 24px; align-items: center; margin-top: 18px; }
+    .card { min-width: 260px; min-height: 170px; padding: 14px; border: 1px solid #b9cce4; border-radius: 10px; }
+    img.svg { width: 240px; height: 128px; border: 1px solid #d1ddec; }
+    img.ico { width: 64px; height: 64px; image-rendering: pixelated; border: 1px solid #d1ddec; }
+    #result { white-space: pre-wrap; margin-top: 18px; padding: 12px; background: #edf3fb; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>NetSurf SVG / ICO content handler</h1>
+    <p>外部SVGはvector path、circle、textを含み、外部ICOは32-bit alpha bitmapを含みます。</p>
+    <div class="row">
+      <section class="card"><strong>SVG resource</strong><br><img class="svg" src="svg_icon_selftest.svg" alt="SVG fixture"></section>
+      <section class="card"><strong>ICO resource</strong><br><img class="ico" src="svg_icon_selftest.ico" alt="ICO fixture"></section>
+    </div>
+    <div id="result">QuickJS: <span id="status">RUNNING</span></div>
+  </main>
+  <script>
+  (function () {
+    var svg = document.querySelector('img.svg');
+    var ico = document.querySelector('img.ico');
+    var ok = !!svg && !!ico && svg.getAttribute('src') === 'svg_icon_selftest.svg' &&
+             ico.getAttribute('src') === 'svg_icon_selftest.ico';
+    document.getElementById('status').textContent = ok ? 'DOM fixture PASS' : 'DOM fixture FAIL';
+    document.title = ok ? 'C-OS SVG / ICO self-test' : 'C-OS SVG / ICO DOM FAIL';
+  })();
+  </script>
+</body>
+</html>

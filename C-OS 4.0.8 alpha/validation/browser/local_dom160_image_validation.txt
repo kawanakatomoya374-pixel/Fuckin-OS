@@ -1,0 +1,1 @@
+storage image valid: validation/local_browser_dual_storage.img (2 entries)

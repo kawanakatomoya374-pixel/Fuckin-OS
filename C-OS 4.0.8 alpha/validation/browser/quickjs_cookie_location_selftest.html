@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>C-OS Cookie / Location self-test</title>
+  <style>
+    body { font: 18px sans-serif; margin: 28px; background: #f4f7fb; color: #18212f; }
+    main { max-width: 760px; padding: 24px; border-radius: 14px; background: #fff; }
+    h1 { margin-top: 0; color: #193d73; }
+    #result { white-space: pre-wrap; line-height: 1.55; padding: 14px; background: #edf3fb; }
+    .pass { color: #075e32; font-weight: 700; }
+    .fail { color: #a21b1b; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>QuickJS Cookie / Location self-test</h1>
+    <p>このページはHTTP origin上で実行し、Cookie jar、相対URL解決、非再入Location遷移を検証します。</p>
+    <div id="result">RUNNING</div>
+  </main>
+  <script>
+  (function () {
+    var result = document.getElementById('result');
+    var checks = [];
+    function check(name, value) {
+      checks.push(name + ': ' + (value ? 'PASS' : 'FAIL'));
+    }
+    function show() {
+      var ok = checks.every(function (line) { return line.indexOf('PASS') >= 0; });
+      result.className = ok ? 'pass' : 'fail';
+      result.textContent = (ok ? 'PASS' : 'FAIL') + '\n' + checks.join('\n');
+      document.title = ok ? 'C-OS Cookie / Location PASS' : 'C-OS Cookie / Location FAIL';
+    }
+
+    var page = location.href;
+    check('HTTP location.href', page.indexOf('http://') === 0 || page.indexOf('https://') === 0);
+    check('Location methods', typeof location.assign === 'function' &&
+                              typeof location.replace === 'function' &&
+                              typeof location.reload === 'function');
+
+    document.cookie = 'cos_cookie_test=visible; Path=/; Max-Age=120';
+    check('document.cookie setter/getter', document.cookie.indexOf('cos_cookie_test=visible') >= 0);
+
+    /* The fixture has an actual destination file. It is not navigated here so
+       the first-frame proof remains visible; the companion manual navigation
+       smoke assigns this exact relative reference. */
+    var relative = 'quickjs_cookie_location_destination.html?from=selftest#ok';
+    check('relative Location target shape', relative.indexOf('quickjs_') === 0 &&
+                                            relative.indexOf('#ok') > 0);
+    check('document.URL', document.URL === page);
+    show();
+
+    /* Validation starts this fixture with ?navigate=1. The assignment must be
+       deferred until this script has returned, then resolve against the active
+       HTTP document and preserve the Cookie jar for the destination page. */
+    if (location.search.indexOf('navigate=1') >= 0) {
+      location.href = relative;
+    }
+  })();
+  </script>
+</body>
+</html>

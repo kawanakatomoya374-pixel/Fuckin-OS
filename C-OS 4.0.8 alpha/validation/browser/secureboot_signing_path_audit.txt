@@ -1,0 +1,8 @@
+tools/build_secureboot_uefi.sh
+--- candidate file names (no contents) ---
+/home/ubuntu/.local/share/c-os-secureboot/C-OS-dev-secureboot.key
+/home/ubuntu/c-os-work/c-os/tools/generate_secureboot_dev_keys.sh
+/home/ubuntu/c-os-work/c-os/validation/secureboot_smp2_attachment_index_keyboard_calc.ppm
+/home/ubuntu/c-os-work/c-os/validation/secureboot_smp2_attachment_index_keyboard_calc.png
+/home/ubuntu/c-os-work/c-os/validation/secureboot_smp2_input1_keyboard_after_ehci_fix.ppm
+/home/ubuntu/c-os-work/c-os/validation/secureboot_smp2_input1_keyboard_after_ehci_fix.png

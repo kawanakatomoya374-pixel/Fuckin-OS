@@ -1,0 +1,491 @@
+309-    .set_icon = cos_ns_window_icon, .set_status = cos_ns_window_status,
+310-    .set_pointer = cos_ns_window_pointer, .place_caret = cos_ns_window_caret,
+311-    .drag_start = cos_ns_window_drag_start
+312-};
+313-struct gui_window_table *cos_netsurf_window_table(void) { return &cos_ns_window_table; }
+314-
+315-#include "netsurf/plotters.h"
+316-#include "netsurf/types.h"
+317-
+318-/* NetSurf colours are 0xXXBBGGRR; vga.* uses 0x00RRGGBB. */
+319:static uint64_t cos_ns_plot_colour(colour c)
+320-{
+321-    return ((uint64_t)(c & 0xffu) << 16) |
+322-           ((uint64_t)((c >> 8) & 0xffu) << 8) |
+323-           (uint64_t)((c >> 16) & 0xffu);
+324-}
+325-
+326-/* The standard redraw contract maintains a single active clip for every
+327- * plot operation. C-OS uses a synchronous display renderer, so a compact
+328- * frontend-global clip is sufficient until per-window redraw scheduling is
+329- * enabled. */
+330-static int cos_ns_clip_x0;
+331-static int cos_ns_clip_y0;
+332-static int cos_ns_clip_x1;
+333-static int cos_ns_clip_y1;
+334-static bool cos_ns_clip_active;
+335-/* Compact redraw diagnostics: a successful browser_window_redraw() alone does
+336- * not prove the page produced visible draw operations. Keep counters in the
+337- * frontend plotter so the bridge can distinguish an empty box tree from a
+338- * coordinate/paint problem without logging every primitive. */
+339-static uint32_t cos_ns_plot_rect_count;
+340-static uint32_t cos_ns_plot_text_count;
+341-static uint32_t cos_ns_plot_bitmap_count;
+342-/* One-shot field diagnostics for real NetSurf text plotting.  This is not
+343- * reset per redraw: a loading page can request many redraws before stable
+344- * layout, and serial output must never become the next rendering bottleneck. */
+345-static uint32_t cos_ns_text_plot_diag_remaining = 10;
+346-
+347-void cos_netsurf_plot_stats_reset(void)
+--
+396-     * is visually safe and must not abort the page redraw. */
+397-    return NSERROR_OK;
+398-}
+399-
+400-static nserror cos_ns_plot_disc(const struct redraw_context *ctx,
+401-                                const plot_style_t *s, int x, int y,
+402-                                int radius)
+403-{
+404-    (void)ctx;
+405-    if (s != NULL && radius > 0 && s->fill_type != PLOT_OP_TYPE_NONE) {
+406:        vga_fill_circle(x, y, radius, cos_ns_plot_colour(s->fill_colour));
+407-    }
+408-    return NSERROR_OK;
+409-}
+410-
+411-static nserror cos_ns_plot_line(const struct redraw_context *ctx,
+412-                                const plot_style_t *s, const struct rect *r)
+413-{
+414-    (void)ctx;
+415-    if (s == NULL || r == NULL || s->stroke_type == PLOT_OP_TYPE_NONE) {
+416-        return NSERROR_OK;
+417-    }
+418-    int width = plot_style_fixed_to_int(s->stroke_width);
+419-    if (width < 1) width = 1;
+420-    vga_draw_line_thick(r->x0, r->y0, r->x1, r->y1, width,
+421:                        cos_ns_plot_colour(s->stroke_colour));
+422-    return NSERROR_OK;
+423-}
+424-
+425-static nserror cos_ns_plot_rect(const struct redraw_context *ctx,
+426-                                const plot_style_t *s, const struct rect *r)
+427-{
+428-    (void)ctx;
+429-    ++cos_ns_plot_rect_count;
+430-    if (s == NULL || r == NULL) return NSERROR_OK;
+431-    int x = r->x0, y = r->y0, w = r->x1 - r->x0, h = r->y1 - r->y0;
+432-    if (!cos_ns_plot_clip_rect(&x, &y, &w, &h)) return NSERROR_OK;
+433-    if (s->fill_type != PLOT_OP_TYPE_NONE) {
+434:        vga_fill_rect(x, y, w, h, cos_ns_plot_colour(s->fill_colour));
+435-    }
+436-    if (s->stroke_type != PLOT_OP_TYPE_NONE) {
+437:        vga_draw_rect(x, y, w, h, cos_ns_plot_colour(s->stroke_colour));
+438-    }
+439-    return NSERROR_OK;
+440-}
+441-
+442-static nserror cos_ns_plot_polygon(const struct redraw_context *ctx,
+443-                                   const plot_style_t *s, const int *p,
+444-                                   unsigned int n)
+445-{
+446-    (void)ctx;
+447-    if (s == NULL || p == NULL || n < 2) return NSERROR_OK;
+448-    /* CSS arrows and small widgets use polygons. Drawing the edge preserves
+449-     * their affordance even before an accelerated winding-rule rasteriser is
+450-     * introduced. */
+451-    if (s->stroke_type != PLOT_OP_TYPE_NONE || s->fill_type != PLOT_OP_TYPE_NONE) {
+452:        uint64_t c = cos_ns_plot_colour((s->stroke_type != PLOT_OP_TYPE_NONE)
+453-                                        ? s->stroke_colour : s->fill_colour);
+454-        for (unsigned int i = 0; i < n; i++) {
+455-            unsigned int j = (i + 1u) % n;
+456-            vga_draw_line(p[i * 2u], p[i * 2u + 1u],
+457-                          p[j * 2u], p[j * 2u + 1u], c);
+458-        }
+459-    }
+460-    return NSERROR_OK;
+461-}
+462-
+463-/* Keep vector path work bounded: a malformed remote SVG must not allocate or
+464- * monopolise the GUI owner. Curves are flattened into short line segments and
+465- * each closed subpath is scanline-filled with the normal even-odd rule. */
+466-#define COS_NS_PATH_MAX_POINTS 192u
+467-#define COS_NS_PATH_BEZIER_STEPS 8u
+468-
+469-static int cos_ns_path_round(float value)
+470-{
+471-    return (int)(value >= 0.0f ? value + 0.5f : value - 0.5f);
+472-}
+473-
+474-static void cos_ns_path_transform_point(const float transform[6], float x,
+475-                                        float y, int *out_x, int *out_y)
+476-{
+477-    if (transform == NULL) {
+478-        *out_x = cos_ns_path_round(x);
+479-        *out_y = cos_ns_path_round(y);
+480-        return;
+--
+507-        int min_y = points[0][1];
+508-        int max_y = points[0][1];
+509-        for (unsigned int i = 1; i < count; ++i) {
+510-            if (points[i][1] < min_y) min_y = points[i][1];
+511-            if (points[i][1] > max_y) max_y = points[i][1];
+512-        }
+513-        if (cos_ns_clip_active) {
+514-            if (min_y < cos_ns_clip_y0) min_y = cos_ns_clip_y0;
+515-            if (max_y >= cos_ns_clip_y1) max_y = cos_ns_clip_y1 - 1;
+516-        }
+517:        const uint64_t fill = cos_ns_plot_colour(s->fill_colour);
+518-        for (int y = min_y; y <= max_y; ++y) {
+519-            int intersections[COS_NS_PATH_MAX_POINTS];
+520-            unsigned int intersections_count = 0;
+521-            for (unsigned int i = 0; i < count; ++i) {
+522-                unsigned int j = (i + 1u) % count;
+523-                int y0 = points[i][1], y1 = points[j][1];
+524-                if (((y0 <= y) && (y1 > y)) || ((y1 <= y) && (y0 > y))) {
+525-                    if (intersections_count < COS_NS_PATH_MAX_POINTS) {
+526-                        intersections[intersections_count++] = points[i][0] +
+527-                            (int)(((int64_t)(y - y0) * (points[j][0] - points[i][0])) /
+528-                                  (int64_t)(y1 - y0));
+529-                    }
+530-                }
+531-            }
+532-            for (unsigned int i = 1; i < intersections_count; ++i) {
+533-                int value = intersections[i];
+534-                unsigned int j = i;
+535-                while (j > 0u && intersections[j - 1u] > value) {
+536-                    intersections[j] = intersections[j - 1u];
+537-                    --j;
+538-                }
+539-                intersections[j] = value;
+540-            }
+541-            for (unsigned int i = 0; i + 1u < intersections_count; i += 2u) {
+542-                int x0 = intersections[i];
+543-                int x1 = intersections[i + 1u];
+544-                if (cos_ns_clip_active) {
+545-                    if (x0 < cos_ns_clip_x0) x0 = cos_ns_clip_x0;
+546-                    if (x1 >= cos_ns_clip_x1) x1 = cos_ns_clip_x1 - 1;
+547-                }
+548-                if (x1 >= x0) vga_fill_rect(x0, y, x1 - x0 + 1, 1, fill);
+549-            }
+550-        }
+551-    }
+552-
+553-    if (s->stroke_type != PLOT_OP_TYPE_NONE) {
+554-        int width = plot_style_fixed_to_int(s->stroke_width);
+555-        if (width < 1) width = 1;
+556:        const uint64_t stroke = cos_ns_plot_colour(s->stroke_colour);
+557-        for (unsigned int i = 1; i < count; ++i) {
+558-            vga_draw_line_thick(points[i - 1u][0], points[i - 1u][1],
+559-                                points[i][0], points[i][1], width, stroke);
+560-        }
+561-        if (closed) {
+562-            vga_draw_line_thick(points[count - 1u][0], points[count - 1u][1],
+563-                                points[0][0], points[0][1], width, stroke);
+564-        }
+565-    }
+566-}
+567-
+568-static nserror cos_ns_plot_path(const struct redraw_context *ctx,
+569-                                const plot_style_t *s, const float *p,
+570-                                unsigned int n, const float transform[6])
+571-{
+572-    (void)ctx;
+573-    if (s == NULL || p == NULL || n == 0u) return NSERROR_OK;
+574-
+575-    int points[COS_NS_PATH_MAX_POINTS][2];
+576-    unsigned int point_count = 0;
+577-    bool closed = false;
+578-    float current_x = 0.0f, current_y = 0.0f;
+579-
+580-    for (unsigned int i = 0; i < n;) {
+581-        int command = (int)p[i];
+582-        if (command == PLOTTER_PATH_MOVE || command == PLOTTER_PATH_LINE) {
+583-            if (i + 2u >= n) break;
+584-            if (command == PLOTTER_PATH_MOVE && point_count != 0u) {
+--
+749-    return NSERROR_OK;
+750-}
+751-
+752-static nserror cos_ns_plot_text(const struct redraw_context *ctx,
+753-                                const plot_font_style_t *s, int x, int y,
+754-                                const char *text, size_t n)
+755-{
+756-    (void)ctx;
+757-    ++cos_ns_plot_text_count;
+758-    if (s == NULL || text == NULL || n == 0) return NSERROR_OK;
+759:    uint64_t foreground = cos_ns_plot_colour(s->foreground);
+760:    uint64_t background = cos_ns_plot_colour(s->background);
+761-    if (cos_ns_text_plot_diag_remaining != 0) {
+762-        --cos_ns_text_plot_diag_remaining;
+763-        serial_puts("[NSTEXT] x="); serial_putdec((uint64_t)(int64_t)x);
+764-        serial_puts(" y="); serial_putdec((uint64_t)(int64_t)y);
+765-        serial_puts(" fg=0x"); serial_puthex(foreground);
+766-        serial_puts(" bg=0x"); serial_puthex(background);
+767-        serial_puts(" n="); serial_putdec((uint64_t)n);
+768-        serial_puts("\n");
+769-    }
+770-    if (cos_ns_clip_active && (y < cos_ns_clip_y0 || y - FONT_H >= cos_ns_clip_y1 ||
+771-        x >= cos_ns_clip_x1)) return NSERROR_OK;
+772-    vga_draw_string_len(x, y - FONT_H, text, (int)n, foreground, background);
+773-    return NSERROR_OK;
+774-}
+775-
+776-static const struct plotter_table cos_ns_plotter_table = {
+777-    .clip = cos_ns_plot_clip,
+778-    .arc = cos_ns_plot_arc,
+779-    .disc = cos_ns_plot_disc,
+780-    .line = cos_ns_plot_line,
+781-    .rectangle = cos_ns_plot_rect,
+782-    .polygon = cos_ns_plot_polygon,
+783-    .path = cos_ns_plot_path,
+784-    .bitmap = cos_ns_plot_bitmap,
+785-    .text = cos_ns_plot_text,
+786-    .group_start = NULL,
+787-    .group_end = NULL,
+788-    .flush = NULL,
+	transform[3] = (float) height / (float) c->height;
+	transform[4] = x;
+	transform[5] = y;
+
+#define BGR(c) ((c) == svgtiny_TRANSPARENT ? NS_TRANSPARENT :		\
+		((svgtiny_RED((c))) |					\
+		 (svgtiny_GREEN((c)) << 8) |				\
+		 (svgtiny_BLUE((c)) << 16)))
+
+	for (i = 0; i != diagram->shape_count; i++) {
+		if (diagram->shape[i].path) {
+			pstyle.stroke_width = plot_style_int_to_fixed(
+					diagram->shape[i].stroke_width);
+			pstyle.stroke_colour = BGR(diagram->shape[i].stroke);
+			pstyle.fill_colour = BGR(diagram->shape[i].fill);
+			res = ctx->plot->path(ctx,
+					&pstyle,
+					diagram->shape[i].path,
+					diagram->shape[i].path_length,
+					transform);
+			if (res != NSERROR_OK) {
+				return false;
+			}
+
+		} else if (diagram->shape[i].text) {
+			px = transform[0] * diagram->shape[i].text_x +
+133-		*ry = (float)(radiiscale * (*ry));
+134-		/* update squares too */
+135-		(*rx_sq) = (*rx) * (*rx);
+136-		(*ry_sq) = (*ry) * (*ry);
+137-	}
+138-}
+139-
+140-
+141-/**
+142- * compute the transformed centre point
+143- */
+144-static void
+145-compute_transformed_centre_point(double sign, float rx, float ry,
+146-				 double rx_sq, double ry_sq,
+147-				 double x1, double y1,
+--
+1940- */
+1941-
+1942-void svgtiny_parse_paint_attributes(dom_element *node,
+1943-		struct svgtiny_parse_state *state)
+1944-{
+1945-	dom_string *attr;
+1946-	dom_exception exc;
+1947-
+1948-	exc = dom_element_get_attribute(node, state->interned_fill, &attr);
+1949-	if (exc == DOM_NO_ERR && attr != NULL) {
+1950:		svgtiny_parse_color(attr, &state->fill, &state->fill_grad, state);
+1951-		dom_string_unref(attr);
+1952-	}
+1953-
+1954-	exc = dom_element_get_attribute(node, state->interned_stroke, &attr);
+1955-	if (exc == DOM_NO_ERR && attr != NULL) {
+1956:		svgtiny_parse_color(attr, &state->stroke, &state->stroke_grad, state);
+1957-		dom_string_unref(attr);
+1958-	}
+1959-
+1960-	exc = dom_element_get_attribute(node, state->interned_stroke_width, &attr);
+1961-	if (exc == DOM_NO_ERR && attr != NULL) {
+1962-		state->stroke_width = svgtiny_parse_length(attr,
+1963-						state->viewport_width, *state);
+1964-		dom_string_unref(attr);
+1965-	}
+1966-
+1967-	exc = dom_element_get_attribute(node, state->interned_style, &attr);
+1968-	if (exc == DOM_NO_ERR && attr != NULL) {
+1969-		char *style = strndup(dom_string_data(attr),
+1970-				      dom_string_byte_length(attr));
+1971-		const char *s;
+1972-		char *value;
+1973-		if ((s = strstr(style, "fill:"))) {
+1974-			s += 5;
+1975-			while (*s == ' ')
+1976-				s++;
+1977-			value = strndup(s, strcspn(s, "; "));
+1978:			_svgtiny_parse_color(value, &state->fill, &state->fill_grad, state);
+1979-			free(value);
+1980-		}
+1981-		if ((s = strstr(style, "stroke:"))) {
+1982-			s += 7;
+1983-			while (*s == ' ')
+1984-				s++;
+1985-			value = strndup(s, strcspn(s, "; "));
+1986:			_svgtiny_parse_color(value, &state->stroke, &state->stroke_grad, state);
+1987-			free(value);
+1988-		}
+1989-		if ((s = strstr(style, "stroke-width:"))) {
+1990-			s += 13;
+1991-			while (*s == ' ')
+1992-				s++;
+1993-			value = strndup(s, strcspn(s, "; "));
+1994-			state->stroke_width = _svgtiny_parse_length(value,
+1995-						state->viewport_width, *state);
+1996-			free(value);
+1997-		}
+1998-		free(style);
+1999-		dom_string_unref(attr);
+2000-	}
+2001-}
+2002-
+2003-
+2004-/**
+2005- * Parse a colour.
+2006- */
+2007-
+2008:static void _svgtiny_parse_color(const char *s, svgtiny_colour *c,
+2009-		struct svgtiny_parse_state_gradient *grad,
+2010-		struct svgtiny_parse_state *state)
+2011-{
+2012-	unsigned int r, g, b;
+2013-	float rf, gf, bf;
+2014-	size_t len = strlen(s);
+2015-	char *id = 0, *rparen;
+2016-
+2017-	if (len == 4 && s[0] == '#') {
+2018-		if (sscanf(s + 1, "%1x%1x%1x", &r, &g, &b) == 3)
+2019-			*c = svgtiny_RGB(r | r << 4, g | g << 4, b | b << 4);
+2020-
+2021-	} else if (len == 7 && s[0] == '#') {
+2022-		if (sscanf(s + 1, "%2x%2x%2x", &r, &g, &b) == 3)
+2023-			*c = svgtiny_RGB(r, g, b);
+2024-
+2025-	} else if (10 <= len && s[0] == 'r' && s[1] == 'g' && s[2] == 'b' &&
+2026-			s[3] == '(' && s[len - 1] == ')') {
+2027-		if (sscanf(s + 4, "%u,%u,%u", &r, &g, &b) == 3)
+2028-			*c = svgtiny_RGB(r, g, b);
+2029-		else if (sscanf(s + 4, "%f%%,%f%%,%f%%", &rf, &gf, &bf) == 3) {
+2030-			b = bf * 255 / 100;
+2031-			g = gf * 255 / 100;
+2032-			r = rf * 255 / 100;
+2033-			*c = svgtiny_RGB(r, g, b);
+2034-		}
+2035-
+2036-	} else if (len == 4 && strcmp(s, "none") == 0) {
+2037-		*c = svgtiny_TRANSPARENT;
+2038-
+2039-	} else if (5 < len && s[0] == 'u' && s[1] == 'r' && s[2] == 'l' &&
+2040-			s[3] == '(') {
+2041-		if (grad == NULL) {
+2042-			*c = svgtiny_RGB(0, 0, 0);
+2043-		} else if (s[4] == '#') {
+2044-			id = strdup(s + 5);
+2045-			if (!id)
+2046-				return;
+2047-			rparen = strchr(id, ')');
+2048-			if (rparen)
+2049-				*rparen = 0;
+2050-			svgtiny_find_gradient(id, grad, state);
+2051-			free(id);
+2052-			if (grad->linear_gradient_stop_count == 0)
+2053-				*c = svgtiny_TRANSPARENT;
+2054-			else if (grad->linear_gradient_stop_count == 1)
+2055-				*c = grad->gradient_stop[0].color;
+2056-			else
+2057-				*c = svgtiny_LINEAR_GRADIENT;
+2058-		}
+2059-
+2060-	} else {
+2061-		const struct svgtiny_named_color *named_color;
+2062-		named_color = svgtiny_color_lookup(s, strlen(s));
+2063-		if (named_color)
+2064-			*c = named_color->color;
+2065-	}
+2066-}
+2067-
+2068:void svgtiny_parse_color(dom_string *s, svgtiny_colour *c,
+2069-		struct svgtiny_parse_state_gradient *grad,
+2070-		struct svgtiny_parse_state *state)
+2071-{
+2072-	dom_string_ref(s);
+2073:	_svgtiny_parse_color(dom_string_data(s), c, grad, state);
+2074-	dom_string_unref(s);
+2075-}
+2076-
+2077-/**
+2078- * Parse font attributes, if present.
+2079- */
+2080-
+2081-void svgtiny_parse_font_attributes(dom_element *node,
+2082-		struct svgtiny_parse_state *state)
+2083-{
+2084-	/* TODO: Implement this, it never used to be */
+2085-	UNUSED(node);
+2086-	UNUSED(state);
+2087-#ifdef WRITTEN_THIS_PROPERLY
+2088-	const xmlAttr *attr;
+2089-
+2090-	UNUSED(state);
+2091-
+2092-	for (attr = node->properties; attr; attr = attr->next) {
+2093-		if (strcmp((const char *) attr->name, "font-size") == 0) {
+2094-			/*if (css_parse_length(
+2095-					(const char *) attr->children->content,
+2096-					&state->style.font_size.value.length,
+2097-					true, true)) {
+2098-				state->style.font_size.size =
+2099-						CSS_FONT_SIZE_LENGTH;
+2100-			}*/
+2101-		}
+2102-        }
+2103-#endif
+2104-}
+2105-
+2106-
+2107-/**
+2108- * Parse transform attributes, if present.
+2109- *
+2110- * http://www.w3.org/TR/SVG11/coords#TransformAttribute
+2111- */
+2112-
+2113-void svgtiny_parse_transform_attributes(dom_element *node,
+2114-		struct svgtiny_parse_state *state)
+2115-{
+2116-	char *transform;
+2117-	dom_string *attr;
+2118-	dom_exception exc;
+2119-
+2120-	exc = dom_element_get_attribute(node, state->interned_transform,
+2121-					&attr);
+2122-	if (exc == DOM_NO_ERR && attr != NULL) {
+2123-		transform = strndup(dom_string_data(attr),
+2124-				    dom_string_byte_length(attr));
+2125-		svgtiny_parse_transform(transform, &state->ctm.a, &state->ctm.b,
+2126-				&state->ctm.c, &state->ctm.d,
+2127-				&state->ctm.e, &state->ctm.f);
+2128-		free(transform);
+2129-		dom_string_unref(attr);
+2130-	}
+2131-}
+2132-
+2133-
+2134-/**
+2135- * Parse a transform string.
+2136- */
+2137-
+2138-void svgtiny_parse_transform(char *s, float *ma, float *mb,
+2139-		float *mc, float *md, float *me, float *mf)
+2140-{
+2141-	float a, b, c, d, e, f;
+2142-	float za, zb, zc, zd, ze, zf;
+2143-	float angle, x, y;

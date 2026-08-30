@@ -1,0 +1,172 @@
+--- render/dirty/bitblt files ---
+src/drivers/video/gfx_blit.c
+src/drivers/video/gfx_blit.h
+src/drivers/video/gfx_blit_avx2.c
+src/drivers/video/vga.c
+src/drivers/video/vga.h
+src/gui/apps/browser/gui_apps_browser.c
+src/gui/apps/core/gui_apps_core.c
+src/gui/apps/games/tinygl_viewer.c
+src/gui/apps/paint/gui_apps_paint.c
+src/gui/components/boot_animation.c
+src/gui/core/gui_internal.h
+src/gui/core/gui_lifecycle.c
+src/gui/core/gui_render_loop.c
+src/gui/core/output/gui_desktop_render.c
+src/gui/core/output/gui_renderer.c
+src/gui/core/window/gui_menus.c
+src/gui/core/window/gui_settings.c
+src/gui/file_manager/efm_render.c
+src/kernel/ai/micropython_vfs.c
+src/kernel/kernel.c
+src/kernel/mm/paging.c
+src/kernel/mm/paging.h
+src/kernel/power/acpica_backend.c
+src/kernel/smp.c
+src/kernel/system/storage_manager.c
+src/kernel/system/storage_manager.h
+--- SMP submit API ---
+src/kernel/smp.c:113:} smp_work_item_t;
+src/kernel/smp.c:119:static smp_work_item_t s_work_queue[SMP_MAX_CPUS][SMP_WORK_QUEUE_CAPACITY];
+src/kernel/smp.c:158:static bool smp_pop_best_locked(uint32_t logical_id, smp_work_item_t *out) {
+src/kernel/smp.c:186:static bool smp_take_work(uint32_t logical_id, smp_work_item_t *out) {
+src/kernel/smp.c:198:static bool smp_steal_work(uint32_t thief_logical_id, smp_work_item_t *out) {
+src/kernel/smp.c:224:static void smp_execute_work(uint32_t logical_id, const smp_work_item_t *item) {
+src/kernel/smp.c:485:        smp_work_item_t item;
+src/kernel/smp.c:586:        if (!smp_submit_work_to_cpu(i, smp_boot_probe, (void *)(uintptr_t)i)) {
+src/kernel/smp.c:617:            if (!smp_submit_work_to_cpu_priority(1u, smp_steal_probe,
+src/kernel/smp.c:702:uint32_t smp_online_cpu_count(void) { return s_online_cpus; }
+src/kernel/smp.c:715:        smp_work_item_t *slot = &s_work_queue[logical_id][s_work_tail[logical_id]];
+src/kernel/smp.c:729:bool smp_submit_work_to_cpu_priority(uint32_t logical_id, smp_work_fn_t fn,
+src/kernel/smp.c:734:bool smp_submit_work_to_cpu(uint32_t logical_id, smp_work_fn_t fn, void *arg) {
+src/kernel/smp.c:735:    return smp_submit_work_to_cpu_priority(logical_id, fn, arg,
+src/kernel/smp.c:739:bool smp_submit_work_priority(smp_work_fn_t fn, void *arg, smp_work_priority_t priority) {
+src/kernel/smp.c:767:bool smp_submit_work(smp_work_fn_t fn, void *arg) {
+src/kernel/smp.c:768:    return smp_submit_work_priority(fn, arg, SMP_WORK_PRIORITY_NORMAL);
+src/gui/apps/taskmanager/gui_apps_taskmanager.c:110:    uitostr(smp_online_cpu_count(), line + strlen(line));
+src/gui/core/output/gui_renderer.c:211:    uint32_t online = smp_online_cpu_count();
+--- renderer entrypoints ---
+src/gui/apps/browser/gui_apps_browser.c:36:extern void gui_request_redraw(void);
+src/gui/apps/browser/gui_apps_browser.c:1802:    gui_request_redraw();
+src/gui/apps/browser/gui_apps_browser.c:1944:        gui_request_redraw();
+src/gui/apps/browser/gui_apps_browser.c:2018:    gui_request_redraw();
+src/gui/apps/browser/gui_apps_browser.c:2169:    gui_request_redraw();
+src/gui/apps/browser/gui_apps_browser.c:2835:            gui_request_redraw();
+src/gui/apps/browser/gui_apps_browser.c:2977:        gui_request_redraw();
+src/gui/apps/browser/gui_apps_browser.c:3012:    gui_request_redraw();
+src/gui/apps/settings/gui_apps_settings.c:552:        gui_request_redraw();
+src/gui/apps/settings/gui_apps_settings.c:562:            gui_request_redraw();
+src/gui/apps/settings/gui_apps_settings.c:581:        gui_request_redraw();
+src/gui/apps/settings/gui_apps_settings.c:829:        gui_request_redraw();
+src/gui/apps/settings/gui_apps_settings.c:836:            gui_request_redraw();
+src/gui/apps/settings/gui_apps_settings.c:841:            gui_request_redraw();
+src/gui/apps/settings/gui_apps_settings.c:852:        gui_request_redraw();
+src/gui/apps/settings/gui_apps_settings.c:865:            gui_request_redraw();
+src/gui/apps/settings/gui_apps_settings.c:872:            gui_request_redraw();
+src/gui/apps/settings/gui_apps_settings.c:885:            gui_request_redraw();
+src/gui/apps/settings/gui_apps_settings.c:906:        gui_request_redraw();
+src/gui/apps/settings/gui_apps_settings.c:914:    gui_request_redraw();
+src/gui/apps/tools/http_downloader_gui.c:370:    gui_request_redraw();
+src/gui/apps/core/gui_apps_core.c:381:    gui_request_redraw();
+src/gui/apps/core/gui_apps_core.c:401:    gui_request_redraw();
+src/gui/apps/core/gui_apps_core.c:464:    gui_request_redraw();
+src/gui/apps/core/gui_apps_core.c:895:    gui_request_redraw();
+src/gui/apps/core/gui_apps_core.c:1208:    gui_request_redraw();
+src/gui/apps/core/gui_apps_core.c:1215:    gui_request_redraw();
+src/gui/apps/core/gui_apps_core.c:1457:        gui_request_redraw();
+src/gui/apps/core/gui_apps_core.c:1464:            gui_request_redraw();
+src/gui/apps/core/gui_apps_core.c:1469:            gui_request_redraw();
+src/gui/apps/core/gui_apps_core.c:1475:            gui_request_redraw();
+src/gui/apps/core/gui_apps_core.c:1484:            gui_request_redraw();
+src/gui/core/gui_render_loop.c:83:void gui_draw(void) {
+src/gui/core/gui_render_loop.c:378:    gui_request_redraw();
+src/gui/core/gui_render_loop.c:397:    gui_request_redraw();
+src/gui/core/gui_render_loop.c:413:    gui_request_redraw();
+src/gui/core/gui_render_loop.c:429:    gui_request_redraw();
+src/gui/core/gui_render_loop.c:442:    gui_request_redraw();
+src/gui/core/gui_render_loop.c:449:void gui_draw_notifications_panel(void)
+src/gui/core/gui_internal.h:217:void gui_draw_usb_taskbar_icon(int x, int y, uint64_t color);
+src/gui/core/gui_internal.h:238:void gui_draw_ctx_icon_art(int icon_id, int x, int y, bool hov);
+src/gui/core/gui_internal.h:244:void gui_draw_app_icon(int kind, int x, int y, int size, bool hov);
+src/gui/core/gui_internal.h:259:void gui_draw_ctx_menu_panel(void);
+src/gui/core/gui_internal.h:274:void gui_draw_notifications_panel(void);
+src/gui/core/gui_lifecycle.c:97:        gui_request_redraw();
+src/gui/core/gui_lifecycle.c:115:void gui_request_redraw(void) {
+src/gui/core/gui_lifecycle.c:126:void gui_draw_usb_taskbar_icon(int x, int y, uint64_t color) {
+src/gui/core/gui_lifecycle.c:178:    gui_request_redraw();
+src/gui/core/gui_lifecycle.c:422:void gui_update(void) {
+src/gui/core/gui_lifecycle.c:478:        gui_request_redraw();
+src/gui/core/gui_lifecycle.c:548:                gui_request_redraw();
+src/gui/core/gui_lifecycle.c:711:    gui_request_redraw();
+src/gui/core/window/gui_menus.c:76:void gui_draw_ctx_menu_panel(void) {
+src/gui/core/window/gui_menus.c:572:    gui_request_redraw();
+src/gui/core/window/gui_menus.c:619:            gui_request_redraw();
+src/gui/core/window/gui_menus.c:626:        if (key == KEY_HOME) { start_menu_selected = 0; gui_request_redraw(); continue; }
+src/gui/core/window/gui_menus.c:630:            gui_request_redraw();
+src/gui/core/window/gui_menus.c:866:    gui_request_redraw();
+src/gui/core/window/gui_menus.c:1055:        gui_request_redraw();
+src/gui/core/window/gui_menus.c:1065:                gui_request_redraw();
+src/gui/core/window/gui_menus.c:1171:    gui_request_redraw();
+src/gui/core/window/gui_menus.c:1193:    gui_request_redraw();
+src/gui/core/window/gui_menus.c:1451:                            gui_request_redraw();
+src/gui/core/window/gui_menus.c:1461:                            gui_request_redraw();
+src/gui/core/window/gui_menus.c:1512:                gui_request_redraw();
+src/gui/core/window/gui_menus.c:1630:                gui_request_redraw();
+src/gui/core/window/gui_menus.c:1646:                gui_request_redraw();
+src/gui/core/window/gui_settings.c:197:    gui_request_redraw();
+src/gui/core/window/gui_settings.c:360:    gui_request_redraw();
+src/gui/core/window/gui_settings.c:438:    gui_request_redraw();
+src/gui/core/window/gui_settings.c:453:    gui_request_redraw();
+src/gui/core/window/gui_settings.c:471:    gui_request_redraw();
+src/gui/core/window/gui_settings.c:569:    gui_request_redraw();
+src/gui/core/gui.h:292:void      gui_request_redraw(void);
+src/gui/core/gui_renderer.h:30:void gui_renderer_set_clip(uint64_t x, uint64_t y, uint64_t w, uint64_t h);
+src/gui/core/gui_renderer.h:31:void gui_renderer_reset_clip(void);
+src/gui/core/gui_renderer.h:32:void gui_renderer_draw_rect(uint64_t x, uint64_t y, uint64_t width, uint64_t height, uint64_t color, bool filled);
+src/gui/core/gui_renderer.h:33:void gui_renderer_draw_gradient_rect(uint64_t x, uint64_t y, uint64_t width, uint64_t height, uint64_t color_top, uint64_t color_bottom);
+src/gui/core/gui_renderer.h:34:void gui_renderer_draw_circle(uint64_t cx, uint64_t cy, uint64_t radius, uint64_t color, bool filled);
+src/gui/core/gui_renderer.h:35:void gui_renderer_clear_screen(uint64_t color);
+src/gui/core/gui_renderer.h:36:void gui_renderer_swap_buffers(void);
+src/gui/core/gui_renderer.h:37:void gui_renderer_present(void);
+src/gui/core/gui_renderer.h:38:void gui_renderer_get_stats(uint64_t* fps, uint64_t* frame_count);
+src/gui/core/gui_renderer.h:39:void gui_renderer_set_vsync(bool enabled);
+src/gui/core/gui_renderer.h:40:void gui_renderer_set_mode(uint8_t mode);
+src/gui/core/input/gui_input.c:998:        gui_request_redraw();
+src/gui/core/input/gui_input.c:1350:        gui_request_redraw();
+src/gui/core/input/gui_input.c:1380:                gui_request_redraw();
+src/gui/core/input/gui_input.c:1395:            gui_request_redraw();
+src/gui/core/input/gui_input.c:1424:        gui_request_redraw();
+src/gui/core/output/gui_renderer.c:364:void gui_renderer_set_clip(uint64_t x, uint64_t y, uint64_t w, uint64_t h) {
+src/gui/core/output/gui_renderer.c:373:void gui_renderer_reset_clip(void) {
+src/gui/core/output/gui_renderer.c:453:void gui_renderer_draw_rect(uint64_t x, uint64_t y, uint64_t width, uint64_t height, uint64_t color, bool filled) {
+src/gui/core/output/gui_renderer.c:482:void gui_renderer_draw_gradient_rect(uint64_t x, uint64_t y, uint64_t width, uint64_t height, 
+src/gui/core/output/gui_renderer.c:507:void gui_renderer_draw_circle(uint64_t cx, uint64_t cy, uint64_t radius, uint64_t color, bool filled) {
+src/gui/core/output/gui_renderer.c:544:void gui_renderer_clear_screen(uint64_t color) {
+src/gui/core/output/gui_renderer.c:557:void gui_renderer_swap_buffers(void) {
+src/gui/core/output/gui_renderer.c:598:void gui_renderer_present(void) {
+src/gui/core/output/gui_renderer.c:638:void gui_renderer_get_stats(uint64_t* fps, uint64_t* frame_count) {
+src/gui/core/output/gui_renderer.c:644:void gui_renderer_set_vsync(bool enabled) {
+src/gui/core/output/gui_renderer.c:649:void gui_renderer_set_mode(uint8_t mode) {
+src/gui/core/output/gui_render_engine.c:58:void gui_render_shutdown(void) {
+src/gui/core/output/gui_render_engine.c:62:void gui_render_set_clip(int x, int y, int w, int h) {
+src/gui/core/output/gui_render_engine.c:70:void gui_render_reset_clip(void) {
+src/gui/core/output/gui_render_engine.c:78:void gui_render_fill_rect(int x, int y, int w, int h, uint64_t color) {
+src/gui/core/output/gui_render_engine.c:84:void gui_render_draw_rect(int x, int y, int w, int h, uint64_t color) {
+src/gui/core/output/gui_render_engine.c:92:void gui_render_draw_rounded_rect(int x, int y, int w, int h, int radius, uint64_t color) {
+src/gui/core/output/gui_render_engine.c:100:void gui_render_fill_rounded_rect(int x, int y, int w, int h, int radius, uint64_t color) {
+src/gui/core/output/gui_render_engine.c:108:void gui_render_draw_line(int x0, int y0, int x1, int y1, uint64_t color) {
+src/gui/core/output/gui_render_engine.c:117:void gui_render_draw_circle(int cx, int cy, int radius, uint64_t color, bool filled) {
+src/gui/core/output/gui_render_engine.c:126:void gui_render_draw_text(int x, int y, const char* text, uint64_t fg, uint64_t bg) {
+src/gui/core/output/gui_desktop_render.c:627:void gui_draw_app_icon(int kind, int x, int y, int size, bool hov) {
+src/gui/core/output/gui_desktop_render.c:693:void gui_draw_ctx_icon_art(int icon_id, int x, int y, bool hov) {
+src/drivers/input/mouse.c:6:void gui_request_redraw(void) __attribute__((weak));
+src/drivers/input/mouse.c:159:    if (gui_request_redraw) gui_request_redraw();
+src/drivers/video/vga.c:449:void vga_copy_rect(int dx, int dy, int sx, int sy, int w, int h, uint32_t* src_buf) {
+src/drivers/video/vga.c:459:void vga_copy_rect_strided(int dx, int dy, int w, int h, const uint32_t *src_buf,
+src/drivers/video/vga.h:41:void vga_copy_rect(int dx, int dy, int sx, int sy, int w, int h, uint32_t* src_buf);
+src/drivers/video/vga.h:43:void vga_copy_rect_strided(int dx, int dy, int w, int h, const uint32_t *src_buf,
+src/kernel/settings_manager.c:324:void gui_draw_context_menus(void) {}
+src/kernel/api/cos_api.c:26:extern void gui_request_redraw(void);
+src/kernel/api/cos_api.c:426:    gui_request_redraw();
+src/kernel/settings_manager.h:80:void gui_draw_context_menus(void);
+src/kernel/kernel.c:81:void gui_update(void);

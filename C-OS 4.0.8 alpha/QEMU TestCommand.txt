@@ -1,0 +1,20 @@
+# C-OS standalone QEMU launcher
+# Run this from any directory after extracting the source tree.
+
+# Default: UEFI, 8 CPUs, EHCI USB mouse, E1000 user network
+./tools/run_qemu_c-os.sh
+
+# Variable CPU counts: all values 1 through 8 are supported
+./tools/run_qemu_c-os.sh --cpus 1
+./tools/run_qemu_c-os.sh --cpus 3
+./tools/run_qemu_c-os.sh --cpus 4
+./tools/run_qemu_c-os.sh --cpus 8
+
+# Legacy BIOS path
+./tools/run_qemu_c-os.sh --bios --cpus 4
+
+# Secure Boot path using the enrolled development-key OVMF variable store
+./tools/run_qemu_c-os.sh --secure-boot --cpus 8
+
+# Optional environment overrides
+COS_MEMORY=1536M COS_SERIAL=/tmp/cos.serial ./tools/run_qemu_c-os.sh --cpus 4

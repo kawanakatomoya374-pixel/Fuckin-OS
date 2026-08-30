@@ -1,0 +1,17 @@
+--- image metadata ---
+-rw-r--r-- 1 ubuntu ubuntu 1.0G Aug 26 18:01 validation/local_browser_dual_storage.img
+-rw-r--r-- 1 ubuntu ubuntu 1.0G Aug 26 14:31 validation/local_browser_fat32.img
+validation/local_browser_dual_storage.img: data
+validation/local_browser_fat32.img:        data
+--- signatures ---
+000000 54 53 4f 46 50 53 53 43 04 00 00 00 00 00 00 00  >TSOFPSSC........<
+000010 00 00 10 00 00 00 00 00 40 00 00 00 00 00 00 00  >........@.......<
+000020 84 00 00 00 00 00 00 00 80 00 00 00 00 00 00 00  >................<
+000030 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  >................<
+000040 de 3c 61 d5 00 00 00 00 00 00 00 00 00 00 00 00  >.<a.............<
+000050 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  >................<
+*
+000400
+--- filesystem tools ---
+/usr/sbin/fsck.fat
+/usr/bin/mcopy

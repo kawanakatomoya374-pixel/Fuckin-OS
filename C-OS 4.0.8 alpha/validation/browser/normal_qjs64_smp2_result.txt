@@ -1,0 +1,41 @@
+--- normal distribution markers ---
+[SMP] Online CPUs=2 (AP per-CPU kernel work loops active)
+[E1000] PCI RX IRQ registered; activation deferred until GUI ready
+[KERNEL] Boot password screen disabled; skipping directly to desktop
+[KERNEL] Entering the modern desktop...
+[KERNEL] Initializing GUI...
+[GUI] Initializing enhanced GUI system
+[E1000] PCI RX IRQ active after GUI scheduler handoff
+[GUI] Desktop arrival confirmed
+[GUI] Boot complete - drawing desktop
+[VGA/SMP] tiled BitBlt grid=2x1 tiles=2 AP CPUs=1
+[GUI] GUI system initialized
+[GUI] Screen resolution: 1024x768
+[GUI] Desktop should now be visible
+[KERNEL] Entering GUI main loop...
+[VGA/SMP] tiled BitBlt grid=2x1 tiles=2 AP CPUs=1
+--- exact memory in binary-facing source ---
+src/third_party/quickjs/quickjs_port.h:24:#define COS_QUICKJS_RUNTIME_MEMORY_LIMIT_BYTES (64u * 1024u * 1024u)
+src/third_party/quickjs/quickjs_port.h:32: * COS_QUICKJS_RUNTIME_MEMORY_LIMIT_BYTES (64MiB) bounded memory limit so a
+src/netsurf/cos_netsurf.c:232:    params.llcache.limit = 128u * 1024u * 1024u;   /* 128MiB RAM cache */
+src/kernel/memory.c:38:#define HEAP_SIZE      0x10000000ULL   /* 256 MiB shared kernel heap */
+src/kernel/memory.c:84:static uint8_t kernel_heap[HEAP_SIZE] __attribute__((aligned(4096)));
+src/kernel/memory.c:129:    uintptr_t end = start + HEAP_SIZE;
+src/kernel/memory.c:159:    heap_head->size = HEAP_SIZE - HEADER_SIZE;
+src/kernel/memory.c:210:    uintptr_t heap_end = heap_start + HEAP_SIZE;
+src/kernel/memory.c:263:    serial_putdec(HEAP_SIZE / (1024 * 1024));
+src/kernel/memory.c:274:    if (size > HEAP_SIZE) {
+src/kernel/memory.c:521:uint64_t kmemory_total(void)              { return HEAP_SIZE; }
+src/kernel/memory.c:524:    st->total_mb     = HEAP_SIZE / (1024 * 1024);
+src/kernel/memory.c:532:    if (total)     *total    = HEAP_SIZE;
+src/kernel/memory.c:534:    if (free_mem)  *free_mem = (HEAP_SIZE > mem_stats.current_usage) ? (HEAP_SIZE - mem_stats.current_usage) : 0;
+src/kernel/memory.c:543:uint64_t cos_heap_get_total_size(void)  { return HEAP_SIZE; }
+src/kernel/memory.c:546:    uint64_t total = HEAP_SIZE;
+src/kernel/memory.c:555:    if (physical_total_bytes == 0) physical_total_bytes = HEAP_SIZE;
+src/kernel/memory.c:556:    if (available_total_bytes == 0) available_total_bytes = HEAP_SIZE;
+src/kernel/memory.c:565:    if (heap < HEAP_SIZE) heap = HEAP_SIZE;
+src/kernel/memory.c:579:    if (heap_size_bytes == 0) heap_size_bytes = HEAP_SIZE;
+src/kernel/memory.c:594:    return g_runtime_total_bytes ? g_runtime_total_bytes : HEAP_SIZE;
+src/kernel/memory.c:597:    return g_runtime_available_bytes ? g_runtime_available_bytes : HEAP_SIZE;
+src/kernel/memory.c:600:    return g_runtime_heap_bytes ? g_runtime_heap_bytes : HEAP_SIZE;
+src/kernel/memory.c:611:   HEAP_SIZE constant. */

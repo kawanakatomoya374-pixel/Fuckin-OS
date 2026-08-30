@@ -1,0 +1,87 @@
+--- benchmark result ---
+[SMP] Online CPUs=2 (AP per-CPU kernel work loops active)
+[USERSPACE] FAILED: could not map user code page
+[NetSurf] engine initialised (content core + html/css/png/jpeg/bmp handlers + QuickJS backend + data:/file:/http:/https: fetchers; llcache=128MiB, QuickJS runtime=24MiB)
+[NetSurf/QuickJS] thread content=0000000000000000
+[NetSurf/QuickJS] page JavaScript context created
+--- last lines ---
+[KEYBOARD] Keyboard initialized
+[KERNEL] Boot password screen disabled; skipping directly to desktop
+[KERNEL] Entering the modern desktop...
+[KERNEL] Initializing GUI...
+[GUI] Initializing enhanced GUI system
+[NOTIF] Initializing notification center...
+[NOTIF] Notification center initialized
+[THEME] Initializing theme system...
+[THEME] Theme system initialized
+[JPEG] Initializing image viewer
+[JPEG] Image viewer initialized successfully
+[MP3] backend initialized
+[MODERN_UI] Initializing modern UI framework
+[MODERN_UI] Modern UI framework initialized
+[E1000] runtime IRQ arm: mask
+[E1000] runtime IRQ arm: disable/ACK
+[E1000] runtime IRQ arm: enable device
+[E1000] runtime IRQ arm: PIC unmask
+[E1000] runtime IRQ arm: PIC unmask returned
+[E1000] PCI RX IRQ active after GUI scheduler handoff
+[GUI] Desktop arrival confirmed
+[GUI] Boot complete - drawing desktop
+[ACPICA] ReallocateRootTable: not required; continuing (status=0x000000000000000F)
+[IRQ] Installing handler for IRQ 9
+[ACPICA] initialized: event hooks active
+[ACPI] tables discovered
+[ACPI] AML namespace parsed (subset)
+[ACPI] Smart battery over SMBus active
+[VGA/SMP] tiled BitBlt grid=2x1 tiles=2 AP CPUs=1
+[GUI] GUI system initialized
+[GUI] Screen resolution: 1024x768
+[GUI] Desktop should now be visible
+[KERNEL] Entering GUI main loop...
+[PAGING] alloc_level -> 0x0000000003FBD000
+[PAGING] alloc_level memset ok
+[NOTIF] Background expiry thread started
+[KERNEL] Enabling preemptive multitasking...
+[SCHED] Preemption ENABLED.
+[KERNEL] Starting scheduler and abandoning boot stack...
+[SCHED] Scheduler started. Switching to first task...
+[E1000] deferred drain irq=0 frames=0 total=0 icr=0x0000000000000000
+[USB] TinyUSB non-blocking service loop active.
+[USB] poll trace: entering EHCI service
+[USB] EHCI root port attached; starting TinyUSB enumeration.
+[USB] poll trace: EHCI service returned
+[USB] poll trace: TinyUSB task returned
+[QJS/Web] asynchronous HTTP worker online
+[GUI] validation: opening file:// Browser from owner loop
+[NetSurf] GUI triggered pipeline for: file:///browser/quickjs_dom_css_performance_selftest.html
+[NSLOG] src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/css_fetcher.c (html_css_fetcher_initialise):70: html_css_fetcher_initialise called for x-ns-css
+[NSLOG] src/third_party/netsurf-all-3.11/netsurf/content/fetchers/data.c (fetch_data_initialise):61: fetch_data_initialise called for data
+[NSLOG] src/third_party/netsurf-all-3.11/netsurf/content/fetchers/resource.c (fetch_resource_initialise):286: direct data for adblock.css
+[NSLOG] src/third_party/netsurf-all-3.11/netsurf/content/fetchers/resource.c (fetch_resource_initialise):286: direct data for default.css
+[NSLOG] src/third_party/netsurf-all-3.11/netsurf/content/fetchers/resource.c (fetch_resource_initialise):286: direct data for internal.css
+[NSLOG] src/third_party/netsurf-all-3.11/netsurf/content/fetchers/resource.c (fetch_resource_initialise):286: direct data for quirks.css
+[NSLOG] src/third_party/netsurf-all-3.11/netsurf/content/fetchers/resource.c (fetch_resource_initialise):286: direct data for user.css
+[PAGING] alloc_level -> 0x0000000003FD7000
+[PAGING] alloc_level memset ok
+[NetSurf] bounded asynchronous HTTP workers online: 2
+[NetSurf] http:/https: fetcher registered (backed by kernel/drivers/http.c)
+[NSLOG] src/third_party/netsurf-all-3.11/netsurf/content/llcache.c (llcache_initialise):3899: llcache initialising with a limit of 134217728 bytes
+[NetSurf] engine initialised (content core + html/css/png/jpeg/bmp handlers + QuickJS backend + data:/file:/http:/https: fetchers; llcache=128MiB, QuickJS runtime=24MiB)
+[NetSurf/QuickJS] thread content=0000000000000000
+[NetSurf/QuickJS] page JavaScript context created
+[NetSurf/JS] eval: 1 + 2
+[QJS] Result: 3
+[NSLOG] src/third_party/netsurf-all-3.11/netsurf/desktop/browser_window.c (browser_window_navigate):3321: bw 0x3fff9d8, url file:///browser/quickjs_dom_css_performance_selftest.html
+[NSLOG] src/third_party/netsurf-all-3.11/netsurf/desktop/browser_window.c (navigate_internal_real):3527: Loading 'file:///browser/quickjs_dom_css_performance_selftest.html'
+[NetSurf/file] queued: file:///browser/quickjs_dom_css_performance_selftest.html
+[VGA/SMP] tiled BitBlt grid=2x1 tiles=2 AP CPUs=1
+[DNS] Server updated from DHCP
+[E1000] deferred drain irq=1 frames=2 total=2 icr=0x0000000000000083
+[USB] EHCI root-port reset start.
+[NetSurf/file] processing queued request
+[NetSurf/file] reading /browser/quickjs_dom_css_performance_selftest.html
+[NetSurf/file] filesystem read failed
+[NSLOG] src/third_party/netsurf-all-3.11/netsurf/desktop/browser_window.c (navigate_internal_query_fetcherror):3766: bw:0x3fff9d8 params:0x1a006b90
+[NSLOG] src/third_party/netsurf-all-3.11/netsurf/desktop/browser_window.c (navigate_internal_real):3527: Loading 'about:query/fetcherror'
+[EXCEPTION] Unhandled interrupt: 6 err_code=0x0000000000000000 rip=0x00000000000049C1 cs=0x0000000000000008
+[EXCEPTION] Fatal unhandled CPU exception - halting

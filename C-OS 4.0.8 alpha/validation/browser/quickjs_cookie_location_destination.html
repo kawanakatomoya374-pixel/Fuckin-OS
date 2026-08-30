@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>C-OS Location destination</title>
+  <style>
+    body { font: 18px sans-serif; margin: 28px; background: #f4f7fb; color: #18212f; }
+    main { max-width: 760px; padding: 24px; border-radius: 14px; background: #fff; }
+    h1 { margin-top: 0; color: #193d73; }
+    #result { white-space: pre-wrap; line-height: 1.55; padding: 14px; background: #edf3fb; }
+    .pass { color: #075e32; font-weight: 700; }
+    .fail { color: #a21b1b; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>QuickJS Location destination</h1>
+    <div id="result">RUNNING</div>
+  </main>
+  <script>
+  (function () {
+    var checks = [];
+    function check(name, value) { checks.push(name + ': ' + (value ? 'PASS' : 'FAIL')); }
+    check('relative navigation path', location.pathname.indexOf('quickjs_cookie_location_destination.html') >= 0);
+    check('relative navigation query', location.search === '?from=selftest');
+    check('relative navigation fragment', location.hash === '#ok');
+    check('Location origin', location.origin.indexOf('http://') === 0 || location.origin.indexOf('https://') === 0);
+    check('Cookie retained after navigation', document.cookie.indexOf('cos_cookie_test=visible') >= 0);
+    check('document.URL synchronized', document.URL === location.href);
+    var passed = checks.every(function (line) { return line.indexOf('PASS') >= 0; });
+    var result = document.getElementById('result');
+    result.className = passed ? 'pass' : 'fail';
+    result.textContent = (passed ? 'PASS' : 'FAIL') + '\n' + checks.join('\n');
+    document.title = passed ? 'C-OS Cookie/Location Navigation PASS' : 'C-OS Cookie/Location Navigation FAIL';
+  })();
+  </script>
+</body>
+</html>

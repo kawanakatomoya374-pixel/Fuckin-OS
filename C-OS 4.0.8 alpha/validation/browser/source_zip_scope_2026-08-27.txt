@@ -1,0 +1,50 @@
+--- build outputs ---
+-rwxr-xr-x 1 ubuntu ubuntu 28M Aug 26 18:59 build/kernel.elf
+-rw-r--r-- 1 ubuntu ubuntu 65M Aug 26 18:59 build/secureboot/C-OS_4.0.8_alpha_secure.iso
+--- source candidates ---
+210M	src
+332K	tools
+13G	validation
+80K	Makefile
+44K	PORTING_NOTES.md
+--- generated large files ---
+1610612736 ./validation/smp-matrix/storage8.img
+1610612736 ./validation/smp-matrix/storage7.img
+1610612736 ./validation/smp-matrix/storage6.img
+1610612736 ./validation/smp-matrix/storage5.img
+1610612736 ./validation/smp-matrix/storage4.img
+1610612736 ./validation/smp-matrix/storage3.img
+1610612736 ./validation/smp-matrix/storage2.img
+1610612736 ./validation/smp-matrix/storage1.img
+1610612736 ./build/stress64-storage.img
+1610612736 ./build/storage.img
+1073741824 ./validation/local_browser_fat32.img
+1073741824 ./validation/local_browser_dual_storage.img
+536870912 ./validation/local_quickjs_storage.img
+536870912 ./validation/browser_perf_storage.img
+536870912 ./build/storage_mp3_test.img
+67487744 ./validation/browser/C-OS_4.0.8_alpha_secure_cookie_location_smp2_smoke.iso
+67487744 ./build/secureboot/C-OS_4.0.8_alpha_secure.iso
+67487744 ./build/secureboot/C-OS_4.0.8_alpha_parallel_tls_smoke_secure.iso
+67487744 ./build/secureboot/C-OS_4.0.8_alpha_parallel_tls_peak_smoke_secure.iso
+67487744 ./build/secureboot/C-OS_4.0.8_alpha_local_file_quickjs_smoke_secure.iso
+67487744 ./build/secureboot/C-OS_4.0.8_alpha_http2_brotli_smoke_secure.iso
+67487744 ./build/secureboot/C-OS_4.0.8_alpha_dns_h2_brotli_smoke_secure.iso
+67108864 ./build/secureboot/iso-root/boot/esp.img
+40570880 ./C-OS_4.0.8_alpha.iso
+28662088 ./kernel.elf
+28662088 ./iso/boot/kernel.elf
+28662088 ./build/kernel.elf
+16777216 ./qemu_usb_disk.img
+16109490 ./build/liblcss.a
+11815314 ./build/libquickjs.a
+10168384 ./obj/quickjs/quickjs.o
+7434310 ./build/libacpica.a
+4848000 ./build/libldom.a
+4796714 ./build/libns_content.a
+4591816 ./build/libbearssl.a
+1399956 ./build/libnghttp2.a
+1318580 ./build/liblhubbub.a
+1002632 ./build/libns_utils.a
+777912 ./obj/drivers/video/jp_font16.o
+775960 ./obj/gui/apps/calculator/gui_apps_calculator.o

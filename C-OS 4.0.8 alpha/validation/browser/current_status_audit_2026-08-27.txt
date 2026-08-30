@@ -1,0 +1,97 @@
+--- memory constants ---
+src/third_party/quickjs/quickjs_port.h:24:#define COS_QUICKJS_RUNTIME_MEMORY_LIMIT_BYTES (24u * 1024u * 1024u)
+src/third_party/quickjs/quickjs_port.h:32: * COS_QUICKJS_RUNTIME_MEMORY_LIMIT_BYTES (24MiB) bounded memory limit so a
+src/third_party/quickjs/quickjs_port.c:2867:        JS_SetMemoryLimit(rt, COS_QUICKJS_RUNTIME_MEMORY_LIMIT_BYTES);
+src/netsurf/cos_fetch_http.c:32: *     full response, up to http.c's HTTP_MAX_RESP cap) happens
+src/netsurf/cos_fetch_http.c:996:            body_len > HTTP_MAX_RESP) {
+src/netsurf/cos_fetch_http.c:997:            body_len = HTTP_MAX_RESP;
+src/netsurf/cos_netsurf.c:232:    params.llcache.limit = 128u * 1024u * 1024u;   /* 128MiB RAM cache */
+src/kernel/drivers/http.h:27:#define HTTP_MAX_RESP   (10u * 1024u * 1024u)
+src/kernel/drivers/http.h:49:    char response[HTTP_MAX_RESP];
+src/kernel/memory.c:38:#define HEAP_SIZE      0x10000000ULL   /* 256 MiB shared kernel heap */
+src/kernel/memory.c:84:static uint8_t kernel_heap[HEAP_SIZE] __attribute__((aligned(4096)));
+src/kernel/memory.c:129:    uintptr_t end = start + HEAP_SIZE;
+src/kernel/memory.c:159:    heap_head->size = HEAP_SIZE - HEADER_SIZE;
+src/kernel/memory.c:210:    uintptr_t heap_end = heap_start + HEAP_SIZE;
+src/kernel/memory.c:263:    serial_putdec(HEAP_SIZE / (1024 * 1024));
+src/kernel/memory.c:274:    if (size > HEAP_SIZE) {
+src/kernel/memory.c:521:uint64_t kmemory_total(void)              { return HEAP_SIZE; }
+src/kernel/memory.c:524:    st->total_mb     = HEAP_SIZE / (1024 * 1024);
+src/kernel/memory.c:532:    if (total)     *total    = HEAP_SIZE;
+src/kernel/memory.c:534:    if (free_mem)  *free_mem = (HEAP_SIZE > mem_stats.current_usage) ? (HEAP_SIZE - mem_stats.current_usage) : 0;
+src/kernel/memory.c:543:uint64_t cos_heap_get_total_size(void)  { return HEAP_SIZE; }
+src/kernel/memory.c:546:    uint64_t total = HEAP_SIZE;
+src/kernel/memory.c:555:    if (physical_total_bytes == 0) physical_total_bytes = HEAP_SIZE;
+src/kernel/memory.c:556:    if (available_total_bytes == 0) available_total_bytes = HEAP_SIZE;
+src/kernel/memory.c:565:    if (heap < HEAP_SIZE) heap = HEAP_SIZE;
+src/kernel/memory.c:579:    if (heap_size_bytes == 0) heap_size_bytes = HEAP_SIZE;
+src/kernel/memory.c:594:    return g_runtime_total_bytes ? g_runtime_total_bytes : HEAP_SIZE;
+src/kernel/memory.c:597:    return g_runtime_available_bytes ? g_runtime_available_bytes : HEAP_SIZE;
+src/kernel/memory.c:600:    return g_runtime_heap_bytes ? g_runtime_heap_bytes : HEAP_SIZE;
+src/kernel/memory.c:611:   HEAP_SIZE constant. */
+--- distribution controls ---
+src/gui/apps/browser/gui_apps_browser.c:22:#ifndef COS_BROWSER_FILE_SMOKE
+src/gui/apps/browser/gui_apps_browser.c:23:#define COS_BROWSER_FILE_SMOKE 0
+src/gui/apps/browser/gui_apps_browser.c:2572:#if COS_BROWSER_FILE_SMOKE
+src/gui/core/gui_render_loop.c:30:#ifndef COS_BROWSER_FILE_SMOKE
+src/gui/core/gui_render_loop.c:31:#define COS_BROWSER_FILE_SMOKE 0
+src/gui/core/gui_lifecycle.c:41:#ifndef COS_BROWSER_FILE_SMOKE
+src/gui/core/gui_lifecycle.c:42:#define COS_BROWSER_FILE_SMOKE 0
+src/gui/core/gui_lifecycle.c:453:#if COS_BROWSER_FILE_SMOKE
+src/gui/core/window/gui_settings.c:8:#ifndef COS_BROWSER_FILE_SMOKE
+src/gui/core/window/gui_settings.c:9:#define COS_BROWSER_FILE_SMOKE 0
+src/gui/core/window/gui_settings.c:59:static bool gui_autostart_browser = true;
+src/gui/core/window/gui_settings.c:374:    gui_autostart_browser = enabled ? true : false;
+src/gui/core/window/gui_settings.c:380:bool gui_get_autostart_browser(void) { return gui_autostart_browser; }
+src/gui/core/window/gui_settings.c:615:        gui_format_int(gui_autostart_browser ? 1 : 0, buf, sizeof(buf));
+src/gui/core/window/gui_settings.c:718:#if COS_BROWSER_FILE_SMOKE
+src/gui/core/window/gui_settings.c:723:    gui_autostart_browser = true;
+src/gui/core/window/gui_settings.c:728:    gui_autostart_browser = false;
+src/gui/core/window/gui_settings.c:920:    if (gui_autostart_browser) {
+Makefile:22:HTTP_RUNTIME_SMOKE ?= 0
+Makefile:30:          	-DCOS_LUA_LINKED=1 -DCOS_HTTP_RUNTIME_SMOKE=$(HTTP_RUNTIME_SMOKE) \
+Makefile:31:          	-DCOS_BROWSER_FILE_SMOKE=$(BROWSER_FILE_SMOKE) \
+--- latest SVG evidence ---
+[NetSurf] engine initialised (content core + html/css/png/jpeg/bmp handlers + QuickJS backend + data:/file:/http:/https: fetchers; llcache=128MiB, QuickJS runtime=24MiB)
+[NetSurf] HTTP fetch success: http://192.168.70.2:8090/svg_icon_selftest.html status=200 mime=text/html
+[NetSurf] HTTP fetch success: http://192.168.70.2:8090/svg_icon_selftest.svg status=200 mime=image/svg+xml
+[NetSurf] HTTP fetch success: http://192.168.70.2:8090/svg_icon_selftest.ico status=200 mime=image/vnd.microsoft.icon
+[NetSurf] HTTP fetch success: http://192.168.70.2:8090/svg_icon_selftest.ico status=200 mime=image/vnd.microsoft.icon
+[NetSurf] HTTP fetch success: http://192.168.70.2:8090/svg_icon_selftest.svg status=200 mime=image/svg+xml
+[NetSurf] HTTP fetch success: http://192.168.70.2:8090/favicon.ico status=404 mime=text/html
+--- benchmark/zip status ---
+C-OS_4.0.8_alpha_secure_cookie_location_smp2_smoke.iso
+benchmark_plan_2026-08-27.md
+cookie_location_smp2.debug.log
+cookie_location_smp2.qmp_reply.log
+cookie_location_smp2.serial.log
+cookie_location_smp2_final.qmp_reply.log
+cookie_location_smp2_fragment_result_extract.txt
+cookie_location_smp2_result_extract.txt
+cookie_location_validation_launch_audit.txt
+generate_svg_icon_selftest_ico.py
+quickjs_cookie_location_destination.html
+quickjs_cookie_location_selftest.html
+secureboot_smp2_cookie_location_navigation.png
+secureboot_smp2_cookie_location_navigation.ppm
+secureboot_smp2_cookie_location_navigation_pass.png
+secureboot_smp2_cookie_location_navigation_pass.ppm
+secureboot_smp2_svg_ico_path_render.png
+secureboot_smp2_svg_ico_path_render.ppm
+secureboot_smp2_svg_ico_selftest.png
+secureboot_smp2_svg_ico_selftest.ppm
+secureboot_smp2_svg_ico_selftest_root_search.png
+secureboot_smp2_svg_ico_selftest_root_search.ppm
+serve_cookie_location_fixture.py
+svg_ico_smp2.debug.log
+svg_ico_smp2.serial.log
+svg_ico_smp2_final.qmp_reply.log
+svg_ico_smp2_path_final.qmp_reply.log
+svg_ico_smp2_result_extract.txt
+svg_ico_smp2_root_search.qmp_reply.log
+svg_icon_handler_audit.txt
+svg_icon_selftest.html
+svg_icon_selftest.ico
+svg_icon_selftest.svg
+-rw-r--r-- 1 ubuntu ubuntu 65M Aug 26 18:56 /home/ubuntu/c-os-work/c-os/build/secureboot/C-OS_4.0.8_alpha_secure.iso
+-rw------- 1 ubuntu ubuntu 23M Aug 25 05:05 /home/ubuntu/upload/C-OS_4_0_8_alpha_fixed.zip

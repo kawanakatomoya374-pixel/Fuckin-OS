@@ -1,0 +1,19 @@
+<!doctype html>
+<div id="host"><span id="light" slot="named">light</span></div><pre id="result">pending</pre>
+<script>
+(function () {
+  var result = document.getElementById('result');
+  try {
+    var host = document.getElementById('host');
+    var light = document.getElementById('light');
+    var root = host.attachShadow({mode: 'open'});
+    var slot = document.createElement('slot');
+    slot.name = 'named';
+    root.appendChild(slot);
+    var assigned = slot.assignedNodes();
+    var ok = assigned.length === 1 && assigned[0] === light && light.slot === 'named' && light.assignedSlot === slot;
+    result.textContent = ok ? 'PASS: Shadow slot APIs' : 'FAIL assigned=' + assigned.length + ' slot=' + light.slot + ' assignedSlot=' + (light.assignedSlot === slot);
+    console.log(ok ? 'SHADOW_SLOT_PASS' : 'SHADOW_SLOT_FAIL values');
+  } catch (e) { result.textContent = 'FAIL: ' + e; console.log('SHADOW_SLOT_FAIL ' + e); }
+}());
+</script>

@@ -1,0 +1,211 @@
+--- libdom XML paths ---
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/xmlerror.h
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/xmlparser.h
+--- dom bindings references ---
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:21:#include "xmlparser.h"
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:26:static void xml_parser_start_document(void *ctx);
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:27:static void xml_parser_end_document(void *ctx);
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:28:static void xml_parser_start_element_ns(void *ctx, const xmlChar *localname,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:33:static void xml_parser_end_element_ns(void *ctx, const xmlChar *localname,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:36:static dom_exception xml_parser_link_nodes(dom_xml_parser *parser,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:39:static dom_exception xml_parser_add_node(dom_xml_parser *parser,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:41:static dom_exception xml_parser_add_element_node(dom_xml_parser *parser,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:43:static dom_exception xml_parser_add_text_node(dom_xml_parser *parser,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:45:static dom_exception xml_parser_add_cdata_section(dom_xml_parser *parser,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:47:static dom_exception xml_parser_add_entity_reference(dom_xml_parser *parser,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:49:static dom_exception xml_parser_add_entity(dom_xml_parser *parser,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:51:static dom_exception xml_parser_add_comment(dom_xml_parser *parser,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:53:static dom_exception xml_parser_add_document_type(dom_xml_parser *parser,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:56:static void xml_parser_internal_subset(void *ctx, const xmlChar *name,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:58:static int xml_parser_is_standalone(void *ctx);
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:59:static int xml_parser_has_internal_subset(void *ctx);
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:60:static int xml_parser_has_external_subset(void *ctx);
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:61:static xmlParserInputPtr xml_parser_resolve_entity(void *ctx,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:63:static xmlEntityPtr xml_parser_get_entity(void *ctx, const xmlChar *name);
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:64:static void xml_parser_entity_decl(void *ctx, const xmlChar *name,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:67:static void xml_parser_notation_decl(void *ctx, const xmlChar *name,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:69:static void xml_parser_attribute_decl(void *ctx, const xmlChar *elem,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:72:static void xml_parser_element_decl(void *ctx, const xmlChar *name,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:74:static void xml_parser_unparsed_entity_decl(void *ctx, const xmlChar *name,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:77:static void xml_parser_set_document_locator(void *ctx, xmlSAXLocatorPtr loc);
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:78:static void xml_parser_reference(void *ctx, const xmlChar *name);
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:79:static void xml_parser_characters(void *ctx, const xmlChar *ch, int len);
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:80:static void xml_parser_comment(void *ctx, const xmlChar *value);
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:81:static xmlEntityPtr xml_parser_get_parameter_entity(void *ctx,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:83:static void xml_parser_cdata_block(void *ctx, const xmlChar *value, int len);
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:84:static void xml_parser_external_subset(void *ctx, const xmlChar *name,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:90:struct dom_xml_parser {
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:107:	.internalSubset         = xml_parser_internal_subset,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:108:	.isStandalone           = xml_parser_is_standalone,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:109:	.hasInternalSubset      = xml_parser_has_internal_subset,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:110:	.hasExternalSubset      = xml_parser_has_external_subset,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:111:	.resolveEntity          = xml_parser_resolve_entity,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:112:	.getEntity              = xml_parser_get_entity,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:113:	.entityDecl             = xml_parser_entity_decl,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:114:	.notationDecl           = xml_parser_notation_decl,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:115:	.attributeDecl          = xml_parser_attribute_decl,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:116:	.elementDecl            = xml_parser_element_decl,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:117:	.unparsedEntityDecl     = xml_parser_unparsed_entity_decl,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:118:	.setDocumentLocator     = xml_parser_set_document_locator,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:119:	.startDocument          = xml_parser_start_document,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:120:	.endDocument            = xml_parser_end_document,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:123:	.reference              = xml_parser_reference,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:124:	.characters             = xml_parser_characters,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:125:	.ignorableWhitespace    = xml_parser_characters,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:127:	.comment                = xml_parser_comment,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:131:	.getParameterEntity     = xml_parser_get_parameter_entity,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:132:	.cdataBlock             = xml_parser_cdata_block,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:133:	.externalSubset         = xml_parser_external_subset,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:136:	.startElementNs         = xml_parser_start_element_ns,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:137:	.endElementNs           = xml_parser_end_element_ns,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:141:static void *dom_xml_alloc(void *ptr, size_t len, void *pw)
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:169:dom_xml_parser *dom_xml_parser_create(const char *enc, const char *int_enc,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:172:	dom_xml_parser *parser;
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:179:	parser = dom_xml_alloc(NULL, sizeof(dom_xml_parser), NULL);
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:188:		dom_xml_alloc(parser, 0, NULL);
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:198:		dom_xml_alloc(parser, 0, NULL);
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:208:		dom_xml_alloc(parser, 0, NULL);
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:225:		dom_xml_alloc(parser, 0, NULL);
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:246:void dom_xml_parser_destroy(dom_xml_parser *parser)
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:255:	dom_xml_alloc(parser, 0, NULL);
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:266:dom_xml_error dom_xml_parser_parse_chunk(dom_xml_parser *parser,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:293:dom_xml_error dom_xml_parser_completed(dom_xml_parser *parser)
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:316:void xml_parser_start_document(void *ctx)
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:318:	dom_xml_parser *parser = (dom_xml_parser *) ctx;
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:332:	parser->err = xml_parser_link_nodes(parser,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:346:void xml_parser_end_document(void *ctx)
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:348:	dom_xml_parser *parser = (dom_xml_parser *) ctx;
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:402:		parser->err = xml_parser_add_node(parser,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:425:void xml_parser_start_element_ns(void *ctx, const xmlChar *localname,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:431:	dom_xml_parser *parser = (dom_xml_parser *) ctx;
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:484:			parser->err = xml_parser_add_node(parser,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:493:	parser->err = xml_parser_add_node(parser,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:506:void xml_parser_end_element_ns(void *ctx, const xmlChar *localname,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:509:	dom_xml_parser *parser = (dom_xml_parser *) ctx;
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:557:		parser->err = xml_parser_add_node(parser,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:572:dom_exception xml_parser_link_nodes(dom_xml_parser *parser, 
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:601:dom_exception xml_parser_add_node(dom_xml_parser *parser,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:631:		return xml_parser_add_element_node(parser, parent, child);
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:633:		return xml_parser_add_text_node(parser, parent, child);
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:635:		return xml_parser_add_cdata_section(parser, parent, child);
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:637:		return xml_parser_add_entity_reference(parser, parent, child);
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:639:		return xml_parser_add_comment(parser, parent, child);
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:641:		return xml_parser_add_document_type(parser, parent, child);
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:643:		return xml_parser_add_entity(parser, parent, child);
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:661:dom_exception xml_parser_add_element_node(dom_xml_parser *parser, 
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:847:			err = xml_parser_add_node(parser,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:856:		err = xml_parser_link_nodes(parser,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:909:	err = xml_parser_link_nodes(parser, (struct dom_node *) el,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:936:dom_exception xml_parser_add_text_node(dom_xml_parser *parser,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:979:	err = xml_parser_link_nodes(parser, (struct dom_node *) text,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1000:dom_exception xml_parser_add_cdata_section(dom_xml_parser *parser,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1043:	err = xml_parser_link_nodes(parser, (struct dom_node *) cdata,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1064:dom_exception xml_parser_add_entity_reference(dom_xml_parser *parser,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1096:		err = xml_parser_add_node(parser,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1117:	err = xml_parser_link_nodes(parser, (struct dom_node *) entity,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1138:dom_exception xml_parser_add_entity(dom_xml_parser *parser, 
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1158:dom_exception xml_parser_add_comment(dom_xml_parser *parser,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1201:	err = xml_parser_link_nodes(parser, (struct dom_node *) comment,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1222:dom_exception xml_parser_add_document_type(dom_xml_parser *parser,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1266:	err = xml_parser_link_nodes(parser, (struct dom_node *) doctype,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1281:void xml_parser_internal_subset(void *ctx, const xmlChar *name,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1284:	dom_xml_parser *parser = (dom_xml_parser *) ctx;
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1289:int xml_parser_is_standalone(void *ctx)
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1291:	dom_xml_parser *parser = (dom_xml_parser *) ctx;
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1296:int xml_parser_has_internal_subset(void *ctx)
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1298:	dom_xml_parser *parser = (dom_xml_parser *) ctx;
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1303:int xml_parser_has_external_subset(void *ctx)
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1305:	dom_xml_parser *parser = (dom_xml_parser *) ctx;
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1310:xmlParserInputPtr xml_parser_resolve_entity(void *ctx,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1313:	dom_xml_parser *parser = (dom_xml_parser *) ctx;
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1318:xmlEntityPtr xml_parser_get_entity(void *ctx, const xmlChar *name)
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1320:	dom_xml_parser *parser = (dom_xml_parser *) ctx;
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1325:void xml_parser_entity_decl(void *ctx, const xmlChar *name,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1329:	dom_xml_parser *parser = (dom_xml_parser *) ctx;
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1335:void xml_parser_notation_decl(void *ctx, const xmlChar *name,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1338:	dom_xml_parser *parser = (dom_xml_parser *) ctx;
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1343:void xml_parser_attribute_decl(void *ctx, const xmlChar *elem,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1347:	dom_xml_parser *parser = (dom_xml_parser *) ctx;
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1353:void xml_parser_element_decl(void *ctx, const xmlChar *name,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1356:	dom_xml_parser *parser = (dom_xml_parser *) ctx;
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1361:void xml_parser_unparsed_entity_decl(void *ctx, const xmlChar *name,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1365:	dom_xml_parser *parser = (dom_xml_parser *) ctx;
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1371:void xml_parser_set_document_locator(void *ctx, xmlSAXLocatorPtr loc)
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1373:	dom_xml_parser *parser = (dom_xml_parser *) ctx;
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1378:void xml_parser_reference(void *ctx, const xmlChar *name)
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1380:	dom_xml_parser *parser = (dom_xml_parser *) ctx;
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1385:void xml_parser_characters(void *ctx, const xmlChar *ch, int len)
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1387:	dom_xml_parser *parser = (dom_xml_parser *) ctx;
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1392:void xml_parser_comment(void *ctx, const xmlChar *value)
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1394:	dom_xml_parser *parser = (dom_xml_parser *) ctx;
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1399:xmlEntityPtr xml_parser_get_parameter_entity(void *ctx, const xmlChar *name)
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1401:	dom_xml_parser *parser = (dom_xml_parser *) ctx;
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1406:void xml_parser_cdata_block(void *ctx, const xmlChar *value, int len)
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1408:	dom_xml_parser *parser = (dom_xml_parser *) ctx;
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1413:void xml_parser_external_subset(void *ctx, const xmlChar *name,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/libxml_xmlparser.c:1416:	dom_xml_parser *parser = (dom_xml_parser *) ctx;
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/xmlparser.h:8:#ifndef xml_xmlparser_h_
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/xmlparser.h:9:#define xml_xmlparser_h_
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/xmlparser.h:18:typedef struct dom_xml_parser dom_xml_parser;
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/xmlparser.h:21:dom_xml_parser *dom_xml_parser_create(const char *enc, const char *int_enc,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/xmlparser.h:25:void dom_xml_parser_destroy(dom_xml_parser *parser);
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/xmlparser.h:28:dom_xml_error dom_xml_parser_parse_chunk(dom_xml_parser *parser,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/xmlparser.h:32:dom_xml_error dom_xml_parser_completed(dom_xml_parser *parser);
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/xmlerror.h:19:} dom_xml_error;
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c:17:#include "xmlparser.h"
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c:25:struct dom_xml_parser {
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c:37:expat_xmlparser_start_element_handler(void *_parser,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c:41:	dom_xml_parser *parser = _parser;
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c:170:expat_xmlparser_end_element_handler(void *_parser,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c:173:	dom_xml_parser *parser = _parser;
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c:203:expat_xmlparser_start_cdata_handler(void *_parser)
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c:205:	dom_xml_parser *parser = _parser;
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c:211:expat_xmlparser_end_cdata_handler(void *_parser)
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c:213:	dom_xml_parser *parser = _parser;
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c:219:expat_xmlparser_cdata_handler(void *_parser,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c:223:	dom_xml_parser *parser = _parser;
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c:304:expat_xmlparser_external_entity_ref_handler(XML_Parser parser,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c:365:expat_xmlparser_comment_handler(void *_parser,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c:368:	dom_xml_parser *parser = _parser;
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c:416:expat_xmlparser_start_doctype_decl_handler(void *_parser,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c:422:	dom_xml_parser *parser = _parser;
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c:458:expat_xmlparser_unknown_data_handler(void *_parser,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c:478:dom_xml_parser *
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c:479:dom_xml_parser_create(const char *enc, const char *int_enc,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c:482:	dom_xml_parser *parser;
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c:528:			      expat_xmlparser_start_element_handler,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c:529:			      expat_xmlparser_end_element_handler);
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c:532:				   expat_xmlparser_start_cdata_handler,
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c:533:				   expat_xmlparser_end_cdata_handler);
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c:536:				    expat_xmlparser_cdata_handler);
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c:542:					expat_xmlparser_external_entity_ref_handler);
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c:545:			      expat_xmlparser_comment_handler);
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c:548:				       expat_xmlparser_start_doctype_decl_handler);
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c:551:			      expat_xmlparser_unknown_data_handler);
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c:566:dom_xml_parser_destroy(dom_xml_parser *parser)
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c:583:dom_xml_error
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c:584:dom_xml_parser_parse_chunk(dom_xml_parser *parser, uint8_t *data, size_t len)
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c:606:dom_xml_error
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/expat_xmlparser.c:607:dom_xml_parser_completed(dom_xml_parser *parser)
+src/third_party/netsurf-all-3.11/libsvgtiny/src/svgtiny.c:18:#include <dom/bindings/xml/xmlparser.h>
+src/third_party/netsurf-all-3.11/libsvgtiny/src/svgtiny.c:615:	dom_xml_parser *parser;
+src/third_party/netsurf-all-3.11/libsvgtiny/src/svgtiny.c:616:	dom_xml_error err;
+src/third_party/netsurf-all-3.11/libsvgtiny/src/svgtiny.c:630:	parser = dom_xml_parser_create(NULL, NULL,
+src/third_party/netsurf-all-3.11/libsvgtiny/src/svgtiny.c:636:	err = dom_xml_parser_parse_chunk(parser, (uint8_t *)buffer, size);
+src/third_party/netsurf-all-3.11/libsvgtiny/src/svgtiny.c:639:		dom_xml_parser_destroy(parser);
+src/third_party/netsurf-all-3.11/libsvgtiny/src/svgtiny.c:643:	err = dom_xml_parser_completed(parser);
+src/third_party/netsurf-all-3.11/libsvgtiny/src/svgtiny.c:646:		dom_xml_parser_destroy(parser);
+src/third_party/netsurf-all-3.11/libsvgtiny/src/svgtiny.c:653:	dom_xml_parser_destroy(parser);
+--- libdom source build list XML entries ---
+src/third_party/netsurf-all-3.11/libdom/Makefile:155:  REQUIRED_PKGS := $(REQUIRED_PKGS) libxml-2.0
+src/third_party/netsurf-all-3.11/libdom/Makefile.config:3:# Build the libxml2 binding?
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/Makefile:2:  DIR_SOURCES := libxml_xmlparser.c
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/Makefile:6:    CFLAGS := $(CFLAGS) $(shell $(PKGCONFIG) libxml-2.0 --cflags)
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/Makefile:7:    LDFLAGS := $(LDFLAGS) $(shell $(PKGCONFIG) libxml-2.0 --libs)
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/Makefile:9:    CFLAGS := $(CFLAGS) -I$(PREFIX)/include/libxml2
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/Makefile:10:    LDFLAGS := $(LDFLAGS) -lxml2
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/Makefile:21:  DIR_SOURCES := expat_xmlparser.c
+src/third_party/netsurf-all-3.11/libdom/bindings/xml/Makefile:29:  DIR_INSTALL_ITEMS := /$(INCLUDEDIR)/dom/bindings/xml:xmlerror.h;xmlparser.h
+src/third_party/netsurf-all-3.11/libdom/bindings/hubbub/Makefile:4:  DIR_INSTALL_ITEMS := /$(INCLUDEDIR)/dom/bindings/hubbub:errors.h;parser.h

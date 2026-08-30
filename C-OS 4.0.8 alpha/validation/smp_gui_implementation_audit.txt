@@ -1,0 +1,1170 @@
+--- GUI/SMP rendering terms ---
+src/gui/components/boot_animation.c:27:static inline void gui_boot_cli(void) { __asm__ __volatile__("cli"); }
+src/gui/components/boot_animation.c:28:static inline void gui_boot_sti(void) { __asm__ __volatile__("sti"); }
+src/gui/components/boot_animation.c:29:static inline void gui_boot_cpu_hlt(void) { __asm__ __volatile__("hlt"); }
+src/gui/components/boot_animation.c:30:static inline void gui_boot_cpu_pause(void) { __asm__ __volatile__("pause"); }
+src/gui/components/boot_animation.c:38:    volatile uint32_t spins = 3000000u + (uint32_t)(elapsed_ticks & 63u) * 20000u;
+src/gui/components/boot_animation.c:507:static volatile uint16_t* gui_boot_text_vram(void) {
+src/gui/components/boot_animation.c:508:    return (volatile uint16_t*)(uintptr_t)0xB8000;
+src/gui/components/boot_animation.c:522:    volatile uint16_t* vram = gui_boot_text_vram();
+src/gui/components/boot_animation.c:532:    volatile uint16_t* vram = gui_boot_text_vram();
+src/gui/components/storage_gui.h:12:/* Storage partition UI info */
+src/gui/components/storage_gui.h:25:} storage_gui_partition_t;
+src/gui/components/storage_gui.h:35:    /* Selected partition */
+src/gui/components/storage_gui.h:36:    int selected_partition;
+src/gui/components/storage_gui.h:46:    storage_gui_partition_t partitions[STORAGE_GUI_MAX_PARTITIONS];
+src/gui/components/storage_gui.h:47:    int partition_count;
+src/gui/components/storage_gui.h:62:void storage_gui_update_partition(int id);
+src/gui/components/storage_gui.h:69:void storage_gui_render_partition_card(int idx, int x, int y, int w, int h);
+src/gui/components/storage_gui.h:70:void storage_gui_render_partition_list_item(int idx, int x, int y, int w);
+src/gui/apps/settings/gui_apps_settings.c:115:    "storage disk files partition ramfs ext2 fat32",
+src/gui/apps/storage/gui_apps_storage.c:145:    vga_draw_string(px2+12+100, py+38, "Volatile RAM", C_TEXT_GRAY, 0xFFFFFFFF);
+src/gui/apps/games/voxel_games_advanced.c:65:} projectile_t;
+src/gui/apps/games/voxel_games_advanced.c:97:    projectile_t projectiles[MAX_PROJECTILES];
+src/gui/core/gui_render_loop.c:218://     for (volatile int i = 0; i < 2500; i++);
+src/gui/core/window/gui_menus.c:869:static void draw_start_tile(int x, int y, int w, int h, int icon, const char* label, bool hov) {
+src/gui/core/window/gui_menus.c:947:            int tile_w = (content_w - (cols - 1) * gap) / cols;
+src/gui/core/window/gui_menus.c:948:            if (tile_w < 150) tile_w = 150;
+src/gui/core/window/gui_menus.c:953:                int bx = content_x + col * (tile_w + gap);
+src/gui/core/window/gui_menus.c:955:                bool hov = (mouse.x >= bx && mouse.x < bx + tile_w && mouse.y >= by && mouse.y < by + action_h);
+src/gui/core/window/gui_menus.c:957:                draw_start_tile(bx, by, tile_w, action_h, start_menu_icon_for_entry(start_menu_results[i]), gui_ctx_label(start_menu_results[i]->en, start_menu_results[i]->ja), hov || sel);
+src/gui/core/window/gui_menus.c:965:        int tile_h = 58;
+src/gui/core/window/gui_menus.c:972:            tile_h = 42;
+src/gui/core/window/gui_menus.c:978:            tile_h = 58;
+src/gui/core/window/gui_menus.c:984:            tile_h = 58;
+src/gui/core/window/gui_menus.c:1012:            int tile_w = (usable_w - (cols - 1) * gap) / cols;
+src/gui/core/window/gui_menus.c:1017:                int bx = content_x + col * (tile_w + gap);
+src/gui/core/window/gui_menus.c:1018:                int by = base_y + row * (tile_h + gap);
+src/gui/core/window/gui_menus.c:1019:                bool hov = (mouse.x >= bx && mouse.x < bx + tile_w && mouse.y >= by && mouse.y < by + tile_h);
+src/gui/core/window/gui_menus.c:1022:                draw_start_tile(bx, by, tile_w, tile_h, icon, gui_ctx_label(entries[i].en, entries[i].ja), hov || sel);
+src/gui/core/window/gui_menus.c:1081:        int tile_w = (content_w - (cols - 1) * gap) / cols;
+src/gui/core/window/gui_menus.c:1082:        if (tile_w < 150) tile_w = 150;
+src/gui/core/window/gui_menus.c:1087:            int bx = content_x + col * (tile_w + gap);
+src/gui/core/window/gui_menus.c:1089:            if (x >= bx && x < bx + tile_w && y >= by && y < by + action_h) {
+src/gui/core/window/gui_menus.c:1104:    int tile_h = 58;
+src/gui/core/window/gui_menus.c:1110:        tile_h = 42;
+src/gui/core/window/gui_menus.c:1115:        tile_h = 58;
+src/gui/core/window/gui_menus.c:1120:        tile_h = 58;
+src/gui/core/window/gui_menus.c:1142:        int tile_w = (usable_w - (cols - 1) * gap) / cols;
+src/gui/core/window/gui_menus.c:1147:            int bx = content_x + col * (tile_w + gap);
+src/gui/core/window/gui_menus.c:1148:            int by = base_y + row * (tile_h + gap);
+src/gui/core/window/gui_menus.c:1149:            if (x >= bx && x < bx + tile_w && y >= by && y < by + tile_h) {
+src/gui/core/window/gui_menus.c:1179:static void gui_tile_window_half(int idx, bool left_side) {
+src/gui/core/window/gui_menus.c:1463:                            gui_tile_window_half(ctx_menu.target_window, true);
+src/gui/core/window/gui_menus.c:1465:                            gui_tile_window_half(ctx_menu.target_window, false);
+src/gui/core/window/gui_menus.c:1634:                gui_tile_window_half(ctx_menu.target_window, true);
+src/gui/core/window/gui_menus.c:1636:                gui_tile_window_half(ctx_menu.target_window, false);
+src/gui/core/output/gui_renderer.c:186:/* A tile job owns a disjoint set of rows. Workers never touch renderer's
+src/gui/core/output/gui_renderer.c:187: * clipping state or dirty accumulator; the GUI/BSP marks the combined region
+src/gui/core/output/gui_renderer.c:189: * large fills and future image/tile conversion work to use idle APs. */
+src/gui/core/output/gui_renderer.c:197:} gui_fill_tile_job_t;
+src/gui/core/output/gui_renderer.c:199:static void gui_fill_tile_worker(void *opaque) {
+src/gui/core/output/gui_renderer.c:200:    gui_fill_tile_job_t *job = (gui_fill_tile_job_t *)opaque;
+src/gui/core/output/gui_renderer.c:219:    gui_fill_tile_job_t tiles[8];
+src/gui/core/output/gui_renderer.c:231:        uint64_t tile_height = base + (i < extra ? 1u : 0u);
+src/gui/core/output/gui_renderer.c:232:        tiles[i].buffer = renderer.active_buffer->buffer;
+src/gui/core/output/gui_renderer.c:233:        tiles[i].x = x;
+src/gui/core/output/gui_renderer.c:234:        tiles[i].y = cursor;
+src/gui/core/output/gui_renderer.c:235:        tiles[i].width = width;
+src/gui/core/output/gui_renderer.c:236:        tiles[i].height = tile_height;
+src/gui/core/output/gui_renderer.c:237:        tiles[i].color = color;
+src/gui/core/output/gui_renderer.c:238:        cursor += tile_height;
+src/gui/core/output/gui_renderer.c:239:        smp_background_job_init(&jobs[i], gui_fill_tile_worker, &tiles[i],
+src/gui/core/output/gui_renderer.c:248:        if (smp_submit_background_job(&jobs[i])) {
+src/gui/core/output/gui_renderer.c:251:            gui_fill_tile_worker(&tiles[i]);
+src/gui/core/output/gui_renderer.c:254:    gui_fill_tile_worker(&tiles[0]);
+src/gui/core/output/gui_renderer.c:626:     * draw only its new dirty rectangle without forcing a full repaint. */
+src/gui/core/output/gui_desktop_render.c:164: * cards: draw_desktop_icons() painted an outer "tile" background,
+src/kernel/ai/mphalport.c:29:        __asm__ volatile ("pause");
+src/kernel/ai/mphalport.c:41:        __asm__ volatile ("pause");
+src/kernel/ai/micropython_bridge.c:737:        __asm__ volatile("hlt");
+src/kernel/mm/paging.c:270:    __asm__ volatile("mov %%cr3,%0":"=r"(cr3));
+src/kernel/mm/paging.c:271:    __asm__ volatile("mov %0,%%cr3"::"r"(cr3):"memory");
+src/kernel/mm/paging.c:274:    __asm__ volatile("invlpg (%0)"::"r"(v):"memory");
+src/kernel/mm/paging.c:283:    __asm__ volatile("mov %%cr0,%0":"=r"(cr0));
+src/kernel/mm/paging.c:285:    __asm__ volatile("mov %0,%%cr0"::"r"(cr0):"memory");
+src/kernel/mm/paging.c:290:    __asm__ volatile("mov %%cr0,%0":"=r"(cr0));
+src/kernel/mm/paging.c:292:    __asm__ volatile("mov %0,%%cr0"::"r"(cr0):"memory");
+src/kernel/mm/paging.c:296:    __asm__ volatile("mov %%cr0,%0":"=r"(cr0));
+src/kernel/mm/paging.c:386:        __asm__ volatile("mov %0,%%cr3"::"r"(cr3_phys):"memory");
+src/kernel/mm/paging.c:755:        __asm__ volatile("mov %0,%%cr3"::"r"(cr3_phys):"memory");
+src/kernel/mm/paging.c:863:    __asm__ volatile("mov %%cr2,%0":"=r"(fault_addr));
+src/kernel/mm/paging.c:1007:    __asm__ volatile("rdmsr" : "=a"(lo), "=d"(hi) : "c"(msr));
+src/kernel/mm/paging.c:1014:    __asm__ volatile("wrmsr" :: "c"(msr), "a"(lo), "d"(hi) : "memory");
+src/kernel/arch/gdt.h:97:    __asm__ volatile(
+src/kernel/arch/gdt.h:109:    __asm__ volatile(
+src/kernel/arch/gdt.h:121:    __asm__ volatile(
+src/kernel/arch/gdt.c:119:    __asm__ volatile("lgdt %0" : : "m"(gdt_ptr));
+src/kernel/arch/gdt.c:132:    __asm__ volatile("ltr %w0" : : "r"((uint16_t)GDT_TSS));
+src/kernel/arch/io.h:7:    __asm__ volatile ("outb %0, %1" : : "a"(val), "Nd"(port));
+src/kernel/arch/io.h:12:    __asm__ volatile ("inb %1, %0" : "=a"(ret) : "Nd"(port));
+src/kernel/arch/io.h:17:    __asm__ volatile ("outw %0, %1" : : "a"(val), "Nd"(port));
+src/kernel/arch/io.h:22:    __asm__ volatile ("inw %1, %0" : "=a"(ret) : "Nd"(port));
+src/kernel/timer.c:17:static volatile uint64_t timer_ticks = 0;
+src/kernel/timer.c:18:static volatile uint64_t timer_seconds = 0;
+src/kernel/timer.c:111:            __asm__ volatile("pause");
+src/kernel/sync.c:34:    __asm__ volatile(
+src/kernel/sync.c:46:    __asm__ volatile(
+src/kernel/kernel.c:95:static inline void cli(void) { __asm__ __volatile__("cli"); }
+src/kernel/kernel.c:96:static inline void sti(void) { __asm__ __volatile__("sti"); }
+src/kernel/kernel.c:97:static inline void cpu_hlt(void) { __asm__ __volatile__("hlt"); }
+src/kernel/kernel.c:98:static inline void cpu_idle(void) { __asm__ __volatile__("sti; hlt"); }
+src/kernel/kernel.c:136:            smp_start_deferred_workers();
+src/kernel/kernel.c:158:static volatile uint64_t preempt_probe_start_tick;
+src/kernel/kernel.c:159:static volatile uint64_t preempt_probe_end_tick;
+src/kernel/kernel.c:160:static volatile uint64_t preempt_probe_observer_tick;
+src/kernel/kernel.c:161:static volatile bool preempt_probe_started;
+src/kernel/kernel.c:169:        __asm__ volatile("pause");
+src/kernel/kernel.c:177:        __asm__ volatile("pause");
+src/kernel/kernel.c:213:static volatile uint32_t http_parallel_smoke_done;
+src/kernel/kernel.c:214:static volatile uint32_t http_parallel_smoke_passed;
+src/kernel/kernel.c:456:    volatile uint32_t* p = (volatile uint32_t*)(uintptr_t)addr;
+src/kernel/kernel.c:472:    uint32_t total_size = *(volatile uint32_t*)(uintptr_t)addr;
+src/kernel/kernel.c:557:            volatile uint32_t* p = (volatile uint32_t*)(uintptr_t)base;
+src/kernel/kernel.c:794:    /* Mounts the real FAT32 partition (see fs.c/fatfs_diskio.h) so
+src/kernel/task.c:189:        __asm__ volatile("sti; hlt");
+src/kernel/task.c:431:    __asm__ volatile("pushfq\n\tpop %0\n\tcli" : "=r"(flags) :: "memory");
+src/kernel/task.c:459:    __asm__ volatile("push %0\n\tpopfq" :: "r"(flags) : "memory", "cc");
+src/kernel/task.c:529:    __asm__ volatile("fninit\n\tfxsave64 %0" : "=m"(th->fpu_state) :: "memory");
+src/kernel/task.c:648:            for (;;) { __asm__ volatile("sti; hlt"); }
+src/kernel/drivers/tusb_port_pc.c:122:    uint8_t caplength = *(volatile uint8_t*)(uintptr_t)cap_base;
+src/kernel/drivers/tusb_port_pc.c:131:        volatile uint32_t* op = (volatile uint32_t*)(uintptr_t)op_base;
+src/kernel/drivers/tcp.c:26:static volatile uint32_t tcp_registry_lock = 0;
+src/kernel/drivers/tcp.c:30:        __asm__ volatile("pause");
+src/kernel/drivers/dns.c:46:static volatile uint32_t dns_state_lock = 0;
+src/kernel/drivers/dns.c:60:        __asm__ volatile("pause");
+src/kernel/drivers/http.c:35:static volatile uint32_t g_http_active_transports = 0;
+src/kernel/drivers/http.c:36:static volatile uint32_t g_http_peak_active_transports = 0;
+src/kernel/drivers/http.c:40:static volatile uint32_t g_http_cookie_lock = 0;
+src/kernel/drivers/http.c:41:static volatile uint32_t g_http_keepalive_lock = 0;
+src/kernel/drivers/http.c:43:static void http_spin_lock(volatile uint32_t *lock) {
+src/kernel/drivers/http.c:45:        __asm__ volatile("pause");
+src/kernel/drivers/http.c:49:static void http_spin_unlock(volatile uint32_t *lock) {
+src/kernel/drivers/http.c:433:        for (volatile int delay = 0; delay < 20000; ++delay) { }
+src/kernel/drivers/http.c:442:            for (volatile int delay = 0; delay < 20000; ++delay) { }
+src/kernel/drivers/e1000.c:21:    __asm__ __volatile__ ("outl %%eax, %%dx" : : "a"((uint32_t)(val)), "d"((uint32_t)(port)))
+src/kernel/drivers/e1000.c:26:    __asm__ __volatile__ ("inl %%dx, %%eax" : "=a"(val) : "d"((uint32_t)(port))); \
+src/kernel/drivers/e1000.c:43:static volatile bool e1000_rx_irq_pending = false;
+src/kernel/drivers/e1000.c:44:static volatile bool e1000_irq_runtime_enabled = false;
+src/kernel/drivers/e1000.c:48:static volatile uint64_t e1000_irq_count = 0;
+src/kernel/drivers/e1000.c:49:static volatile uint64_t e1000_deferred_drains = 0;
+src/kernel/drivers/e1000.c:50:static volatile uint64_t e1000_deferred_frames = 0;
+src/kernel/drivers/e1000.c:51:static volatile uint32_t e1000_last_irq_cause = 0;
+src/kernel/drivers/e1000.c:56:static volatile uint32_t e1000_tx_ring_lock = 0;
+src/kernel/drivers/e1000.c:57:static volatile uint32_t e1000_rx_ring_lock = 0;
+src/kernel/drivers/e1000.c:59:static void e1000_ring_lock_acquire(volatile uint32_t *lock) {
+src/kernel/drivers/e1000.c:61:        __asm__ volatile("pause");
+src/kernel/drivers/e1000.c:65:static void e1000_ring_lock_release(volatile uint32_t *lock) {
+src/kernel/drivers/e1000.c:128:        volatile uint32_t* addr = (volatile uint32_t*)(uintptr_t)(dev->io_base + reg);
+src/kernel/drivers/e1000.c:141:        volatile uint32_t* addr = (volatile uint32_t*)(uintptr_t)(dev->io_base + reg);
+src/kernel/drivers/net.c:35:static volatile uint32_t net_dispatch_busy = 0;
+src/kernel/drivers/net.c:36:static volatile uint64_t net_dispatch_passes = 0;
+src/kernel/drivers/net.c:37:static volatile uint64_t net_dispatch_contended = 0;
+src/kernel/drivers/pci.c:15:    __asm__ __volatile__ ("outl %%eax, %%dx" : : "a"((uint64_t)(val)), "d"((uint64_t)(port)))
+src/kernel/drivers/pci.c:20:    __asm__ __volatile__ ("inl %%dx, %%eax" : "=a"(val) : "d"((uint64_t)(port))); \
+src/kernel/drivers/arp.c:20:static volatile uint32_t arp_table_lock = 0;
+src/kernel/drivers/arp.c:24:        __asm__ volatile("pause");
+src/kernel/drivers/tls_backend.c:402:    __asm__ volatile("cpuid" : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx)
+src/kernel/drivers/tls_backend.c:409:    __asm__ volatile("rdtsc" : "=a"(lo), "=d"(hi));
+src/kernel/drivers/tls_backend.c:437:            __asm__ volatile("rdrand %0; setc %1" : "=r"(word), "=qm"(ok));
+src/kernel/scheduler.c:37:    __asm__ volatile("fninit\n\tfxsave64 %0" : "=m"(thread->fpu_state) :: "memory");
+src/kernel/scheduler.c:42:    __asm__ volatile("fxsave64 %0" : "=m"(thread->fpu_state) :: "memory");
+src/kernel/scheduler.c:47:    __asm__ volatile("fxrstor64 %0" :: "m"(thread->fpu_state) : "memory");
+src/kernel/scheduler.c:901:static volatile uint64_t context_switches_performed = 0;
+src/kernel/scheduler.c:902:static volatile uint64_t preemptions_triggered = 0;
+src/kernel/scheduler.c:903:static volatile bool scheduler_in_switch = false;
+src/kernel/scheduler.c:1022:        __asm__ volatile("sti; hlt");
+src/kernel/power/acpi_power.c:387:static volatile bool g_acpi_init_in_progress = false;
+src/kernel/power/acpi_power.c:483:    return *(volatile const uint8_t*)(uintptr_t)PHYS_TO_VIRT(phys);
+src/kernel/power/acpi_power.c:1815:            ((volatile uint8_t*)(uintptr_t)PHYS_TO_VIRT(addr))[i] = (uint8_t)(value >> (8u * i));
+src/kernel/power/acpi_power.c:1983:     * through the same window and re-run the whole init. `volatile` only
+src/kernel/power/acpica_backend.c:35:static volatile bool g_battery_notify_dirty = true;
+src/kernel/power/acpica_backend.c:36:static volatile bool g_thermal_notify_dirty = true;
+src/kernel/power/acpica_backend.c:37:static volatile bool g_gpe_notify_dirty = true;
+src/kernel/power/acpica_backend.c:38:static volatile uint64_t g_gpe_event_count = 0;
+src/kernel/power/acpica_backend.c:39:static volatile uint64_t g_fixed_event_count = 0;
+src/kernel/power/acpica_backend.c:40:static volatile uint64_t g_suspend_request_count = 0;
+src/kernel/power/acpica_backend.c:41:static volatile uint64_t g_resume_request_count = 0;
+src/kernel/power/acpica_backend.c:71:    volatile uint32_t locked;
+src/kernel/power/acpica_backend.c:170:    uint16_t ebda_seg = *(const volatile uint16_t*)(uintptr_t)PHYS_TO_VIRT(0x40EULL);
+src/kernel/power/acpica_backend.c:543:        case 8:  *Value = *(volatile const uint8_t *)virt; break;
+src/kernel/power/acpica_backend.c:544:        case 16: *Value = *(volatile const uint16_t*)virt; break;
+src/kernel/power/acpica_backend.c:545:        case 32: *Value = *(volatile const uint32_t*)virt; break;
+src/kernel/power/acpica_backend.c:546:        case 64: *Value = *(volatile const uint64_t*)virt; break;
+src/kernel/power/acpica_backend.c:555:        case 8:  *(volatile uint8_t *)virt = (uint8_t)Value; break;
+src/kernel/power/acpica_backend.c:556:        case 16: *(volatile uint16_t*)virt = (uint16_t)Value; break;
+src/kernel/power/acpica_backend.c:557:        case 32: *(volatile uint32_t*)virt = (uint32_t)Value; break;
+src/kernel/power/acpica_backend.c:558:        case 64: *(volatile uint64_t*)virt = (uint64_t)Value; break;
+src/kernel/idt.c:85:    __asm__ volatile("cli");
+src/kernel/idt.c:87:        __asm__ volatile("hlt");
+src/kernel/idt.c:95:    __asm__ volatile("lidt %0" : : "m"(idtp));
+src/kernel/idt.c:214:        __asm__ volatile("outb %0, %1" : : "a"((uint8_t)0x20), "Nd"((uint64_t)0xA0));
+src/kernel/idt.c:216:    __asm__ volatile("outb %0, %1" : : "a"((uint8_t)0x20), "Nd"((uint64_t)0x20));
+src/kernel/idt.c:226:    __asm__ volatile("mov %%cr2, %0" : "=r"(fault_addr));
+src/kernel/smp.c:27:/* AP workers execute real C code (decode/tile jobs as well as bootstrap
+src/kernel/smp.c:95:static volatile uint32_t s_possible_cpus = 1;
+src/kernel/smp.c:96:static volatile uint32_t s_online_cpus = 1;
+src/kernel/smp.c:101:static volatile uint32_t* s_lapic = NULL;
+src/kernel/smp.c:109:    smp_work_fn_t fn;
+src/kernel/smp.c:111:    smp_work_priority_t priority;
+src/kernel/smp.c:113:} smp_work_item_t;
+src/kernel/smp.c:119:static smp_work_item_t s_work_queue[SMP_MAX_CPUS][SMP_WORK_QUEUE_CAPACITY];
+src/kernel/smp.c:120:static volatile uint32_t s_work_head[SMP_MAX_CPUS];
+src/kernel/smp.c:121:static volatile uint32_t s_work_tail[SMP_MAX_CPUS];
+src/kernel/smp.c:122:static volatile uint32_t s_work_count[SMP_MAX_CPUS];
+src/kernel/smp.c:125:static volatile uint32_t s_pending_work = 0u;
+src/kernel/smp.c:126:static volatile uint32_t s_work_lock[SMP_MAX_CPUS];
+src/kernel/smp.c:127:static volatile uint64_t s_completed_work[SMP_MAX_CPUS];
+src/kernel/smp.c:128:static volatile uint64_t s_stolen_work[SMP_MAX_CPUS];
+src/kernel/smp.c:129:static volatile uint32_t s_boot_probe_done[SMP_MAX_CPUS];
+src/kernel/smp.c:130:static volatile uint64_t s_boot_probe_checksum[SMP_MAX_CPUS];
+src/kernel/smp.c:132:static volatile uint32_t s_steal_probe_done = 0u;
+src/kernel/smp.c:133:static volatile uint64_t s_steal_probe_checksum = 0u;
+src/kernel/smp.c:137:static void smp_work_lock_acquire(uint32_t logical_id) {
+src/kernel/smp.c:140:            __asm__ volatile("pause");
+src/kernel/smp.c:145:static void smp_work_lock_release(uint32_t logical_id) {
+src/kernel/smp.c:149:static smp_work_priority_t smp_sanitize_priority(smp_work_priority_t priority) {
+src/kernel/smp.c:158:static bool smp_pop_best_locked(uint32_t logical_id, smp_work_item_t *out) {
+src/kernel/smp.c:163:    smp_work_priority_t best_priority = SMP_WORK_PRIORITY_LOW;
+src/kernel/smp.c:166:        smp_work_priority_t priority = s_work_queue[logical_id][index].priority;
+src/kernel/smp.c:174:    *out = s_work_queue[logical_id][best_index];
+src/kernel/smp.c:178:        s_work_queue[logical_id][dst] = s_work_queue[logical_id][src];
+src/kernel/smp.c:186:static bool smp_take_work(uint32_t logical_id, smp_work_item_t *out) {
+src/kernel/smp.c:189:    smp_work_lock_acquire(logical_id);
+src/kernel/smp.c:191:    smp_work_lock_release(logical_id);
+src/kernel/smp.c:198:static bool smp_steal_work(uint32_t thief_logical_id, smp_work_item_t *out) {
+src/kernel/smp.c:215:    smp_work_lock_acquire(victim);
+src/kernel/smp.c:217:    smp_work_lock_release(victim);
+src/kernel/smp.c:224:static void smp_execute_work(uint32_t logical_id, const smp_work_item_t *item) {
+src/kernel/smp.c:266: * effects. It is a bounded stand-in for an image decode/tile conversion job and
+src/kernel/smp.c:284:    __asm__ volatile("cpuid"
+src/kernel/smp.c:309:    __asm__ volatile("mov %%cr3,%0" : "=r"(value));
+src/kernel/smp.c:315:    __asm__ volatile("rdmsr" : "=a"(lo), "=d"(hi) : "c"(msr));
+src/kernel/smp.c:322:    __asm__ volatile("wrmsr" : : "c"(msr), "a"(lo), "d"(hi));
+src/kernel/smp.c:326:    for (volatile uint32_t i = 0; i < cycles; ++i) {
+src/kernel/smp.c:327:        __asm__ volatile("pause");
+src/kernel/smp.c:457:        __asm__ volatile("pause");
+src/kernel/smp.c:485:        smp_work_item_t item;
+src/kernel/smp.c:486:        if (smp_take_work(logical_id, &item) ||
+src/kernel/smp.c:487:            smp_steal_work(logical_id, &item)) {
+src/kernel/smp.c:488:            smp_execute_work(logical_id, &item);
+src/kernel/smp.c:490:            __asm__ volatile("pause");
+src/kernel/smp.c:503:    __asm__ volatile("sgdt %0" : "=m"(mailbox->gdtr));
+src/kernel/smp.c:533:    s_lapic = (volatile uint32_t*)(uintptr_t)PHYS_TO_VIRT(lapic_phys);
+src/kernel/smp.c:570:            __asm__ volatile("pause");
+src/kernel/smp.c:586:        if (!smp_submit_work_to_cpu(i, smp_boot_probe, (void *)(uintptr_t)i)) {
+src/kernel/smp.c:598:            __asm__ volatile("pause");
+src/kernel/smp.c:617:            if (!smp_submit_work_to_cpu_priority(1u, smp_steal_probe,
+src/kernel/smp.c:626:            __asm__ volatile("pause");
+src/kernel/smp.c:635:    memset(s_work_queue, 0, sizeof(s_work_queue));
+src/kernel/smp.c:692:void smp_start_deferred_workers(void) {
+src/kernel/smp.c:699:bool smp_workers_deferred(void) { return s_workers_deferred; }
+src/kernel/smp.c:705:static bool smp_enqueue_work_to_cpu(uint32_t logical_id, smp_work_fn_t fn,
+src/kernel/smp.c:706:                                    void *arg, smp_work_priority_t priority,
+src/kernel/smp.c:713:    smp_work_lock_acquire(logical_id);
+src/kernel/smp.c:715:        smp_work_item_t *slot = &s_work_queue[logical_id][s_work_tail[logical_id]];
+src/kernel/smp.c:725:    smp_work_lock_release(logical_id);
+src/kernel/smp.c:729:bool smp_submit_work_to_cpu_priority(uint32_t logical_id, smp_work_fn_t fn,
+src/kernel/smp.c:730:                                     void *arg, smp_work_priority_t priority) {
+src/kernel/smp.c:731:    return smp_enqueue_work_to_cpu(logical_id, fn, arg, priority, NULL);
+src/kernel/smp.c:734:bool smp_submit_work_to_cpu(uint32_t logical_id, smp_work_fn_t fn, void *arg) {
+src/kernel/smp.c:735:    return smp_submit_work_to_cpu_priority(logical_id, fn, arg,
+src/kernel/smp.c:739:bool smp_submit_work_priority(smp_work_fn_t fn, void *arg, smp_work_priority_t priority) {
+src/kernel/smp.c:764:    return smp_enqueue_work_to_cpu(best_cpu, fn, arg, priority, NULL);
+src/kernel/smp.c:767:bool smp_submit_work(smp_work_fn_t fn, void *arg) {
+src/kernel/smp.c:768:    return smp_submit_work_priority(fn, arg, SMP_WORK_PRIORITY_NORMAL);
+src/kernel/smp.c:771:uint64_t smp_cpu_completed_work(uint32_t logical_id) {
+src/kernel/smp.c:776:uint64_t smp_cpu_stolen_work(uint32_t logical_id) {
+src/kernel/smp.c:781:void smp_background_job_init(smp_background_job_t *job, smp_work_fn_t fn,
+src/kernel/smp.c:784:                             smp_work_priority_t priority) {
+src/kernel/smp.c:795:bool smp_submit_background_job(smp_background_job_t *job) {
+src/kernel/smp.c:819:    if (best_cpu != 0u && smp_enqueue_work_to_cpu(best_cpu, job->fn, job->arg,
+src/kernel/syscall.c:28:/* Bound how much a single SYS_WRITE can dump, so a buggy or hostile user
+src/kernel/syscall.c:55:            for (;;) { __asm__ volatile("hlt"); }
+src/kernel/page_fault.c:161:    __asm__ volatile("cli");
+src/kernel/page_fault.c:163:        __asm__ volatile("hlt");
+src/netsurf/cos_fetch_http.c:351:    volatile bool aborted;
+src/netsurf/cos_fetch_http.c:357:    volatile bool worker_queued;
+src/netsurf/cos_fetch_http.c:358:    volatile bool worker_running;
+src/netsurf/cos_fetch_http.c:359:    volatile bool transport_complete;
+src/netsurf/cos_fetch_http.c:360:    volatile bool owner_released;
+src/gui/components/boot_animation.c:27:static inline void gui_boot_cli(void) { __asm__ __volatile__("cli"); }
+src/gui/components/boot_animation.c:28:static inline void gui_boot_sti(void) { __asm__ __volatile__("sti"); }
+src/gui/components/boot_animation.c:29:static inline void gui_boot_cpu_hlt(void) { __asm__ __volatile__("hlt"); }
+src/gui/components/boot_animation.c:30:static inline void gui_boot_cpu_pause(void) { __asm__ __volatile__("pause"); }
+src/gui/components/boot_animation.c:38:    volatile uint32_t spins = 3000000u + (uint32_t)(elapsed_ticks & 63u) * 20000u;
+src/gui/components/boot_animation.c:507:static volatile uint16_t* gui_boot_text_vram(void) {
+src/gui/components/boot_animation.c:508:    return (volatile uint16_t*)(uintptr_t)0xB8000;
+src/gui/components/boot_animation.c:522:    volatile uint16_t* vram = gui_boot_text_vram();
+src/gui/components/boot_animation.c:532:    volatile uint16_t* vram = gui_boot_text_vram();
+src/gui/components/storage_gui.h:12:/* Storage partition UI info */
+src/gui/components/storage_gui.h:25:} storage_gui_partition_t;
+src/gui/components/storage_gui.h:35:    /* Selected partition */
+src/gui/components/storage_gui.h:36:    int selected_partition;
+src/gui/components/storage_gui.h:46:    storage_gui_partition_t partitions[STORAGE_GUI_MAX_PARTITIONS];
+src/gui/components/storage_gui.h:47:    int partition_count;
+src/gui/components/storage_gui.h:62:void storage_gui_update_partition(int id);
+src/gui/components/storage_gui.h:69:void storage_gui_render_partition_card(int idx, int x, int y, int w, int h);
+src/gui/components/storage_gui.h:70:void storage_gui_render_partition_list_item(int idx, int x, int y, int w);
+src/gui/apps/settings/gui_apps_settings.c:115:    "storage disk files partition ramfs ext2 fat32",
+src/gui/apps/storage/gui_apps_storage.c:145:    vga_draw_string(px2+12+100, py+38, "Volatile RAM", C_TEXT_GRAY, 0xFFFFFFFF);
+src/gui/apps/games/voxel_games_advanced.c:65:} projectile_t;
+src/gui/apps/games/voxel_games_advanced.c:97:    projectile_t projectiles[MAX_PROJECTILES];
+src/gui/core/gui_render_loop.c:218://     for (volatile int i = 0; i < 2500; i++);
+src/gui/core/window/gui_menus.c:869:static void draw_start_tile(int x, int y, int w, int h, int icon, const char* label, bool hov) {
+src/gui/core/window/gui_menus.c:947:            int tile_w = (content_w - (cols - 1) * gap) / cols;
+src/gui/core/window/gui_menus.c:948:            if (tile_w < 150) tile_w = 150;
+src/gui/core/window/gui_menus.c:953:                int bx = content_x + col * (tile_w + gap);
+src/gui/core/window/gui_menus.c:955:                bool hov = (mouse.x >= bx && mouse.x < bx + tile_w && mouse.y >= by && mouse.y < by + action_h);
+src/gui/core/window/gui_menus.c:957:                draw_start_tile(bx, by, tile_w, action_h, start_menu_icon_for_entry(start_menu_results[i]), gui_ctx_label(start_menu_results[i]->en, start_menu_results[i]->ja), hov || sel);
+src/gui/core/window/gui_menus.c:965:        int tile_h = 58;
+src/gui/core/window/gui_menus.c:972:            tile_h = 42;
+src/gui/core/window/gui_menus.c:978:            tile_h = 58;
+src/gui/core/window/gui_menus.c:984:            tile_h = 58;
+src/gui/core/window/gui_menus.c:1012:            int tile_w = (usable_w - (cols - 1) * gap) / cols;
+src/gui/core/window/gui_menus.c:1017:                int bx = content_x + col * (tile_w + gap);
+src/gui/core/window/gui_menus.c:1018:                int by = base_y + row * (tile_h + gap);
+src/gui/core/window/gui_menus.c:1019:                bool hov = (mouse.x >= bx && mouse.x < bx + tile_w && mouse.y >= by && mouse.y < by + tile_h);
+src/gui/core/window/gui_menus.c:1022:                draw_start_tile(bx, by, tile_w, tile_h, icon, gui_ctx_label(entries[i].en, entries[i].ja), hov || sel);
+src/gui/core/window/gui_menus.c:1081:        int tile_w = (content_w - (cols - 1) * gap) / cols;
+src/gui/core/window/gui_menus.c:1082:        if (tile_w < 150) tile_w = 150;
+src/gui/core/window/gui_menus.c:1087:            int bx = content_x + col * (tile_w + gap);
+src/gui/core/window/gui_menus.c:1089:            if (x >= bx && x < bx + tile_w && y >= by && y < by + action_h) {
+src/gui/core/window/gui_menus.c:1104:    int tile_h = 58;
+src/gui/core/window/gui_menus.c:1110:        tile_h = 42;
+src/gui/core/window/gui_menus.c:1115:        tile_h = 58;
+src/gui/core/window/gui_menus.c:1120:        tile_h = 58;
+src/gui/core/window/gui_menus.c:1142:        int tile_w = (usable_w - (cols - 1) * gap) / cols;
+src/gui/core/window/gui_menus.c:1147:            int bx = content_x + col * (tile_w + gap);
+src/gui/core/window/gui_menus.c:1148:            int by = base_y + row * (tile_h + gap);
+src/gui/core/window/gui_menus.c:1149:            if (x >= bx && x < bx + tile_w && y >= by && y < by + tile_h) {
+src/gui/core/window/gui_menus.c:1179:static void gui_tile_window_half(int idx, bool left_side) {
+src/gui/core/window/gui_menus.c:1463:                            gui_tile_window_half(ctx_menu.target_window, true);
+src/gui/core/window/gui_menus.c:1465:                            gui_tile_window_half(ctx_menu.target_window, false);
+src/gui/core/window/gui_menus.c:1634:                gui_tile_window_half(ctx_menu.target_window, true);
+src/gui/core/window/gui_menus.c:1636:                gui_tile_window_half(ctx_menu.target_window, false);
+src/gui/core/output/gui_renderer.c:186:/* A tile job owns a disjoint set of rows. Workers never touch renderer's
+src/gui/core/output/gui_renderer.c:187: * clipping state or dirty accumulator; the GUI/BSP marks the combined region
+src/gui/core/output/gui_renderer.c:189: * large fills and future image/tile conversion work to use idle APs. */
+src/gui/core/output/gui_renderer.c:197:} gui_fill_tile_job_t;
+src/gui/core/output/gui_renderer.c:199:static void gui_fill_tile_worker(void *opaque) {
+src/gui/core/output/gui_renderer.c:200:    gui_fill_tile_job_t *job = (gui_fill_tile_job_t *)opaque;
+src/gui/core/output/gui_renderer.c:219:    gui_fill_tile_job_t tiles[8];
+src/gui/core/output/gui_renderer.c:231:        uint64_t tile_height = base + (i < extra ? 1u : 0u);
+src/gui/core/output/gui_renderer.c:232:        tiles[i].buffer = renderer.active_buffer->buffer;
+src/gui/core/output/gui_renderer.c:233:        tiles[i].x = x;
+src/gui/core/output/gui_renderer.c:234:        tiles[i].y = cursor;
+src/gui/core/output/gui_renderer.c:235:        tiles[i].width = width;
+src/gui/core/output/gui_renderer.c:236:        tiles[i].height = tile_height;
+src/gui/core/output/gui_renderer.c:237:        tiles[i].color = color;
+src/gui/core/output/gui_renderer.c:238:        cursor += tile_height;
+src/gui/core/output/gui_renderer.c:239:        smp_background_job_init(&jobs[i], gui_fill_tile_worker, &tiles[i],
+src/gui/core/output/gui_renderer.c:248:        if (smp_submit_background_job(&jobs[i])) {
+src/gui/core/output/gui_renderer.c:251:            gui_fill_tile_worker(&tiles[i]);
+src/gui/core/output/gui_renderer.c:254:    gui_fill_tile_worker(&tiles[0]);
+src/gui/core/output/gui_renderer.c:626:     * draw only its new dirty rectangle without forcing a full repaint. */
+src/gui/core/output/gui_desktop_render.c:164: * cards: draw_desktop_icons() painted an outer "tile" background,
+src/bios/bios.c:33:    __asm__ volatile("sti; hlt");
+src/bios/bios.c:54:    __asm__ volatile("cpuid"
+src/bios/bios.c:99:    __asm__ volatile("cli; hlt");
+src/bios/bios.c:100:    for (;;) { __asm__ volatile("hlt"); }
+src/bios/bios.c:106:    for (volatile int i = 0; i < 1000000; ++i) {
+src/bios/bios.c:107:        __asm__ volatile("pause");
+src/bios/bios.c:109:    __asm__ volatile("cli");
+src/bios/bios.c:110:    for (;;) { __asm__ volatile("hlt"); }
+src/kernel/ai/mphalport.c:29:        __asm__ volatile ("pause");
+src/kernel/ai/mphalport.c:41:        __asm__ volatile ("pause");
+src/kernel/ai/micropython_bridge.c:737:        __asm__ volatile("hlt");
+src/kernel/mm/paging.c:270:    __asm__ volatile("mov %%cr3,%0":"=r"(cr3));
+src/kernel/mm/paging.c:271:    __asm__ volatile("mov %0,%%cr3"::"r"(cr3):"memory");
+src/kernel/mm/paging.c:274:    __asm__ volatile("invlpg (%0)"::"r"(v):"memory");
+src/kernel/mm/paging.c:283:    __asm__ volatile("mov %%cr0,%0":"=r"(cr0));
+src/kernel/mm/paging.c:285:    __asm__ volatile("mov %0,%%cr0"::"r"(cr0):"memory");
+src/kernel/mm/paging.c:290:    __asm__ volatile("mov %%cr0,%0":"=r"(cr0));
+src/kernel/mm/paging.c:292:    __asm__ volatile("mov %0,%%cr0"::"r"(cr0):"memory");
+src/kernel/mm/paging.c:296:    __asm__ volatile("mov %%cr0,%0":"=r"(cr0));
+src/kernel/mm/paging.c:386:        __asm__ volatile("mov %0,%%cr3"::"r"(cr3_phys):"memory");
+src/kernel/mm/paging.c:755:        __asm__ volatile("mov %0,%%cr3"::"r"(cr3_phys):"memory");
+src/kernel/mm/paging.c:863:    __asm__ volatile("mov %%cr2,%0":"=r"(fault_addr));
+src/kernel/mm/paging.c:1007:    __asm__ volatile("rdmsr" : "=a"(lo), "=d"(hi) : "c"(msr));
+src/kernel/mm/paging.c:1014:    __asm__ volatile("wrmsr" :: "c"(msr), "a"(lo), "d"(hi) : "memory");
+src/kernel/arch/gdt.h:97:    __asm__ volatile(
+src/kernel/arch/gdt.h:109:    __asm__ volatile(
+src/kernel/arch/gdt.h:121:    __asm__ volatile(
+src/kernel/arch/gdt.c:119:    __asm__ volatile("lgdt %0" : : "m"(gdt_ptr));
+src/kernel/arch/gdt.c:132:    __asm__ volatile("ltr %w0" : : "r"((uint16_t)GDT_TSS));
+src/kernel/arch/io.h:7:    __asm__ volatile ("outb %0, %1" : : "a"(val), "Nd"(port));
+src/kernel/arch/io.h:12:    __asm__ volatile ("inb %1, %0" : "=a"(ret) : "Nd"(port));
+src/kernel/arch/io.h:17:    __asm__ volatile ("outw %0, %1" : : "a"(val), "Nd"(port));
+src/kernel/arch/io.h:22:    __asm__ volatile ("inw %1, %0" : "=a"(ret) : "Nd"(port));
+src/kernel/timer.c:17:static volatile uint64_t timer_ticks = 0;
+src/kernel/timer.c:18:static volatile uint64_t timer_seconds = 0;
+src/kernel/timer.c:111:            __asm__ volatile("pause");
+src/kernel/sync.c:34:    __asm__ volatile(
+src/kernel/sync.c:46:    __asm__ volatile(
+src/kernel/kernel.c:95:static inline void cli(void) { __asm__ __volatile__("cli"); }
+src/kernel/kernel.c:96:static inline void sti(void) { __asm__ __volatile__("sti"); }
+src/kernel/kernel.c:97:static inline void cpu_hlt(void) { __asm__ __volatile__("hlt"); }
+src/kernel/kernel.c:98:static inline void cpu_idle(void) { __asm__ __volatile__("sti; hlt"); }
+src/kernel/kernel.c:136:            smp_start_deferred_workers();
+src/kernel/kernel.c:158:static volatile uint64_t preempt_probe_start_tick;
+src/kernel/kernel.c:159:static volatile uint64_t preempt_probe_end_tick;
+src/kernel/kernel.c:160:static volatile uint64_t preempt_probe_observer_tick;
+src/kernel/kernel.c:161:static volatile bool preempt_probe_started;
+src/kernel/kernel.c:169:        __asm__ volatile("pause");
+src/kernel/kernel.c:177:        __asm__ volatile("pause");
+src/kernel/kernel.c:213:static volatile uint32_t http_parallel_smoke_done;
+src/kernel/kernel.c:214:static volatile uint32_t http_parallel_smoke_passed;
+src/kernel/kernel.c:456:    volatile uint32_t* p = (volatile uint32_t*)(uintptr_t)addr;
+src/kernel/kernel.c:472:    uint32_t total_size = *(volatile uint32_t*)(uintptr_t)addr;
+src/kernel/kernel.c:557:            volatile uint32_t* p = (volatile uint32_t*)(uintptr_t)base;
+src/kernel/kernel.c:794:    /* Mounts the real FAT32 partition (see fs.c/fatfs_diskio.h) so
+src/kernel/task.c:189:        __asm__ volatile("sti; hlt");
+src/kernel/task.c:431:    __asm__ volatile("pushfq\n\tpop %0\n\tcli" : "=r"(flags) :: "memory");
+src/kernel/task.c:459:    __asm__ volatile("push %0\n\tpopfq" :: "r"(flags) : "memory", "cc");
+src/kernel/task.c:529:    __asm__ volatile("fninit\n\tfxsave64 %0" : "=m"(th->fpu_state) :: "memory");
+src/kernel/task.c:648:            for (;;) { __asm__ volatile("sti; hlt"); }
+src/kernel/drivers/tusb_port_pc.c:122:    uint8_t caplength = *(volatile uint8_t*)(uintptr_t)cap_base;
+src/kernel/drivers/tusb_port_pc.c:131:        volatile uint32_t* op = (volatile uint32_t*)(uintptr_t)op_base;
+src/kernel/drivers/tcp.c:26:static volatile uint32_t tcp_registry_lock = 0;
+src/kernel/drivers/tcp.c:30:        __asm__ volatile("pause");
+src/kernel/drivers/dns.c:46:static volatile uint32_t dns_state_lock = 0;
+src/kernel/drivers/dns.c:60:        __asm__ volatile("pause");
+src/kernel/drivers/http.c:35:static volatile uint32_t g_http_active_transports = 0;
+src/kernel/drivers/http.c:36:static volatile uint32_t g_http_peak_active_transports = 0;
+src/kernel/drivers/http.c:40:static volatile uint32_t g_http_cookie_lock = 0;
+src/kernel/drivers/http.c:41:static volatile uint32_t g_http_keepalive_lock = 0;
+src/kernel/drivers/http.c:43:static void http_spin_lock(volatile uint32_t *lock) {
+src/kernel/drivers/http.c:45:        __asm__ volatile("pause");
+src/kernel/drivers/http.c:49:static void http_spin_unlock(volatile uint32_t *lock) {
+src/kernel/drivers/http.c:433:        for (volatile int delay = 0; delay < 20000; ++delay) { }
+src/kernel/drivers/http.c:442:            for (volatile int delay = 0; delay < 20000; ++delay) { }
+src/kernel/drivers/e1000.c:21:    __asm__ __volatile__ ("outl %%eax, %%dx" : : "a"((uint32_t)(val)), "d"((uint32_t)(port)))
+src/kernel/drivers/e1000.c:26:    __asm__ __volatile__ ("inl %%dx, %%eax" : "=a"(val) : "d"((uint32_t)(port))); \
+src/kernel/drivers/e1000.c:43:static volatile bool e1000_rx_irq_pending = false;
+src/kernel/drivers/e1000.c:44:static volatile bool e1000_irq_runtime_enabled = false;
+src/kernel/drivers/e1000.c:48:static volatile uint64_t e1000_irq_count = 0;
+src/kernel/drivers/e1000.c:49:static volatile uint64_t e1000_deferred_drains = 0;
+src/kernel/drivers/e1000.c:50:static volatile uint64_t e1000_deferred_frames = 0;
+src/kernel/drivers/e1000.c:51:static volatile uint32_t e1000_last_irq_cause = 0;
+src/kernel/drivers/e1000.c:56:static volatile uint32_t e1000_tx_ring_lock = 0;
+src/kernel/drivers/e1000.c:57:static volatile uint32_t e1000_rx_ring_lock = 0;
+src/kernel/drivers/e1000.c:59:static void e1000_ring_lock_acquire(volatile uint32_t *lock) {
+src/kernel/drivers/e1000.c:61:        __asm__ volatile("pause");
+src/kernel/drivers/e1000.c:65:static void e1000_ring_lock_release(volatile uint32_t *lock) {
+src/kernel/drivers/e1000.c:128:        volatile uint32_t* addr = (volatile uint32_t*)(uintptr_t)(dev->io_base + reg);
+src/kernel/drivers/e1000.c:141:        volatile uint32_t* addr = (volatile uint32_t*)(uintptr_t)(dev->io_base + reg);
+src/kernel/drivers/net.c:35:static volatile uint32_t net_dispatch_busy = 0;
+src/kernel/drivers/net.c:36:static volatile uint64_t net_dispatch_passes = 0;
+src/kernel/drivers/net.c:37:static volatile uint64_t net_dispatch_contended = 0;
+src/kernel/drivers/pci.c:15:    __asm__ __volatile__ ("outl %%eax, %%dx" : : "a"((uint64_t)(val)), "d"((uint64_t)(port)))
+src/kernel/drivers/pci.c:20:    __asm__ __volatile__ ("inl %%dx, %%eax" : "=a"(val) : "d"((uint64_t)(port))); \
+src/kernel/drivers/arp.c:20:static volatile uint32_t arp_table_lock = 0;
+src/kernel/drivers/arp.c:24:        __asm__ volatile("pause");
+src/kernel/drivers/tls_backend.c:402:    __asm__ volatile("cpuid" : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx)
+src/kernel/drivers/tls_backend.c:409:    __asm__ volatile("rdtsc" : "=a"(lo), "=d"(hi));
+src/kernel/drivers/tls_backend.c:437:            __asm__ volatile("rdrand %0; setc %1" : "=r"(word), "=qm"(ok));
+src/kernel/scheduler.c:37:    __asm__ volatile("fninit\n\tfxsave64 %0" : "=m"(thread->fpu_state) :: "memory");
+src/kernel/scheduler.c:42:    __asm__ volatile("fxsave64 %0" : "=m"(thread->fpu_state) :: "memory");
+src/kernel/scheduler.c:47:    __asm__ volatile("fxrstor64 %0" :: "m"(thread->fpu_state) : "memory");
+src/kernel/scheduler.c:901:static volatile uint64_t context_switches_performed = 0;
+src/kernel/scheduler.c:902:static volatile uint64_t preemptions_triggered = 0;
+src/kernel/scheduler.c:903:static volatile bool scheduler_in_switch = false;
+src/kernel/scheduler.c:1022:        __asm__ volatile("sti; hlt");
+src/kernel/power/acpi_power.c:387:static volatile bool g_acpi_init_in_progress = false;
+src/kernel/power/acpi_power.c:483:    return *(volatile const uint8_t*)(uintptr_t)PHYS_TO_VIRT(phys);
+src/kernel/power/acpi_power.c:1815:            ((volatile uint8_t*)(uintptr_t)PHYS_TO_VIRT(addr))[i] = (uint8_t)(value >> (8u * i));
+src/kernel/power/acpi_power.c:1983:     * through the same window and re-run the whole init. `volatile` only
+src/kernel/power/acpica_backend.c:35:static volatile bool g_battery_notify_dirty = true;
+src/kernel/power/acpica_backend.c:36:static volatile bool g_thermal_notify_dirty = true;
+src/kernel/power/acpica_backend.c:37:static volatile bool g_gpe_notify_dirty = true;
+src/kernel/power/acpica_backend.c:38:static volatile uint64_t g_gpe_event_count = 0;
+src/kernel/power/acpica_backend.c:39:static volatile uint64_t g_fixed_event_count = 0;
+src/kernel/power/acpica_backend.c:40:static volatile uint64_t g_suspend_request_count = 0;
+src/kernel/power/acpica_backend.c:41:static volatile uint64_t g_resume_request_count = 0;
+src/kernel/power/acpica_backend.c:71:    volatile uint32_t locked;
+src/kernel/power/acpica_backend.c:170:    uint16_t ebda_seg = *(const volatile uint16_t*)(uintptr_t)PHYS_TO_VIRT(0x40EULL);
+src/kernel/power/acpica_backend.c:543:        case 8:  *Value = *(volatile const uint8_t *)virt; break;
+src/kernel/power/acpica_backend.c:544:        case 16: *Value = *(volatile const uint16_t*)virt; break;
+src/kernel/power/acpica_backend.c:545:        case 32: *Value = *(volatile const uint32_t*)virt; break;
+src/kernel/power/acpica_backend.c:546:        case 64: *Value = *(volatile const uint64_t*)virt; break;
+src/kernel/power/acpica_backend.c:555:        case 8:  *(volatile uint8_t *)virt = (uint8_t)Value; break;
+src/kernel/power/acpica_backend.c:556:        case 16: *(volatile uint16_t*)virt = (uint16_t)Value; break;
+src/kernel/power/acpica_backend.c:557:        case 32: *(volatile uint32_t*)virt = (uint32_t)Value; break;
+src/kernel/power/acpica_backend.c:558:        case 64: *(volatile uint64_t*)virt = (uint64_t)Value; break;
+src/kernel/idt.c:85:    __asm__ volatile("cli");
+src/kernel/idt.c:87:        __asm__ volatile("hlt");
+src/kernel/idt.c:95:    __asm__ volatile("lidt %0" : : "m"(idtp));
+src/kernel/idt.c:214:        __asm__ volatile("outb %0, %1" : : "a"((uint8_t)0x20), "Nd"((uint64_t)0xA0));
+src/kernel/idt.c:216:    __asm__ volatile("outb %0, %1" : : "a"((uint8_t)0x20), "Nd"((uint64_t)0x20));
+src/kernel/idt.c:226:    __asm__ volatile("mov %%cr2, %0" : "=r"(fault_addr));
+src/kernel/smp.c:27:/* AP workers execute real C code (decode/tile jobs as well as bootstrap
+src/kernel/smp.c:95:static volatile uint32_t s_possible_cpus = 1;
+src/kernel/smp.c:96:static volatile uint32_t s_online_cpus = 1;
+src/kernel/smp.c:101:static volatile uint32_t* s_lapic = NULL;
+src/kernel/smp.c:109:    smp_work_fn_t fn;
+src/kernel/smp.c:111:    smp_work_priority_t priority;
+src/kernel/smp.c:113:} smp_work_item_t;
+src/kernel/smp.c:119:static smp_work_item_t s_work_queue[SMP_MAX_CPUS][SMP_WORK_QUEUE_CAPACITY];
+src/kernel/smp.c:120:static volatile uint32_t s_work_head[SMP_MAX_CPUS];
+src/kernel/smp.c:121:static volatile uint32_t s_work_tail[SMP_MAX_CPUS];
+src/kernel/smp.c:122:static volatile uint32_t s_work_count[SMP_MAX_CPUS];
+src/kernel/smp.c:125:static volatile uint32_t s_pending_work = 0u;
+src/kernel/smp.c:126:static volatile uint32_t s_work_lock[SMP_MAX_CPUS];
+src/kernel/smp.c:127:static volatile uint64_t s_completed_work[SMP_MAX_CPUS];
+src/kernel/smp.c:128:static volatile uint64_t s_stolen_work[SMP_MAX_CPUS];
+src/kernel/smp.c:129:static volatile uint32_t s_boot_probe_done[SMP_MAX_CPUS];
+src/kernel/smp.c:130:static volatile uint64_t s_boot_probe_checksum[SMP_MAX_CPUS];
+src/kernel/smp.c:132:static volatile uint32_t s_steal_probe_done = 0u;
+src/kernel/smp.c:133:static volatile uint64_t s_steal_probe_checksum = 0u;
+src/kernel/smp.c:137:static void smp_work_lock_acquire(uint32_t logical_id) {
+src/kernel/smp.c:140:            __asm__ volatile("pause");
+src/kernel/smp.c:145:static void smp_work_lock_release(uint32_t logical_id) {
+src/kernel/smp.c:149:static smp_work_priority_t smp_sanitize_priority(smp_work_priority_t priority) {
+src/kernel/smp.c:158:static bool smp_pop_best_locked(uint32_t logical_id, smp_work_item_t *out) {
+src/kernel/smp.c:163:    smp_work_priority_t best_priority = SMP_WORK_PRIORITY_LOW;
+src/kernel/smp.c:166:        smp_work_priority_t priority = s_work_queue[logical_id][index].priority;
+src/kernel/smp.c:174:    *out = s_work_queue[logical_id][best_index];
+src/kernel/smp.c:178:        s_work_queue[logical_id][dst] = s_work_queue[logical_id][src];
+src/kernel/smp.c:186:static bool smp_take_work(uint32_t logical_id, smp_work_item_t *out) {
+src/kernel/smp.c:189:    smp_work_lock_acquire(logical_id);
+src/kernel/smp.c:191:    smp_work_lock_release(logical_id);
+src/kernel/smp.c:198:static bool smp_steal_work(uint32_t thief_logical_id, smp_work_item_t *out) {
+src/kernel/smp.c:215:    smp_work_lock_acquire(victim);
+src/kernel/smp.c:217:    smp_work_lock_release(victim);
+src/kernel/smp.c:224:static void smp_execute_work(uint32_t logical_id, const smp_work_item_t *item) {
+src/kernel/smp.c:266: * effects. It is a bounded stand-in for an image decode/tile conversion job and
+src/kernel/smp.c:284:    __asm__ volatile("cpuid"
+src/kernel/smp.c:309:    __asm__ volatile("mov %%cr3,%0" : "=r"(value));
+src/kernel/smp.c:315:    __asm__ volatile("rdmsr" : "=a"(lo), "=d"(hi) : "c"(msr));
+src/kernel/smp.c:322:    __asm__ volatile("wrmsr" : : "c"(msr), "a"(lo), "d"(hi));
+src/kernel/smp.c:326:    for (volatile uint32_t i = 0; i < cycles; ++i) {
+src/kernel/smp.c:327:        __asm__ volatile("pause");
+src/kernel/smp.c:457:        __asm__ volatile("pause");
+src/kernel/smp.c:485:        smp_work_item_t item;
+src/kernel/smp.c:486:        if (smp_take_work(logical_id, &item) ||
+src/kernel/smp.c:487:            smp_steal_work(logical_id, &item)) {
+src/kernel/smp.c:488:            smp_execute_work(logical_id, &item);
+src/kernel/smp.c:490:            __asm__ volatile("pause");
+src/kernel/smp.c:503:    __asm__ volatile("sgdt %0" : "=m"(mailbox->gdtr));
+src/kernel/smp.c:533:    s_lapic = (volatile uint32_t*)(uintptr_t)PHYS_TO_VIRT(lapic_phys);
+src/kernel/smp.c:570:            __asm__ volatile("pause");
+src/kernel/smp.c:586:        if (!smp_submit_work_to_cpu(i, smp_boot_probe, (void *)(uintptr_t)i)) {
+src/kernel/smp.c:598:            __asm__ volatile("pause");
+src/kernel/smp.c:617:            if (!smp_submit_work_to_cpu_priority(1u, smp_steal_probe,
+src/kernel/smp.c:626:            __asm__ volatile("pause");
+src/kernel/smp.c:635:    memset(s_work_queue, 0, sizeof(s_work_queue));
+src/kernel/smp.c:692:void smp_start_deferred_workers(void) {
+src/kernel/smp.c:699:bool smp_workers_deferred(void) { return s_workers_deferred; }
+src/kernel/smp.c:705:static bool smp_enqueue_work_to_cpu(uint32_t logical_id, smp_work_fn_t fn,
+src/kernel/smp.c:706:                                    void *arg, smp_work_priority_t priority,
+src/kernel/smp.c:713:    smp_work_lock_acquire(logical_id);
+src/kernel/smp.c:715:        smp_work_item_t *slot = &s_work_queue[logical_id][s_work_tail[logical_id]];
+src/kernel/smp.c:725:    smp_work_lock_release(logical_id);
+src/kernel/smp.c:729:bool smp_submit_work_to_cpu_priority(uint32_t logical_id, smp_work_fn_t fn,
+src/kernel/smp.c:730:                                     void *arg, smp_work_priority_t priority) {
+src/kernel/smp.c:731:    return smp_enqueue_work_to_cpu(logical_id, fn, arg, priority, NULL);
+src/kernel/smp.c:734:bool smp_submit_work_to_cpu(uint32_t logical_id, smp_work_fn_t fn, void *arg) {
+src/kernel/smp.c:735:    return smp_submit_work_to_cpu_priority(logical_id, fn, arg,
+src/kernel/smp.c:739:bool smp_submit_work_priority(smp_work_fn_t fn, void *arg, smp_work_priority_t priority) {
+src/kernel/smp.c:764:    return smp_enqueue_work_to_cpu(best_cpu, fn, arg, priority, NULL);
+src/kernel/smp.c:767:bool smp_submit_work(smp_work_fn_t fn, void *arg) {
+src/kernel/smp.c:768:    return smp_submit_work_priority(fn, arg, SMP_WORK_PRIORITY_NORMAL);
+src/kernel/smp.c:771:uint64_t smp_cpu_completed_work(uint32_t logical_id) {
+src/kernel/smp.c:776:uint64_t smp_cpu_stolen_work(uint32_t logical_id) {
+src/kernel/smp.c:781:void smp_background_job_init(smp_background_job_t *job, smp_work_fn_t fn,
+src/kernel/smp.c:784:                             smp_work_priority_t priority) {
+src/kernel/smp.c:795:bool smp_submit_background_job(smp_background_job_t *job) {
+src/kernel/smp.c:819:    if (best_cpu != 0u && smp_enqueue_work_to_cpu(best_cpu, job->fn, job->arg,
+src/kernel/syscall.c:28:/* Bound how much a single SYS_WRITE can dump, so a buggy or hostile user
+src/kernel/syscall.c:55:            for (;;) { __asm__ volatile("hlt"); }
+src/kernel/page_fault.c:161:    __asm__ volatile("cli");
+src/kernel/page_fault.c:163:        __asm__ volatile("hlt");
+src/fs/text_editor.c:59:static volatile bool editor_saving[TEXT_EDITOR_MAX_FILES];
+src/fs/fs.c:7: * every change) with real per-file operations against a FAT32 partition
+src/fs/fs.c:9: * partition lives). Every fs_* entry point below keeps its original
+src/fs/fs.c:492:        serial_puts("[FS] No FAT32 filesystem found on partition; formatting...\n");
+src/fs/fs.c:507:        serial_puts("[FS] ERROR: failed to mount FAT32 partition\n");
+src/drivers/input/mouse.c:311:    __asm__ volatile("pushfq\n\tpop %0\n\tcli" : "=r"(flags) :: "memory");
+src/drivers/input/mouse.c:316:    __asm__ volatile("push %0\n\tpopfq" :: "r"(flags) : "memory", "cc");
+src/drivers/input/keyboard.c:490:    __asm__ volatile("pushfq\n\tpop %0\n\tcli" : "=r"(flags) :: "memory");
+src/drivers/input/keyboard.c:504:    __asm__ volatile("push %0\n\tpopfq" :: "r"(flags) : "memory", "cc");
+src/drivers/disk/storage.c:207:static uint64_t g_real_disk_sectors = 0; /* true capacity from ATA IDENTIFY, kept for the FatFs partition */
+src/drivers/disk/storage.c:1174:/* Exposed for the FatFs partition (see src/kernel/fatfs_diskio.c), which
+src/drivers/disk/storage.c:1181: * the FatFs partition. */
+src/drivers/video/gfx_blit_avx2.c:43:    __asm__ volatile(".byte 0x0f, 0x01, 0xd0" /* xgetbv, ecx=0 selects XCR0 */
+src/drivers/video/gfx_blit_avx2.c:51:    __asm__ volatile(".byte 0x0f, 0x01, 0xd1" /* xsetbv, ecx=0 selects XCR0 */
+src/drivers/video/gfx_blit_avx2.c:57:    __asm__ volatile("mov %%cr4, %0" : "=r"(v));
+src/drivers/video/gfx_blit_avx2.c:62:    __asm__ volatile("mov %0, %%cr4" :: "r"(v) : "memory");
+src/third_party/micropython/py/cstack.c:36:    volatile int stack_dummy;
+src/third_party/micropython/py/cstack.c:45:    volatile int stack_dummy;
+src/third_party/micropython/py/bc.h:279:    volatile
+src/third_party/micropython/py/objlist.c:287:// These unusual choices allows structuring the partitioning
+src/third_party/micropython/py/objlist.c:304:            // A pair of objects must be swapped to the other side of the partition
+src/third_party/micropython/py/vm.c:220:mp_vm_return_kind_t MICROPY_WRAP_MP_EXECUTE_BYTECODE(mp_execute_bytecode)(mp_code_state_t *code_state, volatile mp_obj_t inject_exc) {
+src/third_party/micropython/py/vm.c:288:    // variables that are visible to the exception handler (declared volatile)
+src/third_party/micropython/py/vm.c:289:    mp_exc_stack_t *volatile exc_sp = MP_CODE_STATE_EXC_SP_IDX_TO_PTR(exc_stack, code_state->exc_sp_idx); // stack grows up, exc_sp points to top of stack
+src/third_party/micropython/py/vm.c:292:    // This needs to be volatile and outside the VM loop so it persists across handling
+src/third_party/micropython/py/vm.c:294:    volatile int gil_divisor = MICROPY_PY_THREAD_GIL_VM_DIVISOR;
+src/third_party/micropython/py/vm.c:1502:                // variables that are visible to the exception handler (declared volatile)
+src/third_party/micropython/py/nlrx86.c:61:    __asm volatile (
+src/third_party/micropython/py/nlrx86.c:84:    __asm volatile (
+src/third_party/micropython/py/emitglue.c:122:    asm volatile (
+src/third_party/micropython/py/mpstate.h:242:    volatile int16_t sched_state;
+src/third_party/micropython/py/mpstate.h:308:    volatile mp_obj_t mp_pending_exception;
+src/third_party/micropython/py/mpconfig.h:1380:// Whether str.partition()/str.rpartition() method provided
+src/third_party/micropython/py/nlrrv64.c:34:    __asm volatile (
+src/third_party/micropython/py/nlrrv64.c:55:    __asm volatile (
+src/third_party/micropython/py/nlrthumb.c:49:    __asm volatile (
+src/third_party/micropython/py/nlrthumb.c:106:    __asm volatile (
+src/third_party/micropython/py/nlrxtensa.c:41:    __asm volatile (
+src/third_party/micropython/py/nlrxtensa.c:61:    __asm volatile (
+src/third_party/micropython/py/nlrpowerpc.c:39:    __asm__ volatile (
+src/third_party/micropython/py/nlrpowerpc.c:84:    __asm__ volatile (
+src/third_party/micropython/py/nlrpowerpc.c:128:    __asm__ volatile (
+src/third_party/micropython/py/nlrpowerpc.c:173:    __asm__ volatile (
+src/third_party/micropython/py/nlrx64.c:62:    __asm volatile (
+src/third_party/micropython/py/nlrx64.c:79:    __asm volatile (
+src/third_party/micropython/py/nlrx64.c:106:    __asm volatile (
+src/third_party/micropython/py/runtime.c:1000:        // Make the seq variable volatile so the compiler keeps a reference to it,
+src/third_party/micropython/py/runtime.c:1003:        volatile mp_obj_t seq = seq_in;
+src/third_party/micropython/py/nlraarch64.c:64:    __asm volatile (
+src/third_party/micropython/py/stackctrl.c:40:    volatile int stack_dummy;
+src/third_party/micropython/py/stackctrl.c:53:    volatile int stack_dummy;
+src/third_party/micropython/py/nlrrv32.c:34:    __asm volatile (
+src/third_party/micropython/py/nlrrv32.c:55:    __asm volatile (
+src/third_party/micropython/py/modthread.c:52:    volatile bool locked;
+src/third_party/micropython/py/objstr.c:1826:static mp_obj_t str_partitioner(mp_obj_t self_in, mp_obj_t arg, int direction) {
+src/third_party/micropython/py/objstr.c:1866:static mp_obj_t str_partition(mp_obj_t self_in, mp_obj_t arg) {
+src/third_party/micropython/py/objstr.c:1867:    return str_partitioner(self_in, arg, 1);
+src/third_party/micropython/py/objstr.c:1869:MP_DEFINE_CONST_FUN_OBJ_2(str_partition_obj, str_partition);
+src/third_party/micropython/py/objstr.c:1871:static mp_obj_t str_rpartition(mp_obj_t self_in, mp_obj_t arg) {
+src/third_party/micropython/py/objstr.c:1872:    return str_partitioner(self_in, arg, -1);
+src/third_party/micropython/py/objstr.c:1874:MP_DEFINE_CONST_FUN_OBJ_2(str_rpartition_obj, str_rpartition);
+src/third_party/micropython/py/objstr.c:2113:    { MP_ROM_QSTR(MP_QSTR_partition), MP_ROM_PTR(&str_partition_obj) },
+src/third_party/micropython/py/objstr.c:2114:    { MP_ROM_QSTR(MP_QSTR_rpartition), MP_ROM_PTR(&str_rpartition_obj) },
+src/third_party/tinygl/src/tinygl_stdio_stub.c:36:        __asm__ __volatile__("hlt");
+src/third_party/fatfs/diskio.c:19:static uint64_t s_fatfs_partition_sectors = 0;
+src/third_party/fatfs/diskio.c:24:        serial_puts("[FATFS] WARNING: disk too small for the FAT32 partition"
+src/third_party/fatfs/diskio.c:31:    s_fatfs_partition_sectors = real_sectors - FATFS_PARTITION_START_SECTOR;
+src/third_party/fatfs/diskio.c:34:    serial_putdec(s_fatfs_partition_sectors / 2048ULL);
+src/third_party/fatfs/diskio.c:53:    if ((uint64_t)sector + count > s_fatfs_partition_sectors) return RES_PARERR;
+src/third_party/fatfs/diskio.c:64:    if ((uint64_t)sector + count > s_fatfs_partition_sectors) return RES_PARERR;
+src/third_party/fatfs/diskio.c:79:            *(LBA_t*)buff = (LBA_t)s_fatfs_partition_sectors;
+src/third_party/fatfs/ffconf.h:204:/  arbitrary physical drive and partition listed in the VolToPart[]. Also f_fdisk()
+src/third_party/fatfs/ffconf.h:224:/* Minimum number of sectors to switch GPT as partitioning format in f_mkfs() and 
+src/third_party/fatfs/ff.c:201:#define MBR_Table			446		/* MBR: Offset of partition table in the MBR */
+src/third_party/fatfs/ff.c:202:#define SZ_PTE				16		/* MBR: Size of a partition table entry */
+src/third_party/fatfs/ff.c:220:#define GPTH_FstLba			40		/* GPT HDR: First LBA for partition data (QWORD) */
+src/third_party/fatfs/ff.c:221:#define GPTH_LstLba			48		/* GPT HDR: Last LBA for partition data (QWORD) */
+src/third_party/fatfs/ff.c:227:#define SZ_GPTE				128		/* GPT PTE: Size of a GPT partition table entry */
+src/third_party/fatfs/ff.c:230:#define GPTE_FstLba			32		/* GPT PTE: First LBA of partition (QWORD) */
+src/third_party/fatfs/ff.c:231:#define GPTE_LstLba			40		/* GPT PTE: Last LBA of partition (QWORD) */
+src/third_party/fatfs/ff.c:254:#define LD2PT(vol) VolToPart[vol].pt	/* Get partition number from the mapping table (0:auto search, 1-:forced partition number) */
+src/third_party/fatfs/ff.c:257:#define LD2PT(vol) 0			/* Auto partition search */
+src/third_party/fatfs/ff.c:477:static volatile BYTE SysLock;		/* System lock flag to protect Files[] (0:no mutex, 1:unlocked, 2:locked) */
+src/third_party/fatfs/ff.c:478:static volatile BYTE SysLockVolume;	/* Volume id who is locking Files[] */
+src/third_party/fatfs/ff.c:3408:/* (It supports only generic partitioning rules, MBR, GPT and SFD) */
+src/third_party/fatfs/ff.c:3412:	UINT part		/* Partition to fined = 0:find as SFD and partitions, >0:forced partition number */
+src/third_party/fatfs/ff.c:3422:	/* Sector 0 is not an FAT VBR or forced partition number wants a partitioned drive */
+src/third_party/fatfs/ff.c:3433:		for (v_ent = i = 0; i < n_ent; i++) {		/* Find FAT partition */
+src/third_party/fatfs/ff.c:3436:			if (!memcmp(fs->win + ofs + GPTE_PtGuid, GUID_MS_Basic, 16)) {	/* MS basic data partition? */
+src/third_party/fatfs/ff.c:3440:				if (part != 0 && v_ent == part) return fmt;		/* Forced partition order (regardless of it is valid or not) */
+src/third_party/fatfs/ff.c:3446:	if (FF_MULTI_PARTITION && part > 4) return 3;	/* MBR has four primary partitions max (FatFs does not support logical partition) */
+src/third_party/fatfs/ff.c:3447:	for (i = 0; i < 4; i++) {		/* Load partition offset in the MBR */
+src/third_party/fatfs/ff.c:3452:		fmt = mbr_pt[i] ? check_fs(fs, mbr_pt[i]) : 3;	/* Check if the partition is FAT */
+src/third_party/fatfs/ff.c:5899:#define	GPT_ALIGN	0x100000	/* Alignment of partitions in GPT [byte] (>=128KB) */
+src/third_party/fatfs/ff.c:5903:/* Create partitions on the physical drive in format of MBR or GPT */
+src/third_party/fatfs/ff.c:5905:static FRESULT create_partition (
+src/third_party/fatfs/ff.c:5908:	BYTE sys,			/* System ID for each partition (for only MBR) */
+src/third_party/fatfs/ff.c:5922:	if (sz_drv >= FF_MIN_GPT) {	/* Create partitions in GPT format */
+src/third_party/fatfs/ff.c:5937:		sz_ptbl = GPT_ITEMS * SZ_GPTE / ss;	/* Size of partition table [sector] */
+src/third_party/fatfs/ff.c:5938:		top_bpt = sz_drv - sz_ptbl - 1;		/* Backup partition table start LBA */
+src/third_party/fatfs/ff.c:5942:		pi = si = 0;	/* partition table index, map index */
+src/third_party/fatfs/ff.c:5946:				nxt_alloc = (nxt_alloc + align - 1) & ((QWORD)0 - align);	/* Align partition start LBA */
+src/third_party/fatfs/ff.c:5947:				sz_part = plst[si++];		/* Get a partition size */
+src/third_party/fatfs/ff.c:5950:					sz_part = (sz_part + align - 1) & ((QWORD)0 - align);	/* Align partition end LBA (only if in percentage) */
+src/third_party/fatfs/ff.c:5956:			if (sz_part != 0) {				/* Add a partition? */
+src/third_party/fatfs/ff.c:5958:				memcpy(buf + ofs + GPTE_PtGuid, GUID_MS_Basic, 16);	/* Set partition GUID (Microsoft Basic Data) */
+src/third_party/fatfs/ff.c:5959:				rnd = make_rand(rnd, buf + ofs + GPTE_UpGuid, 16);	/* Set unique partition GUID */
+src/third_party/fatfs/ff.c:5960:				st_64(buf + ofs + GPTE_FstLba, nxt_alloc);			/* Set partition start LBA */
+src/third_party/fatfs/ff.c:5961:				st_64(buf + ofs + GPTE_LstLba, nxt_alloc + sz_part - 1);	/* Set partition end LBA */
+src/third_party/fatfs/ff.c:5998:		memcpy(buf + MBR_Table, gpt_mbr, 16);	/* Create a GPT partition */
+src/third_party/fatfs/ff.c:6004:	{	/* Create partitions in MBR format */
+src/third_party/fatfs/ff.c:6013:			sz_part32 = (DWORD)plst[i];	/* Get partition size */
+src/third_party/fatfs/ff.c:6019:			st_32(pte + PTE_SizLba, sz_part32);		/* Size of partition [sector] */
+src/third_party/fatfs/ff.c:6077:	ipart = LD2PT(vol);		/* Hosting partition (0:create as new, 1..:existing partition) */
+src/third_party/fatfs/ff.c:6114:	if (FF_MULTI_PARTITION && ipart != 0) {	/* Is the volume associated with any specific partition? */
+src/third_party/fatfs/ff.c:6115:		/* Get partition location from the existing partition table */
+src/third_party/fatfs/ff.c:6123:			/* Get the partition location from GPT */
+src/third_party/fatfs/ff.c:6129:			while (n_ent) {		/* Find MS Basic partition with order of ipart */
+src/third_party/fatfs/ff.c:6131:				if (!memcmp(buf + ofs + GPTE_PtGuid, GUID_MS_Basic, 16) && ++i == ipart) {	/* MS basic data partition? */
+src/third_party/fatfs/ff.c:6142:		{	/* Get the partition location from MBR partition table */
+src/third_party/fatfs/ff.c:6144:			if (ipart > 4 || pte[PTE_System] == 0) LEAVE_MKFS(FR_MKFS_ABORTED);	/* No partition? */
+src/third_party/fatfs/ff.c:6150:		if (!(fsopt & FM_SFD)) {	/* To be partitioned? */
+src/third_party/fatfs/ff.c:6151:			/* Create a single-partition on the drive in this function */
+src/third_party/fatfs/ff.c:6153:			if (sz_vol >= FF_MIN_GPT) {	/* Which partition type to create, MBR or GPT? */
+src/third_party/fatfs/ff.c:6155:				b_vol = GPT_ALIGN / ss; sz_vol -= b_vol + GPT_ITEMS * SZ_GPTE / ss + 1;	/* Estimated partition offset and size */
+src/third_party/fatfs/ff.c:6160:					b_vol = N_SEC_TRACK; sz_vol -= b_vol;	/* Estimated partition offset and size */
+src/third_party/fatfs/ff.c:6188:	vsn = (DWORD)sz_vol + GET_FATTIME();	/* VSN generated from current time and partition size */
+src/third_party/fatfs/ff.c:6512:	/* Determine system ID in the MBR partition table */
+src/third_party/fatfs/ff.c:6525:	/* Update partition information */
+src/third_party/fatfs/ff.c:6526:	if (FF_MULTI_PARTITION && ipart != 0) {	/* Volume is in the existing partition */
+src/third_party/fatfs/ff.c:6527:		if (!FF_LBA64 || !(fsopt & 0x80)) {	/* Is the partition in MBR? */
+src/third_party/fatfs/ff.c:6528:			/* Update system ID in the partition table */
+src/third_party/fatfs/ff.c:6533:	} else {								/* Volume as a new single partition */
+src/third_party/fatfs/ff.c:6534:		if (!(fsopt & FM_SFD)) {			/* Create partition table if not in SFD format */
+src/third_party/fatfs/ff.c:6536:			res = create_partition(pdrv, lba, sys, buf);
+src/third_party/fatfs/ff.c:6556:	const LBA_t ptbl[],	/* Pointer to the size table for each partitions */
+src/third_party/fatfs/ff.c:6575:	res = create_partition(pdrv, ptbl, 0x07, buf);	/* Create partitions (system ID is temporary setting and determined by f_mkfs) */
+src/third_party/fatfs/ff.h:115:#if FF_MULTI_PARTITION		/* Multiple partition configuration */
+src/third_party/fatfs/ff.h:118:	BYTE pt;	/* Associated partition (0:Auto detect, 1-4:Forced partition) */
+src/third_party/fatfs/ff.h:120:extern PARTITION VolToPart[];	/* Volume to partition mapping table */
+src/third_party/fatfs/ff.h:351:FRESULT f_fdisk (BYTE pdrv, const LBA_t ptbl[], void* work);		/* Divide a physical drive into some partitions */
+src/third_party/quickjs/quickjs.h:1251:   writer. The bytecode format is not designed to resist a hostile
+src/third_party/quickjs/cutils.h:677:    __asm__ __volatile__("fnstcw %0" : "=m"(*&cw));                         \
+src/third_party/quickjs/cutils.h:680:        __asm__ __volatile__("fldcw %0" : /*empty*/ : "m"(*&t));            \
+src/third_party/quickjs/cutils.h:683:    __asm__ __volatile__("fldcw %0" : /*empty*/ : "m"(*&cw))
+src/third_party/quickjs/quickjs.c:2299:    // The volatile store here is intended to escape the local variable, to
+src/third_party/quickjs/quickjs.c:2304:    char *volatile Ptr = &CharOnStack;
+src/third_party/quickjs/quickjs.c:57070:    volatile double temp;  /* enforce evaluation order */
+src/third_party/quickjs/quickjs.c:57100:    /* Use a volatile intermediary variable to ensure order of evaluation
+src/third_party/quickjs/quickjs.c:57103:     * Without the volatile qualifier, the compile can generate code
+src/third_party/quickjs/quickjs_port.c:1798:        /* Bound one hostile document's collection expansion without changing
+src/third_party/quickjs/quickjs_port.c:2685:    /* Reject rather than wrap hostile numeric values.  Width/height are
+src/third_party/quickjs/quickjs_port.c:2821:         * origin-partitioned Web Storage.  A document lacking a normal HTTP(S)
+src/third_party/quickjs/cos_js_web_api.c:98:static volatile uint32_t g_web_worker_lock;
+src/third_party/quickjs/cos_js_web_api.c:726:     * hostile scripts from forging kernel-layer headers. */
+src/third_party/tinyusb/SRC/src/osal/osal_pico.h:175:  //  volatile read.
+src/third_party/tinyusb/SRC/src/osal/osal_none.h:82:  volatile uint16_t count;
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:67:    volatile uint16_t E; /* (@ 0x00000000) Pipe Transaction Counter Enable Register */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:71:      volatile uint16_t TRCLR : 1; /* [8..8] Transaction Counter Clear */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:72:      volatile uint16_t TRENB : 1; /* [9..9] Transaction Counter Enable */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:78:    volatile uint16_t N; /* (@ 0x00000002) Pipe Transaction Counter Register */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:81:      volatile uint16_t TRNCNT : 16; /* [15..0] Transaction Counter */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:90:    volatile uint16_t SYSCFG; /* (@ 0x00000000) System Configuration Control Register */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:93:      volatile uint16_t USBE  : 1; /* [0..0] USB Operation Enable */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:95:      volatile uint16_t DMRPU : 1; /* [3..3] D- Line Resistor Control */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:96:      volatile uint16_t DPRPU : 1; /* [4..4] D+ Line Resistor Control */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:97:      volatile uint16_t DRPD  : 1; /* [5..5] D+/D- Line Resistor Control */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:98:      volatile uint16_t DCFM  : 1; /* [6..6] Controller Function Select */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:99:      volatile uint16_t HSE   : 1; // [7..7] High-Speed Operation Enable
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:100:      volatile uint16_t CNEN  : 1; /* [8..8] CNEN Single End Receiver Enable */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:102:      volatile uint16_t SCKE  : 1; /* [10..10] USB Clock Enable */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:108:    volatile uint16_t BUSWAIT; /* (@ 0x00000002) CPU Bus Wait Register */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:111:      volatile uint16_t BWAIT : 4; /* [3..0] CPU Bus Access Wait Specification BWAIT waits (BWAIT+2 access cycles) */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:117:    volatile const uint16_t SYSSTS0; /* (@ 0x00000004) System Configuration Status Register 0 */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:120:      volatile const uint16_t LNST   : 2; /* [1..0] USB Data Line Status Monitor */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:121:      volatile const uint16_t IDMON  : 1; /* [2..2] External ID0 Input Pin Monitor */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:123:      volatile const uint16_t SOFEA  : 1; /* [5..5] SOF Active Monitor While Host Controller Function is Selected. */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:124:      volatile const uint16_t HTACT  : 1; /* [6..6] USB Host Sequencer Status Monitor */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:126:      volatile const uint16_t OVCMON : 2; /* [15..14] External USB0_OVRCURA/ USB0_OVRCURB Input Pin Monitor */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:131:    volatile const uint16_t PLLSTA; /* (@ 0x00000006) PLL Status Register */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:134:      volatile const uint16_t PLLLOCK : 1; /* [0..0] PLL Lock Flag */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:140:    volatile uint16_t DVSTCTR0; /* (@ 0x00000008) Device State Control Register 0 */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:143:      volatile const uint16_t RHST : 3; /* [2..0] USB Bus Reset Status */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:145:      volatile uint16_t UACT       : 1; /* [4..4] USB Bus Enable */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:146:      volatile uint16_t RESUME     : 1; /* [5..5] Resume Output */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:147:      volatile uint16_t USBRST     : 1; /* [6..6] USB Bus Reset Output */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:148:      volatile uint16_t RWUPE      : 1; /* [7..7] Wakeup Detection Enable */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:149:      volatile uint16_t WKUP       : 1; /* [8..8] Wakeup Output */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:150:      volatile uint16_t VBUSEN     : 1; /* [9..9] USB_VBUSEN Output Pin Control */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:151:      volatile uint16_t EXICEN     : 1; /* [10..10] USB_EXICEN Output Pin Control */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:152:      volatile uint16_t HNPBTOA    : 1; /* [11..11] Host Negotiation Protocol (HNP) */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:156:  volatile const uint16_t RESERVED;
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:159:    volatile uint16_t TESTMODE; /* (@ 0x0000000C) USB Test Mode Register */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:162:      volatile uint16_t UTST : 4; /* [3..0] Test Mode */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:166:  volatile const uint16_t RESERVED1;
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:167:  volatile const uint32_t RESERVED2;
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:170:    volatile uint32_t CFIFO; /* (@ 0x00000014) CFIFO Port Register */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:174:        volatile uint16_t CFIFOL; /* (@ 0x00000014) CFIFO Port Register L */
+src/third_party/tinyusb/SRC/src/portable/renesas/rusb2/rusb2_type.h:175:        volatile uint8_t CFIFOLL; /* (@ 0x00000014) CFIFO Port Register LL */
+--- AP entry/scheduler terms ---
+src/kernel/kernel.c:136:            smp_start_deferred_workers();
+src/kernel/kernel.c:149:/* Enable only in a dedicated validation build. The probe starts a worker
+src/kernel/kernel.c:151: * worker observed time *before* the spin worker completed. A cooperative
+src/kernel/kernel.c:153: * spinning worker leaves the CPU. */
+src/kernel/kernel.c:188:    serial_puts(passed ? "[SCHED] PREEMPTION-PROBE PASS: observer ran during CPU-bound no-yield worker\\n"
+src/kernel/kernel.c:189:                       : "[SCHED] PREEMPTION-PROBE FAIL: observer did not run before CPU-bound worker ended\\n");
+src/kernel/kernel.c:208:/* This worker is intentionally compiled only into a validation image.  It
+src/kernel/kernel.c:216:static void http_parallel_smoke_worker(void* arg) {
+src/kernel/kernel.c:217:    uint64_t worker_id = (uint64_t)(uintptr_t)arg;
+src/kernel/kernel.c:226:        serial_puts("[HTTP-TEST] parallel worker=");
+src/kernel/kernel.c:227:        serial_putdec(worker_id);
+src/kernel/kernel.c:231:        serial_puts("[HTTP-TEST] parallel worker create failed\n");
+src/kernel/kernel.c:247:        thread_t *worker = thread_create_kernel_stack_size(
+src/kernel/kernel.c:249:            (void*)http_parallel_smoke_worker, (void*)(uintptr_t)i,
+src/kernel/kernel.c:251:        if (worker == NULL) {
+src/kernel/kernel.c:252:            serial_puts("[HTTP-TEST] FAIL: parallel worker creation\n");
+src/kernel/kernel.c:290:        serial_puts("[HTTP-TEST] FAIL: worker creation\n");
+src/kernel/kernel.c:413:} __attribute__((packed)) mb2_mmap_entry_t;
+src/kernel/kernel.c:484:            if (!mtag->entry_size || mtag->entry_size < sizeof(mb2_mmap_entry_t))
+src/kernel/kernel.c:485:                mtag->entry_size = sizeof(mb2_mmap_entry_t);
+src/kernel/kernel.c:492:                mb2_mmap_entry_t* e = (mb2_mmap_entry_t*)entry_ptr;
+src/kernel/kernel.c:849:         * fix for the prev==NULL case) and this stack is abandoned. */        bool gui_workers_ok = true;
+src/kernel/kernel.c:855:         * kernel worker. That mismatch let a JS-heavy page overrun the real
+src/kernel/kernel.c:869:            gui_workers_ok = false;
+src/kernel/kernel.c:878:            gui_workers_ok = false;
+src/kernel/kernel.c:881:        if (!gui_workers_ok) {
+src/kernel/kernel.c:886:        if (gui_workers_ok) {
+src/kernel/drivers/http.h:52:     * transport workers from sharing TLS plaintext staging or gzip/Brotli
+src/kernel/drivers/http.h:95: * the explicit client argument preserves the origin context when worker
+src/kernel/drivers/tcp.c:22:/* NIC receive handling and future AP-owned transport workers can access the
+src/kernel/drivers/dns.c:4: * DNS is used by HTTP/TLS workers.  The former single global pending hostname
+src/kernel/drivers/dns.c:176:         * response into an unrelated request before the original worker wakes. */
+src/kernel/drivers/dns.c:380:         * other HTTP/TLS workers a chance to run. */
+src/kernel/drivers/http.c:29: * browser-owned workers overlap. */
+src/kernel/drivers/http.c:32: * this allows independent fetch workers to overlap while keeping memory and
+src/kernel/drivers/http.c:38: * a future bounded worker pool overlap unrelated sockets without exposing the
+src/kernel/drivers/http.c:63: * needs no worker locking. */
+src/kernel/drivers/http.c:852:     * scarce active-transfer permit while other workers are in flight. */
+src/kernel/drivers/http.c:1246:            /* The transport is temporarily would-block. Yield this worker's
+src/kernel/drivers/e1000.c:53:/* Transport workers may submit TX while the sole network dispatcher drains
+src/kernel/drivers/arp.c:17:/* Transport workers perform lookups while packet ingress inserts resolved
+src/kernel/drivers/tls_backend.c:467:     * machine once concurrent transport workers are enabled. */
+src/kernel/scheduler.c:1029:int scheduler_get_cpu_load(int cpu) {
+src/kernel/scheduler.c:1039:float scheduler_get_cpu_usage(void) {
+src/kernel/scheduler.c:1047:void scheduler_migrate_task(thread_t* thread, int target_cpu) {
+src/kernel/smp.c:27:/* AP workers execute real C code (decode/tile jobs as well as bootstrap
+src/kernel/smp.c:99:static bool s_workers_deferred = false;
+src/kernel/smp.c:100:static bool s_workers_started = false;
+src/kernel/smp.c:467:void smp_ap_entry(void) {
+src/kernel/smp.c:483:     * timer/scheduler IRQ handling BSP-only until its full per-CPU conversion. */
+src/kernel/smp.c:504:    mailbox->entry = (uint64_t)(uintptr_t)smp_ap_entry;
+src/kernel/smp.c:509:    if (s_workers_started || !s_apic || s_possible_cpus <= 1) return;
+src/kernel/smp.c:510:    s_workers_started = true;
+src/kernel/smp.c:603:            serial_puts("[SMP] CPU kernel worker timeout: ");
+src/kernel/smp.c:650:    s_workers_deferred = false;
+src/kernel/smp.c:651:    s_workers_started = false;
+src/kernel/smp.c:666:        /* Do not invent APIC IDs on a real machine; remain safely BSP-only
+src/kernel/smp.c:682:        s_workers_deferred = true;
+src/kernel/smp.c:683:        serial_puts("[SMP] VirtualBox detected; AP workers deferred until desktop frame\n");
+src/kernel/smp.c:692:void smp_start_deferred_workers(void) {
+src/kernel/smp.c:693:    if (!s_workers_deferred) return;
+src/kernel/smp.c:694:    s_workers_deferred = false;
+src/kernel/smp.c:695:    serial_puts("[SMP] Starting deferred VirtualBox AP workers after desktop frame\n");
+src/kernel/smp.c:699:bool smp_workers_deferred(void) { return s_workers_deferred; }
+src/netsurf/cos_gui_table.c:109:     * fairly without needing the currently unsafe permanent fetch worker. */
+src/netsurf/cos_fetch_http.c:355:    /* Transport is performed only by the dedicated kernel worker. NetSurf
+src/netsurf/cos_fetch_http.c:357:    volatile bool worker_queued;
+src/netsurf/cos_fetch_http.c:358:    volatile bool worker_running;
+src/netsurf/cos_fetch_http.c:363:    /* HTTP transport finishes on the worker, but a large decoded body is
+src/netsurf/cos_fetch_http.c:376:    struct cos_http_fetch_context *worker_next;
+src/netsurf/cos_fetch_http.c:382:static struct cos_http_fetch_context *worker_head = NULL;
+src/netsurf/cos_fetch_http.c:383:static struct cos_http_fetch_context *worker_tail = NULL;
+src/netsurf/cos_fetch_http.c:384:/* Match the HTTP transport semaphore. Two independent fetch workers improve
+src/netsurf/cos_fetch_http.c:389:static uint32_t worker_count = 0;
+src/netsurf/cos_fetch_http.c:408:static void fetch_http_enqueue_worker(struct cos_http_fetch_context *c)
+src/netsurf/cos_fetch_http.c:410:    if (c == NULL || c->worker_queued || c->worker_running ||
+src/netsurf/cos_fetch_http.c:413:    if (!c->worker_queued && !c->worker_running && !c->transport_complete) {
+src/netsurf/cos_fetch_http.c:414:        c->worker_queued = true;
+src/netsurf/cos_fetch_http.c:415:        c->worker_next = NULL;
+src/netsurf/cos_fetch_http.c:416:        if (worker_tail != NULL) worker_tail->worker_next = c;
+src/netsurf/cos_fetch_http.c:417:        else worker_head = c;
+src/netsurf/cos_fetch_http.c:418:        worker_tail = c;
+src/netsurf/cos_fetch_http.c:423:static struct cos_http_fetch_context *fetch_http_dequeue_worker(void)
+src/netsurf/cos_fetch_http.c:427:    c = worker_head;
+src/netsurf/cos_fetch_http.c:429:        worker_head = c->worker_next;
+src/netsurf/cos_fetch_http.c:430:        if (worker_head == NULL) worker_tail = NULL;
+src/netsurf/cos_fetch_http.c:431:        c->worker_next = NULL;
+src/netsurf/cos_fetch_http.c:432:        c->worker_queued = false;
+src/netsurf/cos_fetch_http.c:433:        c->worker_running = true;
+src/netsurf/cos_fetch_http.c:456:    c->worker_running = false;
+src/netsurf/cos_fetch_http.c:469:static void fetch_http_worker_main(void *arg)
+src/netsurf/cos_fetch_http.c:473:        struct cos_http_fetch_context *c = fetch_http_dequeue_worker();
+src/netsurf/cos_fetch_http.c:477:             * such a newly-created network worker is woken by NIC activity.
+src/netsurf/cos_fetch_http.c:478:             * Yield keeps the worker preemptible without corrupting its return
+src/netsurf/cos_fetch_http.c:490:    /* Transport never runs on the GUI owner thread. Two dedicated workers
+src/netsurf/cos_fetch_http.c:493:     * thread. HTTP itself enforces the same two-transport bound and each worker
+src/netsurf/cos_fetch_http.c:495:    if (worker_count == 0u) {
+src/netsurf/cos_fetch_http.c:500:            thread_t *worker = thread_create_kernel_stack_size(
+src/netsurf/cos_fetch_http.c:501:                names[i], (void *)fetch_http_worker_main, NULL,
+src/netsurf/cos_fetch_http.c:503:            if (worker == NULL) break;
+src/netsurf/cos_fetch_http.c:504:            ++worker_count;
+src/netsurf/cos_fetch_http.c:506:        if (worker_count == 0u) {
+src/netsurf/cos_fetch_http.c:507:            serial_puts("[NetSurf] HTTP worker creation failed; retaining cooperative fallback\n");
+src/netsurf/cos_fetch_http.c:510:        serial_puts("[NetSurf] bounded asynchronous HTTP workers online: ");
+src/netsurf/cos_fetch_http.c:511:        serial_putdec(worker_count);
+src/netsurf/cos_fetch_http.c:513:        if (worker_count < FETCH_HTTP_WORKER_LIMIT) {
+src/netsurf/cos_fetch_http.c:514:            serial_puts("[NetSurf] worker pool degraded; transport limit remains bounded\n");
+src/netsurf/cos_fetch_http.c:598:    ctx->worker_queued = false;
+src/netsurf/cos_fetch_http.c:599:    ctx->worker_running = false;
+src/netsurf/cos_fetch_http.c:613:    ctx->worker_next = NULL;
+src/netsurf/cos_fetch_http.c:642:     * alive until the worker has stopped touching it; the poll loop performs
+src/netsurf/cos_fetch_http.c:644:    if (c->worker_queued || c->worker_running) {
+src/netsurf/cos_fetch_http.c:770: * transport worker has already finished by this point, so yielding between
+src/netsurf/cos_fetch_http.c:855:    /* The preemptive worker owns DNS/TCP/TLS and only stores the completed
+src/netsurf/cos_fetch_http.c:1064:    /* Detach this generation before issuing callbacks. The worker owns the
+src/netsurf/cos_fetch_http.c:1075:    int transport_budget = worker_count != 0u ? 0x7fffffff : 1;
+src/netsurf/cos_fetch_http.c:1088:            if (worker_count != 0u) {
+src/netsurf/cos_fetch_http.c:1089:                fetch_http_enqueue_worker(c);
+src/netsurf/cos_netsurf.c:379:         * but it must still not monopolise a CPU while a transport worker is
+src/netsurf/cos_netsurf.c:463:         * but it must still not monopolise a CPU while a transport worker is
+src/gui/core/gui_lifecycle.c:559:         * never invoked from an IRQ/AP worker or from JS evaluation itself. */
+src/gui/core/output/gui_renderer.c:199:static void gui_fill_tile_worker(void *opaque) {
+src/gui/core/output/gui_renderer.c:215:    uint32_t workers = online > 8u ? 8u : online;
+src/gui/core/output/gui_renderer.c:216:    if (workers > height) workers = (uint32_t)height;
+src/gui/core/output/gui_renderer.c:217:    if (workers < 2u) return false;
+src/gui/core/output/gui_renderer.c:222:    uint64_t base = height / workers;
+src/gui/core/output/gui_renderer.c:223:    uint64_t extra = height % workers;
+src/gui/core/output/gui_renderer.c:230:    for (uint32_t i = 0; i < workers; ++i) {
+src/gui/core/output/gui_renderer.c:239:        smp_background_job_init(&jobs[i], gui_fill_tile_worker, &tiles[i],
+src/gui/core/output/gui_renderer.c:245:     * the AP workers run. Queue pressure falls back safely to BSP execution
+src/gui/core/output/gui_renderer.c:247:    for (uint32_t i = 1; i < workers; ++i) {
+src/gui/core/output/gui_renderer.c:251:            gui_fill_tile_worker(&tiles[i]);
+src/gui/core/output/gui_renderer.c:254:    gui_fill_tile_worker(&tiles[0]);
+src/gui/core/output/gui_renderer.c:256:    for (uint32_t i = 1; i < workers; ++i) {
+src/kernel/kernel.c:136:            smp_start_deferred_workers();
+src/kernel/kernel.c:149:/* Enable only in a dedicated validation build. The probe starts a worker
+src/kernel/kernel.c:151: * worker observed time *before* the spin worker completed. A cooperative
+src/kernel/kernel.c:153: * spinning worker leaves the CPU. */
+src/kernel/kernel.c:188:    serial_puts(passed ? "[SCHED] PREEMPTION-PROBE PASS: observer ran during CPU-bound no-yield worker\\n"
+src/kernel/kernel.c:189:                       : "[SCHED] PREEMPTION-PROBE FAIL: observer did not run before CPU-bound worker ended\\n");
+src/kernel/kernel.c:208:/* This worker is intentionally compiled only into a validation image.  It
+src/kernel/kernel.c:216:static void http_parallel_smoke_worker(void* arg) {
+src/kernel/kernel.c:217:    uint64_t worker_id = (uint64_t)(uintptr_t)arg;
+src/kernel/kernel.c:226:        serial_puts("[HTTP-TEST] parallel worker=");
+src/kernel/kernel.c:227:        serial_putdec(worker_id);
+src/kernel/kernel.c:231:        serial_puts("[HTTP-TEST] parallel worker create failed\n");
+src/kernel/kernel.c:247:        thread_t *worker = thread_create_kernel_stack_size(
+src/kernel/kernel.c:249:            (void*)http_parallel_smoke_worker, (void*)(uintptr_t)i,
+src/kernel/kernel.c:251:        if (worker == NULL) {
+src/kernel/kernel.c:252:            serial_puts("[HTTP-TEST] FAIL: parallel worker creation\n");
+src/kernel/kernel.c:290:        serial_puts("[HTTP-TEST] FAIL: worker creation\n");
+src/kernel/kernel.c:413:} __attribute__((packed)) mb2_mmap_entry_t;
+src/kernel/kernel.c:484:            if (!mtag->entry_size || mtag->entry_size < sizeof(mb2_mmap_entry_t))
+src/kernel/kernel.c:485:                mtag->entry_size = sizeof(mb2_mmap_entry_t);
+src/kernel/kernel.c:492:                mb2_mmap_entry_t* e = (mb2_mmap_entry_t*)entry_ptr;
+src/kernel/kernel.c:849:         * fix for the prev==NULL case) and this stack is abandoned. */        bool gui_workers_ok = true;
+src/kernel/kernel.c:855:         * kernel worker. That mismatch let a JS-heavy page overrun the real
+src/kernel/kernel.c:869:            gui_workers_ok = false;
+src/kernel/kernel.c:878:            gui_workers_ok = false;
+src/kernel/kernel.c:881:        if (!gui_workers_ok) {
+src/kernel/kernel.c:886:        if (gui_workers_ok) {
+src/kernel/drivers/http.h:52:     * transport workers from sharing TLS plaintext staging or gzip/Brotli
+src/kernel/drivers/http.h:95: * the explicit client argument preserves the origin context when worker
+src/kernel/drivers/tcp.c:22:/* NIC receive handling and future AP-owned transport workers can access the
+src/kernel/drivers/dns.c:4: * DNS is used by HTTP/TLS workers.  The former single global pending hostname
+src/kernel/drivers/dns.c:176:         * response into an unrelated request before the original worker wakes. */
+src/kernel/drivers/dns.c:380:         * other HTTP/TLS workers a chance to run. */
+src/kernel/drivers/http.c:29: * browser-owned workers overlap. */
+src/kernel/drivers/http.c:32: * this allows independent fetch workers to overlap while keeping memory and
+src/kernel/drivers/http.c:38: * a future bounded worker pool overlap unrelated sockets without exposing the
+src/kernel/drivers/http.c:63: * needs no worker locking. */
+src/kernel/drivers/http.c:852:     * scarce active-transfer permit while other workers are in flight. */
+src/kernel/drivers/http.c:1246:            /* The transport is temporarily would-block. Yield this worker's
+src/kernel/drivers/e1000.c:53:/* Transport workers may submit TX while the sole network dispatcher drains
+src/kernel/drivers/arp.c:17:/* Transport workers perform lookups while packet ingress inserts resolved
+src/kernel/drivers/tls_backend.c:467:     * machine once concurrent transport workers are enabled. */
+src/kernel/scheduler.c:1029:int scheduler_get_cpu_load(int cpu) {
+src/kernel/scheduler.c:1039:float scheduler_get_cpu_usage(void) {
+src/kernel/scheduler.c:1047:void scheduler_migrate_task(thread_t* thread, int target_cpu) {
+src/kernel/smp.c:27:/* AP workers execute real C code (decode/tile jobs as well as bootstrap
+src/kernel/smp.c:99:static bool s_workers_deferred = false;
+src/kernel/smp.c:100:static bool s_workers_started = false;
+src/kernel/smp.c:467:void smp_ap_entry(void) {
+src/kernel/smp.c:483:     * timer/scheduler IRQ handling BSP-only until its full per-CPU conversion. */
+src/kernel/smp.c:504:    mailbox->entry = (uint64_t)(uintptr_t)smp_ap_entry;
+src/kernel/smp.c:509:    if (s_workers_started || !s_apic || s_possible_cpus <= 1) return;
+src/kernel/smp.c:510:    s_workers_started = true;
+src/kernel/smp.c:603:            serial_puts("[SMP] CPU kernel worker timeout: ");
+src/kernel/smp.c:650:    s_workers_deferred = false;
+src/kernel/smp.c:651:    s_workers_started = false;
+src/kernel/smp.c:666:        /* Do not invent APIC IDs on a real machine; remain safely BSP-only
+src/kernel/smp.c:682:        s_workers_deferred = true;
+src/kernel/smp.c:683:        serial_puts("[SMP] VirtualBox detected; AP workers deferred until desktop frame\n");
+src/kernel/smp.c:692:void smp_start_deferred_workers(void) {
+src/kernel/smp.c:693:    if (!s_workers_deferred) return;
+src/kernel/smp.c:694:    s_workers_deferred = false;
+src/kernel/smp.c:695:    serial_puts("[SMP] Starting deferred VirtualBox AP workers after desktop frame\n");
+src/kernel/smp.c:699:bool smp_workers_deferred(void) { return s_workers_deferred; }
+src/third_party/quickjs/cos_js_web_api.c:66:    bool worker_queued;
+src/third_party/quickjs/cos_js_web_api.c:67:    bool worker_running;
+src/third_party/quickjs/cos_js_web_api.c:82:    struct cos_web_request *worker_next;
+src/third_party/quickjs/cos_js_web_api.c:95:static cos_web_request_t *g_web_worker_head;
+src/third_party/quickjs/cos_js_web_api.c:96:static cos_web_request_t *g_web_worker_tail;
+src/third_party/quickjs/cos_js_web_api.c:97:static bool g_web_worker_started;
+src/third_party/quickjs/cos_js_web_api.c:98:static volatile uint32_t g_web_worker_lock;
+src/third_party/quickjs/cos_js_web_api.c:113:static void web_worker_lock_acquire(void)
+src/third_party/quickjs/cos_js_web_api.c:115:    while (__atomic_exchange_n(&g_web_worker_lock, 1u, __ATOMIC_ACQUIRE) != 0u) {
+src/third_party/quickjs/cos_js_web_api.c:120:static void web_worker_lock_release(void)
+src/third_party/quickjs/cos_js_web_api.c:122:    __atomic_store_n(&g_web_worker_lock, 0u, __ATOMIC_RELEASE);
+src/third_party/quickjs/cos_js_web_api.c:125:static void web_worker_enqueue(cos_web_request_t *request)
+src/third_party/quickjs/cos_js_web_api.c:128:    web_worker_lock_acquire();
+src/third_party/quickjs/cos_js_web_api.c:129:    request->worker_next = NULL;
+src/third_party/quickjs/cos_js_web_api.c:130:    if (g_web_worker_tail != NULL) g_web_worker_tail->worker_next = request;
+src/third_party/quickjs/cos_js_web_api.c:131:    else g_web_worker_head = request;
+src/third_party/quickjs/cos_js_web_api.c:132:    g_web_worker_tail = request;
+src/third_party/quickjs/cos_js_web_api.c:133:    request->worker_queued = true;
+src/third_party/quickjs/cos_js_web_api.c:134:    web_worker_lock_release();
+src/third_party/quickjs/cos_js_web_api.c:137:static cos_web_request_t *web_worker_dequeue(void)
+src/third_party/quickjs/cos_js_web_api.c:139:    web_worker_lock_acquire();
+src/third_party/quickjs/cos_js_web_api.c:140:    cos_web_request_t *request = g_web_worker_head;
+src/third_party/quickjs/cos_js_web_api.c:142:        g_web_worker_head = request->worker_next;
+src/third_party/quickjs/cos_js_web_api.c:143:        if (g_web_worker_head == NULL) g_web_worker_tail = NULL;
+src/third_party/quickjs/cos_js_web_api.c:144:        request->worker_next = NULL;
+src/third_party/quickjs/cos_js_web_api.c:145:        request->worker_queued = false;
+src/third_party/quickjs/cos_js_web_api.c:146:        request->worker_running = true;
+src/third_party/quickjs/cos_js_web_api.c:148:    web_worker_lock_release();
+src/third_party/quickjs/cos_js_web_api.c:834:        __atomic_store_n(&request->worker_running, false, __ATOMIC_RELEASE);
+src/third_party/quickjs/cos_js_web_api.c:852:    __atomic_store_n(&request->worker_running, false, __ATOMIC_RELEASE);
+src/third_party/quickjs/cos_js_web_api.c:857:static void web_worker_main(void *arg)
+src/third_party/quickjs/cos_js_web_api.c:861:        cos_web_request_t *request = web_worker_dequeue();
+src/third_party/quickjs/cos_js_web_api.c:870:static bool web_start_worker(void)
+src/third_party/quickjs/cos_js_web_api.c:872:    if (g_web_worker_started) return true;
+src/third_party/quickjs/cos_js_web_api.c:873:    thread_t *worker = thread_create_kernel("qjs_http", (void *)web_worker_main, NULL);
+src/third_party/quickjs/cos_js_web_api.c:874:    if (worker == NULL) {
+src/third_party/quickjs/cos_js_web_api.c:875:        serial_puts("[QJS/Web] HTTP worker creation failed; using owner fallback\n");
+src/third_party/quickjs/cos_js_web_api.c:878:    g_web_worker_started = true;
+src/third_party/quickjs/cos_js_web_api.c:879:    serial_puts("[QJS/Web] asynchronous HTTP worker online\n");
+src/third_party/quickjs/cos_js_web_api.c:904:    bool worker = web_start_worker();
+src/third_party/quickjs/cos_js_web_api.c:909:            if (!request->worker_running) web_free_request(request);
+src/third_party/quickjs/cos_js_web_api.c:912:        if (!worker) {
+src/third_party/quickjs/cos_js_web_api.c:914:        } else         if (!request->worker_queued && !request->worker_running &&
+src/third_party/quickjs/cos_js_web_api.c:916:            serial_puts("[QJS/Web] dispatching request to worker\n");
+src/third_party/quickjs/cos_js_web_api.c:917:            web_worker_enqueue(request);
+src/third_party/quickjs/cos_js_web_api.c:919:        if (request->transport_complete && !request->worker_running) {
+src/third_party/quickjs/cos_js_web_api.c:931:            if (request->worker_queued || request->worker_running) {
+src/third_party/quickjs/cos_js_web_api.c:933:                /* The worker may finish after the JS context is gone. Detach
+src/third_party/tinyusb/SRC/src/portable/raspberrypi/rp2040/rp2040_usb.h:168:  // todo add critsec as necessary to prevent issues between worker and IRQ...
+src/third_party/tinyusb/SRC/src/portable/raspberrypi/rp2040/rp2040_usb.h:170:  //  sense to have worker and IRQ on same core, however I think using critsec is about equivalent.
+src/third_party/openssl/crypto/bn/bn_sparc.c:48:            bn_mul_mont_f worker = funcs[num / 16 - 1];
+src/third_party/openssl/crypto/bn/bn_sparc.c:50:            if ((*worker)(rp, ap, bp, np, n0))
+src/third_party/openssl/crypto/bn/bn_sparc.c:53:            if ((*worker)(rp, ap, bp, np, n0))
+src/third_party/openssl/crypto/bn/bn_exp.c:791:        bn_pwr5_mont_f pwr5_worker = pwr5_funcs[top / 16 - 1];
+src/third_party/openssl/crypto/bn/bn_exp.c:811:        bn_mul_mont_f mul_worker = mul_funcs[top / 16 - 1];
+src/third_party/openssl/crypto/bn/bn_exp.c:843:        if (!(*mul_worker)(tmp.d, am.d, am.d, np, n0) && !(*mul_worker)(tmp.d, am.d, am.d, np, n0))
+src/third_party/openssl/crypto/bn/bn_exp.c:849:            if (!(*mul_worker)(tmp.d, tmp.d, am.d, np, n0) && !(*mul_worker)(tmp.d, tmp.d, am.d, np, n0))
+src/third_party/openssl/crypto/bn/bn_exp.c:881:            if ((*pwr5_worker)(tmp.d, np, n0, powerbuf, wvalue, stride))
+src/third_party/openssl/crypto/bn/bn_exp.c:884:            if ((*pwr5_worker)(tmp.d, np, n0, powerbuf, wvalue, stride))
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/imagemap.c:50:} imagemap_entry_type;
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/imagemap.c:53:	imagemap_entry_type type;	/**< type of shape */
+src/third_party/netsurf-all-3.11/netsurf/content/fetchers/resource.c:74:static struct fetch_resource_map_entry {
+src/third_party/netsurf-all-3.11/netsurf/content/fetchers/resource.c:96:	struct fetch_resource_map_entry *entry; /**< resource map entry */
+src/third_party/netsurf-all-3.11/netsurf/content/fetchers/resource.c:261:	struct fetch_resource_map_entry *e;
+src/third_party/netsurf-all-3.11/netsurf/utils/hashmap.c:32:typedef struct hashmap_entry_s {
+src/third_party/netsurf-all-3.11/netsurf/utils/hashmap.c:33:	struct hashmap_entry_s **prevptr;
+src/third_party/netsurf-all-3.11/netsurf/utils/hashmap.c:34:	struct hashmap_entry_s *next;
+src/third_party/netsurf-all-3.11/netsurf/utils/hashmap.c:38:} hashmap_entry_t;
+src/third_party/netsurf-all-3.11/netsurf/utils/hashmap.c:52:	hashmap_entry_t **buckets;
+src/third_party/netsurf-all-3.11/netsurf/utils/hashmap.c:77:	ret->buckets = malloc(ret->bucket_count * sizeof(hashmap_entry_t *));
+src/third_party/netsurf-all-3.11/netsurf/utils/hashmap.c:84:	memset(ret->buckets, 0, ret->bucket_count * sizeof(hashmap_entry_t *));
+src/third_party/netsurf-all-3.11/netsurf/utils/hashmap.c:94:	hashmap_entry_t *entry;
+src/third_party/netsurf-all-3.11/netsurf/utils/hashmap.c:99:			hashmap_entry_t *next = entry->next;
+src/third_party/netsurf-all-3.11/netsurf/utils/hashmap.c:116:	hashmap_entry_t *entry = hashmap->buckets[hash % hashmap->bucket_count];
+src/third_party/netsurf-all-3.11/netsurf/utils/hashmap.c:135:	hashmap_entry_t *entry = hashmap->buckets[bucket];
+src/third_party/netsurf-all-3.11/netsurf/utils/hashmap.c:210:	hashmap_entry_t *entry = hashmap->buckets[hash % hashmap->bucket_count];
+src/third_party/netsurf-all-3.11/netsurf/utils/hashmap.c:238:		for (hashmap_entry_t *entry = hashmap->buckets[bucket];
+src/third_party/netsurf-all-3.11/libcss/src/parse/propstrings.c:17:typedef struct stringmap_entry {
+src/third_party/netsurf-all-3.11/libcss/src/parse/propstrings.c:20:} stringmap_entry;
+src/third_party/netsurf-all-3.11/libcss/src/parse/propstrings.c:30:const stringmap_entry stringmap[LAST_KNOWN] = {
+src/third_party/nghttp2/bpf/reuseport_kern.c:326:} worker_id_map SEC(".maps");
+src/third_party/nghttp2/bpf/reuseport_kern.c:484:  __u8 *worker_id;
+src/third_party/nghttp2/bpf/reuseport_kern.c:536:      worker_id = qhd.dcid + WORKER_ID_OFFSET;
+src/third_party/nghttp2/bpf/reuseport_kern.c:537:      AES_ECB_decrypt(aes_ctx, worker_id);
+src/third_party/nghttp2/bpf/reuseport_kern.c:539:      psk_index = bpf_map_lookup_elem(&worker_id_map, worker_id);
+src/third_party/nghttp2/bpf/reuseport_kern.c:556:    worker_id = qhd.dcid + WORKER_ID_OFFSET;
+src/third_party/nghttp2/bpf/reuseport_kern.c:557:    AES_ECB_decrypt(aes_ctx, worker_id);
+src/third_party/nghttp2/bpf/reuseport_kern.c:559:    psk_index = bpf_map_lookup_elem(&worker_id_map, worker_id);
+src/third_party/nghttp2/src/HttpServer.h:77:  size_t num_worker;
+src/third_party/nghttp2/src/h2load.h:298:  // number of clients this worker handles
+src/third_party/nghttp2/src/h2load.h:305:  // maximum number of samples in this worker thread
+src/third_party/nghttp2/src/h2load.h:308:  // The next client ID this worker assigns
+src/third_party/nghttp2/src/h2load.h:311:  // worker
+src/third_party/nghttp2/src/h2load.h:349:  Worker *worker;
+src/third_party/nghttp2/src/h2load.h:394:  // The client id per worker
+src/third_party/nghttp2/src/h2load.h:422:  Client(uint32_t id, Worker *worker, size_t req_todo);
+src/third_party/nghttp2/src/shrpx_api_downstream_connection.h:68:  APIDownstreamConnection(Worker *worker);
+src/third_party/nghttp2/src/shrpx_api_downstream_connection.h:103:  Worker *worker_;
+src/third_party/nghttp2/src/shrpx_client_handler.h:70:  ClientHandler(Worker *worker, int fd, SSL *ssl, const StringRef &ipaddr,
+src/third_party/nghttp2/src/shrpx_client_handler.h:142:  Worker *get_worker() const;
+src/third_party/nghttp2/src/shrpx_client_handler.h:231:  Worker *worker_;
+src/third_party/nghttp2/src/shrpx_config.h:92:constexpr auto SHRPX_OPT_WORKERS = "workers"_sr;
+src/third_party/nghttp2/src/shrpx_config.h:145:constexpr auto SHRPX_OPT_WORKER_READ_RATE = "worker-read-rate"_sr;
+src/third_party/nghttp2/src/shrpx_config.h:146:constexpr auto SHRPX_OPT_WORKER_READ_BURST = "worker-read-burst"_sr;
+src/third_party/nghttp2/src/shrpx_config.h:147:constexpr auto SHRPX_OPT_WORKER_WRITE_RATE = "worker-write-rate"_sr;
+src/third_party/nghttp2/src/shrpx_config.h:148:constexpr auto SHRPX_OPT_WORKER_WRITE_BURST = "worker-write-burst"_sr;
+src/third_party/nghttp2/src/shrpx_config.h:167:  "worker-frontend-connections"_sr;
+src/third_party/nghttp2/src/shrpx_config.h:182:  "backend-http2-connections-per-worker"_sr;
+src/third_party/nghttp2/src/shrpx_config.h:351:constexpr auto SHRPX_OPT_MAX_WORKER_PROCESSES = "max-worker-processes"_sr;
+src/third_party/nghttp2/src/shrpx_config.h:353:  "worker-process-grace-shutdown-period"_sr;
+src/third_party/nghttp2/src/shrpx_config.h:1019:    size_t worker_connections;
+src/third_party/nghttp2/src/shrpx_config.h:1059:      num_worker{0},
+src/third_party/nghttp2/src/shrpx_config.h:1073:      max_worker_processes{0},
+src/third_party/nghttp2/src/shrpx_config.h:1074:      worker_process_grace_shutdown_period{0.} {
+src/third_party/nghttp2/src/shrpx_config.h:1110:  size_t num_worker;
+src/third_party/nghttp2/src/shrpx_config.h:1128:  size_t max_worker_processes;
+src/third_party/nghttp2/src/shrpx_config.h:1129:  ev_tstamp worker_process_grace_shutdown_period;
+src/third_party/nghttp2/src/shrpx_connection_handler.h:118:  bpf_map *worker_id_map;
+src/third_party/nghttp2/src/shrpx_connection_handler.h:131:  QUICLingeringWorkerProcess(std::vector<WorkerID> worker_ids, int quic_ipc_fd)
+src/third_party/nghttp2/src/shrpx_connection_handler.h:132:    : worker_ids{std::move(worker_ids)}, quic_ipc_fd{quic_ipc_fd} {}
+src/third_party/nghttp2/src/shrpx_connection_handler.h:134:  std::vector<WorkerID> worker_ids;
+src/third_party/nghttp2/src/shrpx_connection_handler.h:135:  // Socket to send QUIC IPC message to this worker process.
+src/third_party/nghttp2/src/shrpx_connection_handler.h:147:  int create_single_worker();
+src/third_party/nghttp2/src/shrpx_connection_handler.h:150:  int create_worker_thread(size_t num);
+src/third_party/nghttp2/src/shrpx_connection_handler.h:152:  set_ticket_keys_to_worker(const std::shared_ptr<TicketKeys> &ticket_keys);
+src/third_party/nghttp2/src/shrpx_connection_handler.h:153:  void worker_reopen_log_files();
+src/third_party/nghttp2/src/shrpx_connection_handler.h:157:  Worker *get_single_worker() const;
+src/third_party/nghttp2/src/shrpx_connection_handler.h:164:  void graceful_shutdown_worker();
+src/third_party/nghttp2/src/shrpx_connection_handler.h:167:  void join_worker();
+src/third_party/nghttp2/src/shrpx_connection_handler.h:210:  void set_worker_ids(std::vector<WorkerID> worker_ids);
+src/third_party/nghttp2/src/shrpx_connection_handler.h:211:  Worker *find_worker(const WorkerID &wid) const;
+src/third_party/nghttp2/src/shrpx_connection_handler.h:213:  void set_quic_lingering_worker_processes(
+src/third_party/nghttp2/src/shrpx_connection_handler.h:220:  match_quic_lingering_worker_process_worker_id(const WorkerID &wid);
+src/third_party/nghttp2/src/shrpx_connection_handler.h:222:  int forward_quic_packet_to_lingering_worker_process(
+src/third_party/nghttp2/src/shrpx_connection_handler.h:251:  worker_replace_downstream(std::shared_ptr<DownstreamConfig> downstreamconf);
+src/third_party/nghttp2/src/shrpx_connection_handler.h:265:  std::vector<WorkerID> worker_ids_;
+src/third_party/nghttp2/src/shrpx_connection_handler.h:266:  std::vector<WorkerID> lingering_worker_ids_;
+src/third_party/nghttp2/src/shrpx_connection_handler.h:268:  std::vector<QUICLingeringWorkerProcess> quic_lingering_worker_processes_;
+src/third_party/nghttp2/src/shrpx_connection_handler.h:278:  // ev_loop for each worker
+src/third_party/nghttp2/src/shrpx_connection_handler.h:279:  std::vector<struct ev_loop *> worker_loops_;
+src/third_party/nghttp2/src/shrpx_connection_handler.h:282:  // additional worker dedicated to API request .
+src/third_party/nghttp2/src/shrpx_connection_handler.h:283:  std::vector<std::unique_ptr<Worker>> workers_;
+src/third_party/nghttp2/src/shrpx_connection_handler.h:289:  // Otherwise, nullptr and workers_ has instances of Worker instead.
+src/third_party/nghttp2/src/shrpx_connection_handler.h:290:  std::unique_ptr<Worker> single_worker_;
+src/third_party/nghttp2/src/shrpx_connection_handler.h:314:  unsigned int worker_round_robin_cnt_;
+src/third_party/nghttp2/src/shrpx_http2_session.h:109:  Http2Session(struct ev_loop *loop, SSL_CTX *ssl_ctx, Worker *worker,
+src/third_party/nghttp2/src/shrpx_http2_session.h:276:  Worker *worker_;
+src/third_party/nghttp2/src/shrpx_http_downstream_connection.h:48:                           Worker *worker);
+src/third_party/nghttp2/src/shrpx_http_downstream_connection.h:99:  Worker *worker_;
+src/third_party/nghttp2/src/shrpx_live_check.h:56:  LiveCheck(struct ev_loop *loop, SSL_CTX *ssl_ctx, Worker *worker,
+src/third_party/nghttp2/src/shrpx_live_check.h:107:  Worker *worker_;
+src/third_party/nghttp2/src/shrpx_quic.h:99:      uint16_t worker_process;
+src/third_party/nghttp2/src/shrpx_quic.h:102:    uint64_t worker;
+src/third_party/nghttp2/src/shrpx_quic.h:110:  return lhd.worker == rhd.worker;
+src/third_party/nghttp2/src/shrpx_quic.h:114:  return lhd.worker != rhd.worker;
+src/third_party/nghttp2/src/shrpx_quic.h:118:  WorkerID worker;
+src/third_party/nghttp2/src/shrpx_quic_connection_handler.h:53:  CloseWait(Worker *worker, std::vector<ngtcp2_cid> scids,
+src/third_party/nghttp2/src/shrpx_quic_connection_handler.h:61:  Worker *worker;
+src/third_party/nghttp2/src/shrpx_quic_connection_handler.h:82:  QUICConnectionHandler(Worker *worker);
+src/third_party/nghttp2/src/shrpx_quic_connection_handler.h:131:  Worker *worker_;
+src/third_party/nghttp2/src/shrpx_quic_listener.h:39:  QUICListener(const UpstreamAddr *faddr, Worker *worker);
+src/third_party/nghttp2/src/shrpx_quic_listener.h:45:  Worker *worker_;
+src/third_party/nghttp2/src/shrpx_signal.h:55:int shrpx_signal_set_worker_proc_ign_handler();
+src/third_party/nghttp2/src/shrpx_signal.h:56:int shrpx_signal_unset_worker_proc_ign_handler();
+src/third_party/nghttp2/src/shrpx_tls.h:111:ClientHandler *accept_connection(Worker *worker, int fd, sockaddr *addr,
+src/third_party/nghttp2/src/shrpx_worker.h:347:  WorkerStat *get_worker_stat();
+src/third_party/nghttp2/src/shrpx_worker.h:388:  const WorkerID &get_worker_id() const;
+src/third_party/nghttp2/src/shrpx_worker.h:411:  // Unique index of this worker.
+src/third_party/nghttp2/src/shrpx_worker.h:421:  WorkerStat worker_stat_;
+src/third_party/nghttp2/src/shrpx_worker.h:425:  WorkerID worker_id_;
+src/third_party/nghttp2/src/shrpx_worker.h:438:  // get_config()->tls_ctx_per_worker == true.
+src/third_party/nghttp2/src/shrpx_worker_process.h:45:  // IPC socket to tell that a worker process is ready for service.
+src/third_party/nghttp2/src/shrpx_worker_process.h:52:  // Worker IDs for the new worker process.
+src/third_party/nghttp2/src/shrpx_worker_process.h:53:  std::vector<WorkerID> worker_ids;
+src/third_party/nghttp2/src/shrpx_worker_process.h:55:  // worker process.
+src/third_party/nghttp2/src/shrpx_worker_process.h:57:  // Lingering worker processes which were created before this worker
+src/third_party/nghttp2/src/shrpx_worker_process.h:59:  std::vector<QUICLingeringWorkerProcess> quic_lingering_worker_processes;
+src/third_party/nghttp2/src/shrpx_worker_process.h:63:int worker_process_event_loop(WorkerProcessConfig *wpconf);
+src/third_party/nghttp2/src/shrpx_worker_test.h:38:extern const MunitSuite worker_suite;
+src/third_party/nghttp2/src/shrpx_worker_test.h:40:munit_void_test_decl(test_shrpx_worker_match_downstream_addr_group)
+src/include/cos_js_scheduler.h:11: * worker. */
+src/include/smp.h:55:/* Starts AP workers deferred during early boot on hypervisors whose firmware
+src/include/smp.h:57:void smp_start_deferred_workers(void);
+src/include/smp.h:58:bool smp_workers_deferred(void);
+src/include/smp.h:66: * The function must not use BSP-only scheduler state or sleep while holding
+src/include/smp.h:74: * and deterministic SMP validation; CPU 0 is BSP-only in this stage. */
+src/include/scheduler.h:150:int scheduler_get_cpu_load(int cpu);
+src/include/scheduler.h:151:void scheduler_migrate_task(thread_t* thread, int target_cpu);
+src/include/scheduler.h:160:float scheduler_get_cpu_usage(void);
+src/include/task.h:145: * native C call depth than a typical kernel worker - see gui_main in

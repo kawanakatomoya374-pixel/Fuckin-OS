@@ -1,0 +1,28 @@
+# net_poll call sites
+src/kernel/kernel.c:85:void net_poll(void);
+src/kernel/kernel.c:126:        net_poll();
+src/kernel/kernel.c:871:                net_poll();
+src/kernel/kernel.c:891:        net_poll();
+src/kernel/drivers/tusb_port_pc.c:184: * polled context instead, the same way net_poll() ticks e1000), so
+src/kernel/drivers/usb.c:15: * calls tuh_task() from the GUI main loop, the same way net_poll()
+src/kernel/drivers/tusb_config.h:32: * loop (see kernel.c), the same way net_poll() already ticks the
+src/kernel/drivers/tcp.c:13:extern void net_poll(void);
+src/kernel/drivers/tcp.c:229:        net_poll();
+src/kernel/drivers/tcp.c:266:        net_poll();
+src/kernel/drivers/tcp.c:277:    net_poll();
+src/kernel/drivers/tcp.c:332:            net_poll();
+src/kernel/drivers/dns.c:361:        net_poll();
+src/kernel/drivers/http.c:22:extern void net_poll(void);
+src/kernel/drivers/http.c:373:        net_poll();
+src/kernel/drivers/e1000.c:299: * can level-assert legacy INTx before the first packet. net_poll() samples
+src/kernel/drivers/e1000.c:505: * re-deliver vector 0x2B indefinitely. net_poll() drains descriptors and
+src/kernel/drivers/e1000.c:698:     * interrupt stack, but skip descriptor reads on idle net_poll() passes. */
+src/kernel/drivers/net.c:57:void net_poll(void) {
+src/kernel/drivers/net.h:179:void net_poll(void);
+src/kernel/drivers/tls_backend.c:463:    net_poll();
+src/kernel/drivers/tls_backend.c:553:            net_poll();
+
+# e1000 poll sites
+src/kernel/drivers/e1000.c:695:void e1000_poll(void) {
+src/kernel/drivers/net.c:29:extern void e1000_poll(void);
+src/kernel/drivers/net.c:59:    e1000_poll();

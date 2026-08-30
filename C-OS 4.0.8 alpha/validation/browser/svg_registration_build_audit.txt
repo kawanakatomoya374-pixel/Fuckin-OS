@@ -1,0 +1,29 @@
+--- image init calls ---
+src/netsurf/cos_netsurf.c:160:    err = nsbmp_init();
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/image/rsvg.h:26:nserror nsrsvg_init(void);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/image/image.c:53:	error = nsbmp_init();
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/image/image.c:65:	error = nsico_init();
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/image/image.c:71:	error = nsjpeg_init();
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/image/image.c:83:	error = nspng_init();
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/image/image.c:96:	error = svg_init();
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/image/image.c:101:	error = nsrsvg_init();
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/image/svg.h:26:nserror svg_init(void);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/image/jpeg.h:26:nserror nsjpeg_init(void);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/image/jpeg.c:91:static void nsjpeg_init_source(j_decompress_ptr cinfo)
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/image/jpeg.c:268:		nsjpeg_init_source,
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/image/jpeg.c:390:		nsjpeg_init_source, nsjpeg_fill_input_buffer,
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/image/ico.h:26:nserror nsico_init(void);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/image/bmp.h:28:nserror nsbmp_init(void);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/image/png.h:23:nserror nspng_init(void);
+--- current libsvgtiny artifacts/build refs ---
+src/third_party/netsurf-all-3.11/Makefile:34:NSLIB_SVGTINY_TARG := libsvgtiny
+src/third_party/netsurf-all-3.11/Makefile:64:  NSLIB_TARG := $(NSLIB_ALL_TARG) $(NSLIB_SVGTINY_TARG) $(NSLIB_RO_TARG)
+src/third_party/netsurf-all-3.11/Makefile:68:    NSLIB_TARG := $(NSLIB_ALL_TARG) $(NSLIB_SVGTINY_TARG)  $(NSLIB_FB_TARG)
+src/third_party/netsurf-all-3.11/Makefile:72:      NSLIB_TARG := $(NSLIB_ALL_TARG) $(NSLIB_SVGTINY_TARG)
+src/third_party/netsurf-all-3.11/Makefile:76:        NSLIB_TARG := $(NSLIB_ALL_TARG) $(NSLIB_SVGTINY_TARG) 
+src/third_party/netsurf-all-3.11/Makefile:83:          NSLIB_TARG := $(NSLIB_ALL_TARG) $(NSLIB_SVGTINY_TARG) 
+src/third_party/netsurf-all-3.11/Makefile:141:checkout-release: $(NSLIB_TARG) $(NETSURF_TARG) $(NSGENBIND_TARG) $(NSLIB_FB_TARG) $(NSLIB_SVGTINY_TARG) $(NSLIB_RO_TARG)
+src/third_party/netsurf-all-3.11/Makefile:146:checkout-head: $(NSLIB_TARG) $(NETSURF_TARG) $(NSGENBIND_TARG) $(NSLIB_FB_TARG) $(NSLIB_SVGTINY_TARG) $(NSLIB_RO_TARG)
+src/third_party/netsurf-all-3.11/libsvgtiny/Makefile:3:# Makefile for libsvgtiny
+src/third_party/netsurf-all-3.11/libsvgtiny/Makefile:8:COMPONENT := svgtiny
+src/third_party/netsurf-all-3.11/libsvgtiny/Makefile:57:INSTALL_ITEMS := $(INSTALL_ITEMS) $(I):include/svgtiny.h

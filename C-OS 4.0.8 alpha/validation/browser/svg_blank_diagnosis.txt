@@ -1,0 +1,180 @@
+--- svgtiny root/name traversal ---
+	 * We now own the document entirely.
+	 */
+	dom_xml_parser_destroy(parser);
+#endif
+
+	/* find root <svg> element */
+	exc = dom_document_get_document_element(document, &svg);
+	if (exc != DOM_NO_ERR) {
+		dom_node_unref(document);
+		return svgtiny_LIBDOM_ERROR;
+	}
+        if (svg == NULL) {
+                /* no root svg element */
+                dom_node_unref(document);
+		return svgtiny_SVG_ERROR;
+        }
+
+	exc = dom_node_get_node_name(svg, &svg_name);
+	if (exc != DOM_NO_ERR) {
+		dom_node_unref(svg);
+		dom_node_unref(document);
+		return svgtiny_LIBDOM_ERROR;
+	}
+	if (lwc_intern_string("svg", 3 /* SLEN("svg") */,
+			      &svg_name_lwc) != lwc_error_ok) {
+		dom_string_unref(svg_name);
+		dom_node_unref(svg);
+		dom_node_unref(document);
+		return svgtiny_LIBDOM_ERROR;
+	}
+	if (!dom_string_caseless_lwc_isequal(svg_name, svg_name_lwc)) {
+		lwc_string_unref(svg_name_lwc);
+		dom_string_unref(svg_name);
+		dom_node_unref(svg);
+		dom_node_unref(document);
+		return svgtiny_NOT_SVG;
+	}
+
+	lwc_string_unref(svg_name_lwc);
+	dom_string_unref(svg_name);
+
+	/* get graphic dimensions */
+	memset(&state, 0, sizeof(state));
+	state.diagram = diagram;
+	state.document = document;
+	state.viewport_width = viewport_width;
+	state.viewport_height = viewport_height;
+
+#define SVGTINY_STRING_ACTION2(s,n)					\
+	if (dom_string_create_interned((const uint8_t *) #n,		\
+				       strlen(#n), &state.interned_##s)	\
+	    != DOM_NO_ERR) {						\
+		code = svgtiny_LIBDOM_ERROR;				\
+		goto cleanup;						\
+	}
+#include "svgtiny_strings.h"
+#undef SVGTINY_STRING_ACTION2
+
+	svgtiny_parse_position_attributes(svg, state, &x, &y, &width, &height);
+	diagram->width = width;
+	diagram->height = height;
+
+	/* set up parsing state */
+	state.viewport_width = width;
+	state.viewport_height = height;
+	state.ctm.a = 1; /*(float) viewport_width / (float) width;*/
+	state.ctm.b = 0;
+	state.ctm.c = 0;
+	state.ctm.d = 1; /*(float) viewport_height / (float) height;*/
+	state.ctm.e = 0; /*x;*/
+	state.ctm.f = 0; /*y;*/
+	/*state.style = css_base_style;
+	state.style.font_size.value.length.value = option_font_size * 0.1;*/
+	state.fill = 0x000000;
+	state.stroke = svgtiny_TRANSPARENT;
+	state.stroke_width = 1;
+--- libdom node traversal examples ---
+src/third_party/netsurf-all-3.11/libsvgtiny/src/svgtiny.c:712:	exc = dom_node_get_node_name(svg, &svg_name);
+src/third_party/netsurf-all-3.11/libsvgtiny/src/svgtiny.c:833:	exc = dom_node_get_first_child(svg, (dom_node **) (void *) &child);
+src/third_party/netsurf-all-3.11/libsvgtiny/src/svgtiny.c:843:		exc = dom_node_get_node_type(child, &nodetype);
+src/third_party/netsurf-all-3.11/libsvgtiny/src/svgtiny.c:850:			exc = dom_node_get_node_name(child, &nodename);
+src/third_party/netsurf-all-3.11/libsvgtiny/src/svgtiny.c:896:		exc = dom_node_get_next_sibling(child,
+src/third_party/netsurf-all-3.11/libsvgtiny/src/svgtiny.c:1738:        exc = dom_node_get_first_child(text, &child);
+src/third_party/netsurf-all-3.11/libsvgtiny/src/svgtiny.c:1748:		exc = dom_node_get_node_type(child, &nodetype);
+src/third_party/netsurf-all-3.11/libsvgtiny/src/svgtiny.c:1756:			exc = dom_node_get_node_name(child, &nodename);
+src/third_party/netsurf-all-3.11/libsvgtiny/src/svgtiny.c:1798:		exc = dom_node_get_next_sibling(child, &next);
+src/third_party/netsurf-all-3.11/libsvgtiny/src/svgtiny_gradient.c:80:	exc = dom_node_get_node_name(gradient, &name);
+src/netsurf/cos_netsurf_render.c:240:    if (dom_node_get_node_name(node, &name) != DOM_NO_ERR || name == NULL) {
+src/third_party/netsurf-all-3.11/netsurf/desktop/save_complete.c:554:		exc = dom_node_get_first_child(node, &next);
+src/third_party/netsurf-all-3.11/netsurf/desktop/save_complete.c:564:			exc = dom_node_get_next_sibling(node, &next);
+src/third_party/netsurf-all-3.11/netsurf/desktop/save_complete.c:578:					exc = dom_node_get_next_sibling(node,
+src/third_party/netsurf-all-3.11/netsurf/desktop/save_complete.c:610:				exc = dom_node_get_next_sibling(node, &next);
+src/third_party/netsurf-all-3.11/netsurf/desktop/save_complete.c:878:	error = dom_node_get_node_name(node, &name);
+src/third_party/netsurf-all-3.11/netsurf/desktop/save_complete.c:1026:	error = dom_node_get_node_type(node, &type);
+src/third_party/netsurf-all-3.11/netsurf/desktop/hotlist.c:753:	error = dom_node_get_node_name(node, &name);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/html.c:462:	if (dom_node_get_first_child(node, &child) != DOM_NO_ERR) return;
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/html.c:464:		if (dom_node_get_next_sibling(child, &next) != DOM_NO_ERR) {
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/html.c:1071:	exc = dom_node_get_node_name(html, &node_name);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/box_special.c:77:		err = dom_node_get_node_type(parent, &type);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/box_special.c:300:	err = dom_node_get_first_child(n, &c);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/box_special.c:310:				err = dom_node_get_node_type(c, &type);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/box_special.c:316:				err = dom_node_get_node_name(c, &name);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/box_special.c:330:					err = dom_node_get_next_sibling(c,
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/box_special.c:356:			err = dom_node_get_node_name(c, &s);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/box_special.c:372:				err = dom_node_get_next_sibling(c, &next);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/box_special.c:466:			err = dom_node_get_next_sibling(c, &next);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/box_special.c:1538:	err = dom_node_get_first_child(n, &c);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/box_special.c:1546:		err = dom_node_get_node_type(c, &type);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/box_special.c:1555:			err = dom_node_get_node_name(c, &name);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/box_special.c:1619:		err = dom_node_get_next_sibling(c, &next);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/box_special.c:1680:	err = dom_node_get_first_child(n, &c);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/box_special.c:1689:		err = dom_node_get_node_name(c, &name);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/box_special.c:1709:			err = dom_node_get_first_child(c, &c2);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/box_special.c:1719:				err = dom_node_get_node_name(c2, &c2_name);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/box_special.c:1742:				err = dom_node_get_next_sibling(c2, &next2);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/box_special.c:1757:		err = dom_node_get_next_sibling(c, &next);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/box_construct.c:133:		err = dom_node_get_node_type(parent, &type);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/box_construct.c:874:		err = dom_node_get_first_child(n, &next);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/box_construct.c:881:		err = dom_node_get_next_sibling(n, &next);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/box_construct.c:907:				err = dom_node_get_next_sibling(parent,
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/box_construct.c:942:				err = dom_node_get_next_sibling(parent, &next);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/box_construct.c:1275:			err = dom_node_get_node_type(next, &type);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/box_inspect.c:794:		if (dom_node_get_node_name(box->node, &name) == DOM_NO_ERR) {
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/interaction.c:709:			    dom_node_get_node_name(box->node, &trace_name) == DOM_NO_ERR) {
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/form.c:1111:		exp = dom_node_get_node_name(element, &nodename);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/layout.c:4049:	exc = dom_node_get_node_type(node, &node_type);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/layout.c:4217:	exc = dom_node_get_first_child(list_owner, &child);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/layout.c:4242:		exc = dom_node_get_next_sibling(child, &temp_node);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/layout.c:4298:	exc = dom_node_get_first_child(box->node, &child);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/layout.c:4331:		exc = dom_node_get_next_sibling(child, &temp_node);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/dom_event.c:597:	exc = dom_node_get_node_type(node, &type);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/dom_event.c:681:		exc = dom_node_get_node_type(node, &type);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/dom_event.c:723:		exc = dom_node_get_node_type(node, &type);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/css/select.c:260:	if (dom_node_get_first_child(node, &child) != DOM_NO_ERR) return;
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/css/select.c:262:		if (dom_node_get_next_sibling(child, &next) != DOM_NO_ERR) {
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/css/select.c:414:	err = dom_node_get_node_name(n, &name);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/css/select.c:565:		err = dom_node_get_node_type(n, &type);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/css/select.c:587:		err = dom_node_get_node_name(n, &name);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/css/select.c:633:		err = dom_node_get_node_type(n, &type);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/css/select.c:640:			err = dom_node_get_node_name(n, &name);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/css/select.c:713:		err = dom_node_get_node_type(n, &type);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/css/select.c:764:		err = dom_node_get_node_name(n, &name);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/css/select.c:1288:		err = dom_node_get_node_type(parent, &type);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/css/select.c:1318:	exc = dom_node_get_node_type(node, &type);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/css/select.c:1325:		exc = dom_node_get_node_name(node, &node_name);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/css/select.c:1363:		exc = dom_node_get_node_name(node, &node_name);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/css/select.c:1374:			exc = dom_node_get_next_sibling(node, &next);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/css/select.c:1425:	err = dom_node_get_first_child(n, &n);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/css/select.c:1432:		err = dom_node_get_node_type(n, &ntype);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/css/select.c:1445:		err = dom_node_get_next_sibling(n, &next);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/css/select.c:1473:	exc = dom_node_get_node_name(node, &node_name);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/css/select.c:1519:	exc = dom_node_get_node_name(n, &s);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/javascript/duktape/dukky.c:411:	err = dom_node_get_node_type(node, &nodetype);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/javascript/duktape/dukky.c:1061:	exc = dom_node_get_node_type(et, &ntype);
+src/third_party/netsurf-all-3.11/netsurf/content/handlers/javascript/duktape/dukky.c:1484:	exc = dom_node_get_node_name(node, &nodename);
+src/third_party/netsurf-all-3.11/netsurf/utils/libdom.c:41:	exc = dom_node_get_first_child(parent, &element);
+src/third_party/netsurf-all-3.11/netsurf/utils/libdom.c:48:		exc = dom_node_get_node_type(element, &node_type);
+src/third_party/netsurf-all-3.11/netsurf/utils/libdom.c:51:			exc = dom_node_get_node_name(element, &node_name);
+src/third_party/netsurf-all-3.11/netsurf/utils/libdom.c:62:		exc = dom_node_get_next_sibling(element, &next_node);
+src/third_party/netsurf-all-3.11/netsurf/utils/libdom.c:103:		error = dom_node_get_node_type(child, &type);
+src/third_party/netsurf-all-3.11/netsurf/utils/libdom.c:223:	exc = dom_node_get_node_type(node, &type);
+src/third_party/netsurf-all-3.11/netsurf/utils/libdom.c:285:	exc = dom_node_get_node_type(node, &type);
+src/third_party/netsurf-all-3.11/netsurf/utils/libdom.c:295:	exc = dom_node_get_node_name(node, &node_name);
+src/third_party/netsurf-all-3.11/netsurf/utils/libdom.c:359:	exc = dom_node_get_first_child(node, &child);
+src/third_party/netsurf-all-3.11/netsurf/utils/libdom.c:378:			exc = dom_node_get_next_sibling(child, &next_child);
+--- C-OS plot path implementation ---
+src/netsurf/cos_gui_table.c:175:static const char *cos_gui_filetype(const char *path)
+src/netsurf/cos_gui_table.c:184:static struct nsurl *cos_gui_get_resource_url(const char *path)
+src/netsurf/cos_gui_table.c:193:static nserror cos_gui_get_resource_data(const char *path,
+src/netsurf/cos_netsurf_adapter.c:463:static nserror cos_ns_plot_path(const struct redraw_context *ctx,
+src/netsurf/cos_netsurf_adapter.c:627:    .path = cos_ns_plot_path,
+src/netsurf/cos_netsurf.c:239:    params.llcache.store.path = NULL; /* no backing store - see
+src/netsurf/cos_fetch_file.c:62:static const char *cos_file_fetch_mime(const char *path)
+src/netsurf/cos_fetch_file.c:95:static bool cos_file_fetch_path(const nsurl *url, char out[FS_MAX_PATH])
+src/netsurf/cos_fetch_file.c:135:    return cos_file_fetch_path(url, path);
+src/netsurf/cos_fetch_file.c:185:static bool cos_file_fetch_load(cos_file_fetch_context_t *ctx, char path[FS_MAX_PATH])
+src/netsurf/cos_fetch_file.c:187:    if (!cos_file_fetch_path(ctx->url, path)) {
+src/netsurf/cos_fetch_file.c:212:    ctx->mime = cos_file_fetch_mime(path);
+src/netsurf/cos_fetch_file.c:221:    if (!cos_file_fetch_load(ctx, path)) {

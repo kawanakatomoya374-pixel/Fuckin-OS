@@ -1,0 +1,180 @@
+B32
+LM
+
+[KERNEL] ================================
+[KERNEL] C-OS 4.0.8 alpha (64-bit)
+[KERNEL] Boot path: VirtualBox-compatible full mode
+[KERNEL] Multiboot magic=0x0000000036D76289  info=0x0000000000101180
+[KERNEL] ================================
+[MMAP] Multiboot2 memory map:
+[MMAP]  [0] base=0x0000000000000000 length=0x000000000009FC00 (639 KiB) type=1 (Available) [counted in total AND available]
+[MMAP]  [1] base=0x000000000009FC00 length=0x0000000000000400 (1 KiB) type=2 (Reserved) [counted in total only]
+[MMAP]  [2] base=0x00000000000F0000 length=0x0000000000010000 (64 KiB) type=2 (Reserved) [counted in total only]
+[MMAP]  [3] base=0x0000000000100000 length=0x000000007FEDE000 (2095992 KiB) type=1 (Available) [counted in total AND available]
+[MMAP]  [4] base=0x000000007FFDE000 length=0x0000000000022000 (136 KiB) type=2 (Reserved) [counted in total only]
+[MMAP]  [5] base=0x00000000B0000000 length=0x0000000010000000 (262144 KiB) type=2 (Reserved) [counted in total only]
+[MMAP]  [6] base=0x00000000FED1C000 length=0x0000000000004000 (16 KiB) type=2 (Reserved) [counted in total only]
+[MMAP]  [7] base=0x00000000FFFC0000 length=0x0000000000040000 (256 KiB) type=2 (Reserved) [counted in total only]
+[MMAP]  [8] base=0x000000FD00000000 length=0x0000000300000000 (12582912 KiB) type=2 (Reserved) [counted in total only]
+[MMAP] running total after this tag: total=0x000000007FFDE000 available=0x000000007FF7DC00
+[KERNEL] multiboot parse: total=2047 MiB, available=2047 MiB
+[MEMORY] runtime authority set: total=2047 MiB, available=2047 MiB, heap=511 MiB
+[KERNEL] Initializing GDT...
+[GDT] Initializing GDT...
+[GDT] GDT and TSS installed successfully
+[KERNEL] Initializing IDT...
+[IDT] Initializing 64-bit IDT
+[IDT] 64-bit IDT initialized
+[SYSCALL] int 0x80 syscall gate registered (SYS_WRITE, SYS_EXIT)
+[KERNEL] Initializing IRQ...
+[IRQ] Initializing IRQ system
+[IRQ] Installing handler for IRQ 0
+[IRQ] Timer handler registered at IRQ0
+[IRQ] Installing handler for IRQ 1
+[IRQ] Installing handler for IRQ 12
+[IRQ] Installing handler for IRQ 14
+[IRQ] Installing handler for IRQ 2
+[IRQ] Installing handler for IRQ 3
+[IRQ] Installing handler for IRQ 4
+[IRQ] Installing handler for IRQ 5
+[IRQ] Installing handler for IRQ 6
+[IRQ] Installing handler for IRQ 7
+[IRQ] Installing handler for IRQ 8
+[IRQ] Installing handler for IRQ 9
+[IRQ] Installing handler for IRQ 10
+[IRQ] Installing handler for IRQ 11
+[IRQ] Installing handler for IRQ 13
+[IRQ] Installing handler for IRQ 15
+[IRQ] Mouse handler registered at IRQ12
+[IRQ] IRQ system initialized
+[KERNEL] Initializing timer...
+[TIMER] Initializing Programmable Interval Timer
+[TIMER] Timer initialized at 1000 Hz
+[KERNEL] Initializing physical memory manager...
+[PHYS] Initializing physical memory manager
+[PHYS] Physical memory initialized: 524157 pages (2047 MB managed range)
+[PHYS] Reserving Multiboot2 information region
+[PHYS] Multiboot2 information region reserved
+[KERNEL] Detecting VM/HW memory from multiboot...
+[KERNEL] Initializing memory...
+[MEMORY] Initializing heap allocator
+[MEMORY] Heap base 0x0000000003011000, size=256 MiB
+[KERNEL] Initializing paging...
+[PAGING] init
+[PAGING] memset ok
+[PAGING] before alloc_level
+[PAGING] alloc_level -> 0x0000000003012000
+[PAGING] alloc_level memset ok
+[PAGING] after alloc_level
+[PAGING] before map
+[PAGING] map_range start virt=0x0000000000000000 phys=0x0000000000000000 size=0x0000000015F14000 flags=0x0000000000000003
+[PAGING] alloc_level -> 0x0000000003014000
+[PAGING] alloc_level memset ok
+[PAGING] alloc_level -> 0x0000000003016000
+[PAGING] alloc_level memset ok
+[PAGING] alloc_level -> 0x0000000003018000
+[PAGING] alloc_level memset ok
+[PAGING] dynamic identity runway 0x0000000015F14000..0x0000000019F14000
+[PAGING] map_range start virt=0x0000000015F14000 phys=0x0000000015F14000 size=0x0000000004000000 flags=0x0000000000000003
+[PAGING] alloc_level -> 0x000000000301A000
+[PAGING] alloc_level memset ok
+[PAGING] alloc_level -> 0x000000000301C000
+[PAGING] alloc_level memset ok
+[PAGING] alloc_level -> 0x000000000301E000
+[PAGING] alloc_level memset ok
+[PAGING] alloc_level -> 0x0000000003020000
+[PAGING] alloc_level memset ok
+[PAGING] alloc_level -> 0x0000000003022000
+[PAGING] alloc_level memset ok
+[PAGING] alloc_level -> 0x0000000003024000
+[PAGING] alloc_level memset ok
+[PAGING] alloc_level -> 0x0000000003026000
+[PAGING] alloc_level memset ok
+[PAGING] alloc_level -> 0x0000000003028000
+[PAGING] alloc_level memset ok
+[PAGING] alloc_level -> 0x000000000302A000
+[PAGING] alloc_level memset ok
+[PAGING] alloc_level -> 0x000000000302C000
+[PAGING] alloc_level memset ok
+[PAGING] alloc_level -> 0x000000000302E000
+[PAGING] alloc_level memset ok
+[PAGING] alloc_level -> 0x0000000003030000
+[PAGING] alloc_level memset ok
+[PAGING] alloc_level -> 0x0000000003032000
+[PAGING] alloc_level memset ok
+[PAGING] alloc_level -> 0x0000000003034000
+[PAGING] alloc_level memset ok
+[PAGING] alloc_level -> 0x0000000003036000
+[PAGING] alloc_level memset ok
+[PAGING] alloc_level -> 0x0000000003038000
+[PAGING] alloc_level memset ok
+[PAGING] alloc_level -> 0x000000000303A000
+[PAGING] alloc_level memset ok
+[PAGING] alloc_level -> 0x000000000303C000
+[PAGING] alloc_level memset ok
+[PAGING] alloc_level -> 0x000000000303E000
+[PAGING] alloc_level memset ok
+[PAGING] alloc_level -> 0x0000000003040000
+[PAGING] alloc_level memset ok
+[PAGING] alloc_level -> 0x0000000003042000
+[PAGING] alloc_level memset ok
+[PAGING] alloc_level -> 0x0000000003044000
+[PAGING] alloc_level memset ok
+[PAGING] alloc_level -> 0x0000000003046000
+[PAGING] alloc_level memset ok
+[PAGING] alloc_level -> 0x0000000003048000
+[PAGING] alloc_level memset ok
+[PAGING] alloc_level -> 0x000000000304A000
+[PAGING] alloc_level memset ok
+[PAGING] alloc_level -> 0x000000000304C000
+[PAGING] alloc_level memset ok
+[PAGING] alloc_level -> 0x000000000304E000
+[PAGING] alloc_level memset ok
+[PAGING] alloc_level -> 0x0000000003050000
+[PAGING] alloc_level memset ok
+[PAGING] alloc_level -> 0x0000000003052000
+[PAGING] alloc_level memset ok
+[PAGING] alloc_level -> 0x0000000003054000
+[PAGING] alloc_level memset ok
+[PAGING] alloc_level -> 0x0000000003056000
+[PAGING] alloc_level memset ok
+[PAGING] alloc_level -> 0x0000000003058000
+[PAGING] alloc_level memset ok
+[PAGING] after map
+[PAGING] before higher
+[PAGING] direct-map extent=0x000000007FFDE000 map-size=0x0000000080000000
+[PAGING] alloc_level -> 0x000000000305A000
+[PAGING] alloc_level memset ok
+[PAGING] alloc_level -> 0x000000000305C000
+[PAGING] alloc_level memset ok
+[PAGING] alloc_level -> 0x000000000305E000
+[PAGING] alloc_level memset ok
+[PAGING] after higher
+[PAGING] before cr3
+[PAGING] after cr3
+[PAGING] ready
+[KERNEL] Initializing VGA/Framebuffer...
+[VGA] mb2 info addr=0x0000000000101180
+[VGA] mb2 total_size=2480
+[VGA] mb2 tag type=21 size=12
+[VGA] mb2 tag type=1 size=9
+[VGA] mb2 tag type=2 size=29
+[VGA] mb2 tag type=10 size=28
+[VGA] mb2 tag type=6 size=232
+[VGA] mb2 tag type=9 size=1236
+[VGA] mb2 tag type=4 size=16
+[VGA] mb2 tag type=5 size=20
+[VGA] mb2 tag type=7 size=784
+[VGA] mb2 tag type=8 size=38
+[VGA] fb tag: addr=0x00000000FD000000 pitch=4096 w=1024 h=768 bpp=32 fbtype=1
+[PAGING] PAT slot 4 configured for Write-Combining
+[PAGING] paging_mark_region_wc: converted 0 of 2 2MB page(s) to Write-Combining
+[VGA] fb tag accepted
+[VGA] Screen resolution: 1024x768
+[PAGING] map_range start virt=0xFFFF8000FD000000 phys=0x00000000FD000000 size=0x0000000000400000 flags=0x0000000000000003
+[PAGING] alloc_level -> 0x0000000003060000
+[PAGING] alloc_level memset ok
+[KERNEL] Drawing framebuffer status screen...
+[KERNEL] Framebuffer status screen drawn
+[KERNEL] Running rich boot animation...
+[BOOT] Showing early splash screen

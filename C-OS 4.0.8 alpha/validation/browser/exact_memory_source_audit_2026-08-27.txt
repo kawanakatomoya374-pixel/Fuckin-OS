@@ -1,0 +1,12 @@
+--- exact memory definitions ---
+src/third_party/quickjs/quickjs_port.h:24:#define COS_QUICKJS_RUNTIME_MEMORY_LIMIT_BYTES (24u * 1024u * 1024u)
+src/third_party/quickjs/quickjs_port.h:32: * COS_QUICKJS_RUNTIME_MEMORY_LIMIT_BYTES (24MiB) bounded memory limit so a
+src/third_party/quickjs/quickjs_port.c:2867:        JS_SetMemoryLimit(rt, COS_QUICKJS_RUNTIME_MEMORY_LIMIT_BYTES);
+src/netsurf/cos_netsurf.c:232:    params.llcache.limit = 128u * 1024u * 1024u;   /* 128MiB RAM cache */
+src/netsurf/cos_netsurf.c:233:    params.llcache.hysteresis = 16u * 1024u * 1024u;
+src/kernel/drivers/http.h:27:#define HTTP_MAX_RESP   (10u * 1024u * 1024u)
+src/kernel/memory.c:38:#define HEAP_SIZE      0x10000000ULL   /* 256 MiB shared kernel heap */
+--- modified source ---
+--- tree size ---
+17G	.
+--- current branch/revision ---

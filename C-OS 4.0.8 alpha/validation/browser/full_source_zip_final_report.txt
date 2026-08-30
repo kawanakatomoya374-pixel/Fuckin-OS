@@ -1,0 +1,14 @@
+--- integrity ---
+No errors detected in compressed data of /home/ubuntu/upload/C-OS_4_0_8_alpha_full_source_2026-08-27.zip.
+--- package ---
+-rw-r--r-- 1 ubuntu ubuntu 98M Aug 26 19:02 /home/ubuntu/upload/C-OS_4_0_8_alpha_full_source_2026-08-27.zip
+--- key files ---
+    47326  2026-08-26 18:46   c-os/src/netsurf/cos_fetch_http.c
+    33052  2026-08-26 18:52   c-os/src/netsurf/cos_netsurf_adapter.c
+     9433  2026-08-26 18:46   c-os/src/netsurf/cos_fetch_file.c
+     5436  2026-08-26 18:59   c-os/src/third_party/quickjs/quickjs_port.h
+     8553  2026-08-26 18:56   c-os/src/third_party/netsurf-all-3.11/netsurf/content/handlers/image/svg.c
+     4050  2026-08-26 18:16   c-os/validation/browser/benchmark_plan_2026-08-27.md
+      389  2026-08-26 18:43   c-os/validation/browser/svg_icon_selftest.svg
+     1150  2026-08-26 18:44   c-os/validation/browser/svg_icon_selftest.ico
+     1852  2026-08-26 18:44   c-os/validation/browser/svg_icon_selftest.html

@@ -1,0 +1,96 @@
+src/third_party/netsurf-all-3.11/netsurf/desktop/save_pdf.c:625:	if (p[0] != PLOTTER_PATH_MOVE)
+src/third_party/netsurf-all-3.11/netsurf/desktop/save_pdf.c:632:		if (p[i] == PLOTTER_PATH_MOVE) {
+src/third_party/netsurf-all-3.11/netsurf/desktop/save_pdf.c:637:		} else if (p[i] == PLOTTER_PATH_CLOSE) {
+src/third_party/netsurf-all-3.11/netsurf/desktop/save_pdf.c:641:		} else if (p[i] == PLOTTER_PATH_LINE) {
+src/third_party/netsurf-all-3.11/netsurf/desktop/save_pdf.c:647:		} else if (p[i] == PLOTTER_PATH_BEZIER) {
+src/third_party/netsurf-all-3.11/netsurf/include/netsurf/plotters.h:42:	PLOTTER_PATH_MOVE,
+src/third_party/netsurf-all-3.11/netsurf/include/netsurf/plotters.h:43:	PLOTTER_PATH_CLOSE,
+src/third_party/netsurf-all-3.11/netsurf/include/netsurf/plotters.h:44:	PLOTTER_PATH_LINE,
+src/third_party/netsurf-all-3.11/netsurf/include/netsurf/plotters.h:45:	PLOTTER_PATH_BEZIER,
+--- path doc ---
+204-	 * \param n number of verticies.
+205-	 * \return NSERROR_OK on success else error code.
+206-	 */
+207-	nserror (*polygon)(
+208-			const struct redraw_context *ctx,
+209-			const plot_style_t *pstyle,
+210-			const int *p,
+211-			unsigned int n);
+212-
+213-	/**
+214:	 * Plots a path.
+215-	 *
+216-	 * Path plot consisting of cubic Bezier curves. Line and fill colour is
+217-	 *  controlled by the plot style.
+218-	 *
+219-	 * \param ctx The current redraw context.
+220-	 * \param pstyle Style controlling the path plot.
+221-	 * \param p elements of path
+222-	 * \param n nunber of elements on path
+223-	 * \param transform A transform to apply to the path.
+224-	 * \return NSERROR_OK on success else error code.
+225-	 */
+226-	nserror (*path)(
+227-			const struct redraw_context *ctx,
+228-			const plot_style_t *pstyle,
+229-			const float *p,
+230-			unsigned int n,
+231-			const float transform[6]);
+232-
+233-	/**
+234-	 * Plot a bitmap
+235-	 *
+236-	 * Tiled plot of a bitmap image. (x,y) gives the top left
+237-	 * coordinate of an explicitly placed tile. From this tile the
+238-	 * image can repeat in all four directions -- up, down, left
+239-	 * and right -- to the extents given by the current clip
+240-	 * rectangle.
+241-	 *
+242-	 * The bitmap_flags say whether to tile in the x and y
+243-	 * directions. If not tiling in x or y directions, the single
+244-	 * image is plotted. The width and height give the dimensions
+245-	 * the image is to be scaled to.
+246-	 *
+247-	 * \param ctx The current redraw context.
+248-	 * \param bitmap The bitmap to plot
+249-	 * \param x The x coordinate to plot the bitmap
+250-	 * \param y The y coordiante to plot the bitmap
+251-	 * \param width The width of area to plot the bitmap into
+252-	 * \param height The height of area to plot the bitmap into
+253-	 * \param bg the background colour to alpha blend into
+254-	 * \param flags the flags controlling the type of plot operation
+255-	 * \return NSERROR_OK on success else error code.
+256-	 */
+257-	nserror (*bitmap)(
+258-			const struct redraw_context *ctx,
+259-			struct bitmap *bitmap,
+260-			int x,
+261-			int y,
+262-			int width,
+263-			int height,
+264-			colour bg,
+265-			bitmap_flags_t flags);
+266-
+267-	/**
+268-	 * Text plotting.
+269-	 *
+270-	 * \param ctx The current redraw context.
+271-	 * \param fstyle plot style for this text
+272-	 * \param x x coordinate
+273-	 * \param y y coordinate
+274-	 * \param text UTF-8 string to plot
+275-	 * \param length length of string, in bytes
+276-	 * \return NSERROR_OK on success else error code.
+277-	 */
+278-	nserror (*text)(
+279-			const struct redraw_context *ctx,
+280-			const plot_font_style_t *fstyle,
+281-			int x,
+282-			int y,
+283-			const char *text,
+284-			size_t length);
+285-
+286-	/**
+287-	 * Start of a group of objects.
+288-	 *
+289-	 * optional, may be NULL. Used when plotter implements export

@@ -1,0 +1,28 @@
+--- events ---
+[NSLOG] src/third_party/netsurf-all-3.11/netsurf/content/fetchers/resource.c (fetch_resource_initialise):286: direct data for default.css
+[NSLOG] src/third_party/netsurf-all-3.11/netsurf/desktop/browser_window.c (navigate_internal_real):3527: Loading 'http://192.168.70.2:8090/quickjs_cookie_location_selftest.html?navigate=1'
+[NSLOG] src/third_party/netsurf-all-3.11/netsurf/desktop/browser_window.c (navigate_internal_real):3527: Loading 'http://192.168.70.2:8090/quickjs_cookie_location_selftest.html?navigate=1'
+GET /quickjs_cookie_location_selftest.html?navigate=1 HTTP/1.1
+GET /quickjs_cookie_location_selftest.html?navigate=1 HTTP/1.1
+[NSLOG] src/third_party/netsurf-all-3.11/netsurf/content/content.c (content__init):201: url resource:default.css -> 0x4053250
+[NSLOG] src/third_party/netsurf-all-3.11/netsurf/content/content.c (content_add_user):671: content resource:default.css (0x4053250), user 0x38a350 0x4021658
+[NSLOG] src/third_party/netsurf-all-3.11/netsurf/content/content.c (content_convert):79: content resource:default.css (0x4053250)
+[NSLOG] src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/css.c (html_convert_css_callback):114: done stylesheet slot 0 'resource:default.css'
+[NSLOG] src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/dom_event.c (dom_default_action_DOMNodeInserted_cb):652: javascript context: 0x4052ab0 (htmlc: 0x401b708)
+[QJS/Web] origin url=http://192.168.70.2:8090/quickjs_cookie_location_selftest.html?navigate=1 key=http://192.168.70.2:8090
+[NetSurf/QuickJS] executing page script bytes=1884
+[NetSurf/QuickJS] page script complete
+[NSLOG] src/third_party/netsurf-all-3.11/netsurf/desktop/browser_window.c (navigate_internal_real):3527: Loading 'http://192.168.70.2:8090/quickjs_cookie_location_destination.html?from=selftest#ok'
+GET /quickjs_cookie_location_destination.html?from=selftest HTTP/1.1
+Cookie: cos_cookie_test=visible
+[NSLOG] src/third_party/netsurf-all-3.11/netsurf/content/content.c (content_add_user):671: content resource:default.css (0x4053250), user 0x38a350 0x4087000
+[NSLOG] src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/css.c (html_convert_css_callback):114: done stylesheet slot 0 'resource:default.css'
+[NSLOG] src/third_party/netsurf-all-3.11/netsurf/content/content.c (content_remove_user):700: content resource:default.css (0x4053250), user 0x38a350 0x4021658
+[NSLOG] src/third_party/netsurf-all-3.11/netsurf/content/handlers/html/dom_event.c (dom_default_action_DOMNodeInserted_cb):652: javascript context: 0x40845f0 (htmlc: 0x403e078)
+[QJS/Web] origin url=http://192.168.70.2:8090/quickjs_cookie_location_destination.html?from=selftest#ok key=http://192.168.70.2:8090
+[NetSurf/QuickJS] executing page script bytes=1071
+[NetSurf/QuickJS] page script complete
+Cookie: cos_cookie_test=visible
+--- destination fetch count ---
+1
+--- errors ---

@@ -1,0 +1,11 @@
+notes
+=====
+
+this is the documents folder.
+store your files here.
+
+- text documents
+- configurations
+- data files
+
+organized by kt

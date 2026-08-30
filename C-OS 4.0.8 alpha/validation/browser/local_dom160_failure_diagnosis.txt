@@ -1,0 +1,18 @@
+--- stale runtime object ---
+2026-08-26 18:29:42.941236457 +0000 src/third_party/quickjs/quickjs_port.c
+validation/browser/secureboot_smp2_file_fetch_gui_observation_2026-08-26.md:3:検証ISOは `COS_BROWSER_FILE_SMOKE=1` でビルドし、`validation/local_browser_dual_storage.img` を明示PCI IDE controller経由で接続した。C-OSは実機ログ上で ATA IDENTIFY (1024 MiB) と、sector 1048576 からの 512 MiB FatFs領域のmountを成功させた。host側でもそのFatFs領域の `/browser` に local QuickJS self-test と添付HTML三件が存在することを確認済みである。
+validation/browser/2026-08-27_css_usb_form_progress.md:52:従来のWikipedia専用64KiB truncationを削除し、HTTP transportの `HTTP_MAX_RESP` を `10u * 1024u * 1024u` へ更新した。これはheap上のper-document response bufferであり、NetSurfのHTML/CSS/DOM conversionへ渡るpayloadを10MiBまで保持する。ローカル `file:` fetcherも旧 `FS_MAX_DATA`（32KiB metadata/editor上限）から独立させ、同じ10MiB document safety limitへ更新した。FatFs側の `fs_read_file_at()` は既にファイルサイズに応じてheap bufferを拡張する実装であり、ブラウザ用file fetchの10MiB上限と整合する。
+tools/build_secureboot_uefi.sh:55:for command in grub-mkstandalone sbsign sbverify openssl mkfs.vfat mmd mcopy xorriso sha256sum; do
+tools/build_secureboot_uefi.sh:97:mkfs.vfat -F 32 -n "$label" "$esp" >/dev/null
+tools/build_secureboot_uefi.sh:99:mcopy -i "$esp" "$signed" ::/EFI/BOOT/BOOTX64.EFI
+tools/build_secureboot_uefi.sh:100:mcopy -i "$esp" "$public_cert" ::/EFI/COS/C-OS-secureboot-public.cer
+tools/inject_storage.py:24:DISK_SECTORS = 1048576
+tools/pack_storage.py:4:SECTOR=512; MAGIC=0x43535350464F5354; VERSION=4; DISK_SECTORS=1048576
+tools/validate_storage_image.py:3:S=512; MAGIC=0x43535350464F5354; VERSION=4; SECTORS=1048576; CAT=64; DATA=132; MAX=128; H=72; E=188; CS=64
+--- file fetch offset ---
+src/fs/fs.h:8:#define FS_MAX_DATA    (32 * 1024)  /* 64KB per file - increased for text editing */
+src/fs/fs.h:27:    char     data[FS_MAX_DATA];
+src/fs/fs.c:5: * with each file's content embedded inline as a FS_MAX_DATA-byte buffer,
+src/netsurf/cos_fetch_file.c:30: * as network documents, rather than inheriting FS_MAX_DATA (32KiB). */
+src/drivers/disk/storage.c:119: * FS_MAX_ENTRIES (128) files, each up to FS_MAX_DATA (32KB) of data,
+src/drivers/disk/storage.c:127:#define STORAGE_DISK_SECTORS       1048576ULL   /* 512 MiB raw image */

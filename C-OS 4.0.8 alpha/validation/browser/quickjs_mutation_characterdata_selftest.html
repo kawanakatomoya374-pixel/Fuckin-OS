@@ -1,0 +1,21 @@
+<!doctype html>
+<div id="root"></div><pre id="result">pending</pre>
+<script>
+(function () {
+  var root = document.getElementById('root');
+  var result = document.getElementById('result');
+  try {
+    var text = document.createTextNode('a');
+    root.appendChild(text);
+    var seen = false;
+    var observer = new MutationObserver(function (records) {
+      seen = records.length === 1 && records[0].type === 'characterData' && records[0].target === text && records[0].oldValue === null;
+      result.textContent = seen ? 'PASS: characterData mutation' : 'FAIL: record';
+      console.log(seen ? 'MUTATION_CHARACTERDATA_PASS' : 'MUTATION_CHARACTERDATA_FAIL');
+    });
+    observer.observe(text, { characterData: true });
+    text.appendData('b');
+    queueMicrotask(function () { if (!seen) console.log('MUTATION_CHARACTERDATA_FAIL not-queued'); });
+  } catch (e) { result.textContent = 'FAIL: ' + e; console.log('MUTATION_CHARACTERDATA_FAIL ' + e); }
+}());
+</script>

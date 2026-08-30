@@ -1,0 +1,27 @@
+<!doctype html>
+<div id="result">pending</div>
+<script>
+(function () {
+  var result = document.getElementById('result');
+  var first = 0, second = 0;
+  try {
+    var target = document.createElement('div');
+    var a = new MutationObserver(function (records) { first += records.length; });
+    var b = new MutationObserver(function (records) { second += records.length; });
+    a.observe(target, { attributes: true });
+    b.observe(target, { attributes: true });
+    target.setAttribute('data-a', '1');
+    queueMicrotask(function () {
+      var both = first === 1 && second === 1;
+      a.disconnect();
+      target.setAttribute('data-b', '2');
+      queueMicrotask(function () {
+        var independent = both && first === 1 && second === 2;
+        var msg = independent ? 'MULTI_OBSERVER_PASS' : 'MULTI_OBSERVER_FAIL first=' + first + ' second=' + second;
+        console.log(msg);
+        result.textContent = msg;
+      });
+    });
+  } catch (e) { console.log('MULTI_OBSERVER_FAIL ' + e); result.textContent = 'MULTI_OBSERVER_FAIL ' + e; }
+}());
+</script>

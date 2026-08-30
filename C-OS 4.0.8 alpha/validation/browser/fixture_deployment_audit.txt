@@ -1,0 +1,49 @@
+validation/browser/local_quickjs_file_selftest.html
+validation/browser/local_static_layout_selftest.html
+validation/browser/quickjs_dom_css_performance_selftest.html
+validation/browser/quickjs_dom_storage_selftest.html
+validation/external_web/google_home_host_snapshot.html
+--- image references ---
+validation/browser/performance_regression_2026-08-26.md:17:| `validation/browser/quickjs_dom_css_performance_selftest.html` | 160ノードのDocumentFragment挿入、selector、classList、CSSOM、Event、Storage、fetch/XHR機能検査 | C-OS独自ストレージへ`/browser/quickjs_dom_css_performance_selftest.html`として投入済み |
+validation/browser/performance_regression_2026-08-26.md:18:| `validation/browser_perf_storage.img` | 上記HTMLを含む512 MiB C-OSストレージイメージ | primary/backup catalogとCRCを検証済み（2エントリ） |
+validation/browser/performance_regression_2026-08-26.md:19:| `validation/browser_perf_smp/` | Secure Boot UEFIのSMP2/4/8シリアル・debug・launcherログ | 下記の起動回帰を記録済み |
+validation/browser/http2_brotli_secureboot_smp_regression_2026-08-26.md:64:| `validation/browser/http2_brotli_secureboot_smp2_runtime_2026-08-26.md` | in-guest h2/Brotli 詳細 |
+validation/browser/secureboot_smp2_file_fetch_gui_observation_2026-08-26.md:3:検証ISOは `COS_BROWSER_FILE_SMOKE=1` でビルドし、`validation/local_browser_dual_storage.img` を明示PCI IDE controller経由で接続した。C-OSは実機ログ上で ATA IDENTIFY (1024 MiB) と、sector 1048576 からの 512 MiB FatFs領域のmountを成功させた。host側でもそのFatFs領域の `/browser` に local QuickJS self-test と添付HTML三件が存在することを確認済みである。
+validation/browser/secureboot_smp2_file_fetch_gui_observation_2026-08-26.md:51:ユーザー提供の `index.html` をguest-visible FAT32の`/browser/index.html`から`file:///browser/index.html`としてSecure Boot SMP2へロードした。file fetchは2939 bytesを読み込み、QuickJSは1128 bytesのページscriptを例外なく実行し、NetSurfはtitle `QuickJS Compatible App` とフォーム・buttonを実描画した。初期画面は `validation/secureboot_smp2_attachment_index_initial.png`。
+validation/browser/2026-08-27_css_usb_form_progress.md:54:Secure Boot UEFI・SMP2 strict QEMUで10MiB版ISOを起動し、HTTP/file fetcher登録、FAT32上の `file:///browser/index.html` 2939 bytes読込、NetSurf DOM-to-box完了、Flex column layout、画面描画、EHCI USB keyboard mountを確認した。起動・描画ログにpage fault、#GP、panicはなく、既存のCSS/forms/QuickJS回帰を壊していない。成果物は `build/secureboot/C-OS_4.0.8_alpha_secure.iso`。
+validation/browser/fixture_deployment_audit.txt:1:validation/browser/local_quickjs_file_selftest.html
+validation/browser/fixture_deployment_audit.txt:2:validation/browser/local_static_layout_selftest.html
+validation/browser/fixture_deployment_audit.txt:3:validation/browser/quickjs_dom_css_performance_selftest.html
+validation/browser/fixture_deployment_audit.txt:4:validation/browser/quickjs_dom_storage_selftest.html
+validation/browser_gui_storage_regression_2026-08-25.md:9:The Makefile now uses the Python storage packer when the optional Go toolchain is absent, and links `cos_netsurf_render.o` into the final kernel. The QuickJS bridge documentation was updated to reflect the existing real DOM, selectors, classList/style, Event, fetch, XMLHttpRequest, localStorage, and sessionStorage paths. An executable browser smoke-test page was added at `validation/browser/quickjs_dom_storage_selftest.html`.
+validation/browser_gui_storage_regression_2026-08-25.md:16:- Nested browser test injection: `validation/browser/quickjs_dom_storage_selftest.html` -> `/browser/quickjs_dom_storage_selftest.html`; catalog verification passed.
+validation/browser_benchmark_instrumentation_inventory.txt:74:validation/browser/local_quickjs_file_module.js
+validation/browser_benchmark_instrumentation_inventory.txt:75:validation/browser/local_quickjs_file_selftest.html
+validation/browser_benchmark_instrumentation_inventory.txt:76:validation/browser/performance_design_2026-08-26.md
+validation/browser_benchmark_instrumentation_inventory.txt:77:validation/browser/performance_regression_2026-08-26.md
+validation/browser_benchmark_instrumentation_inventory.txt:78:validation/browser/quickjs_dom_css_performance_selftest.html
+validation/browser_benchmark_instrumentation_inventory.txt:79:validation/browser/quickjs_dom_storage_selftest.html
+validation/browser_benchmark_instrumentation_inventory.txt:80:validation/browser/quickjs_netsurf_attachment_compat_audit_2026-08-26.md
+validation/browser_benchmark_instrumentation_inventory.txt:81:validation/browser_benchmark_instrumentation_inventory.txt
+validation/browser_benchmark_instrumentation_inventory.txt:82:validation/browser_perf_final_smp/smp2.debug.log
+validation/browser_benchmark_instrumentation_inventory.txt:83:validation/browser_perf_final_smp/smp2.launcher.log
+validation/browser_benchmark_instrumentation_inventory.txt:84:validation/browser_perf_final_smp/smp2.serial.log
+validation/browser_benchmark_instrumentation_inventory.txt:85:validation/browser_perf_final_smp/smp4.debug.log
+validation/browser_benchmark_instrumentation_inventory.txt:86:validation/browser_perf_final_smp/smp4.launcher.log
+validation/browser_benchmark_instrumentation_inventory.txt:87:validation/browser_perf_final_smp/smp4.serial.log
+validation/browser_benchmark_instrumentation_inventory.txt:88:validation/browser_perf_final_smp/smp8.debug.log
+validation/browser_benchmark_instrumentation_inventory.txt:89:validation/browser_perf_final_smp/smp8.launcher.log
+validation/browser_benchmark_instrumentation_inventory.txt:90:validation/browser_perf_final_smp/smp8.serial.log
+validation/browser_benchmark_instrumentation_inventory.txt:91:validation/browser_perf_smp/smp2.debug.log
+validation/browser_benchmark_instrumentation_inventory.txt:92:validation/browser_perf_smp/smp2.launcher.log
+validation/browser_benchmark_instrumentation_inventory.txt:93:validation/browser_perf_smp/smp2.serial.log
+validation/browser_benchmark_instrumentation_inventory.txt:94:validation/browser_perf_smp/smp4.debug.log
+validation/browser_benchmark_instrumentation_inventory.txt:95:validation/browser_perf_smp/smp4.launcher.log
+validation/browser_benchmark_instrumentation_inventory.txt:96:validation/browser_perf_smp/smp4.serial.log
+validation/browser_benchmark_instrumentation_inventory.txt:97:validation/browser_perf_smp/smp8.debug.log
+validation/browser_benchmark_instrumentation_inventory.txt:98:validation/browser_perf_smp/smp8.launcher.log
+validation/browser_benchmark_instrumentation_inventory.txt:99:validation/browser_perf_smp/smp8.serial.log
+validation/browser_benchmark_instrumentation_inventory.txt:100:validation/browser_perf_storage.img
+tools/build_secureboot_uefi.sh:55:for command in grub-mkstandalone sbsign sbverify openssl mkfs.vfat mmd mcopy xorriso sha256sum; do
+tools/build_secureboot_uefi.sh:99:mcopy -i "$esp" "$signed" ::/EFI/BOOT/BOOTX64.EFI
+tools/build_secureboot_uefi.sh:100:mcopy -i "$esp" "$public_cert" ::/EFI/COS/C-OS-secureboot-public.cer

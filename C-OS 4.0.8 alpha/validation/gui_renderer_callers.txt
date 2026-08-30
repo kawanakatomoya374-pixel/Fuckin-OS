@@ -1,0 +1,33 @@
+--- present callers ---
+src/gui/core/gui_renderer.h:28:int gui_renderer_init(void);
+src/gui/core/gui_renderer.h:32:void gui_renderer_draw_rect(uint64_t x, uint64_t y, uint64_t width, uint64_t height, uint64_t color, bool filled);
+src/gui/core/gui_renderer.h:35:void gui_renderer_clear_screen(uint64_t color);
+src/gui/core/gui_renderer.h:36:void gui_renderer_swap_buffers(void);
+src/gui/core/gui_renderer.h:37:void gui_renderer_present(void);
+src/gui/core/output/gui_renderer.c:288:int gui_renderer_init(void) {
+src/gui/core/output/gui_renderer.c:453:void gui_renderer_draw_rect(uint64_t x, uint64_t y, uint64_t width, uint64_t height, uint64_t color, bool filled) {
+src/gui/core/output/gui_renderer.c:544:void gui_renderer_clear_screen(uint64_t color) {
+src/gui/core/output/gui_renderer.c:557:void gui_renderer_swap_buffers(void) {
+src/gui/core/output/gui_renderer.c:598:void gui_renderer_present(void) {
+--- gui render engine callers ---
+src/gui/apps/ui/modern_ui.c:1135:        gui_render_fill_rect(comp->x + 2, comp->y + 2, comp->w, comp->h, theme->shadow_color);
+src/gui/apps/ui/modern_ui.c:1143:    gui_render_draw_text(text_x, text_y, button->text, comp->fg_color, 0xFFFFFFFF);
+src/gui/apps/ui/modern_ui.c:1170:    gui_render_draw_text(text_x, text_y, display_text, text_color, 0xFFFFFFFF);
+src/gui/apps/ui/modern_ui.c:1175:        gui_render_fill_rect(cursor_x, text_y, 1, 16, comp->fg_color);
+src/gui/apps/ui/modern_ui.c:1183:    gui_render_draw_text(comp->x, comp->y, comp->text, comp->fg_color, 0xFFFFFFFF);
+src/gui/apps/ui/modern_ui.c:1218:        gui_render_draw_text(text_x, text_y, percentage_text, theme->text_color, 0xFFFFFFFF);
+src/gui/core/gui_lifecycle.c:268:    gui_render_fill_rect(x, y, width, height, color);
+src/gui/core/gui_lifecycle.c:272:    gui_render_draw_text(x, y, text ? text : "", color, 0xFFFFFFFF);
+src/gui/core/output/gui_render_engine.c:62:void gui_render_set_clip(int x, int y, int w, int h) {
+src/gui/core/output/gui_render_engine.c:70:void gui_render_reset_clip(void) {
+src/gui/core/output/gui_render_engine.c:78:void gui_render_fill_rect(int x, int y, int w, int h, uint64_t color) {
+src/gui/core/output/gui_render_engine.c:86:    gui_render_fill_rect(x, y, w, 1, color);
+src/gui/core/output/gui_render_engine.c:87:    gui_render_fill_rect(x, y + h - 1, w, 1, color);
+src/gui/core/output/gui_render_engine.c:88:    gui_render_fill_rect(x, y, 1, h, color);
+src/gui/core/output/gui_render_engine.c:89:    gui_render_fill_rect(x + w - 1, y, 1, h, color);
+src/gui/core/output/gui_render_engine.c:102:        gui_render_fill_rect(x, y, w, h, color);
+src/gui/core/output/gui_render_engine.c:126:void gui_render_draw_text(int x, int y, const char* text, uint64_t fg, uint64_t bg) {
+src/include/gui_render_engine.h:9:void gui_render_set_clip(int x, int y, int w, int h);
+src/include/gui_render_engine.h:10:void gui_render_reset_clip(void);
+src/include/gui_render_engine.h:11:void gui_render_fill_rect(int x, int y, int w, int h, uint64_t color);
+src/include/gui_render_engine.h:17:void gui_render_draw_text(int x, int y, const char* text, uint64_t fg, uint64_t bg);

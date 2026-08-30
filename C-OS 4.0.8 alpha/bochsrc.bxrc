@@ -1,0 +1,57 @@
+# C-OS 4.0.7 Demo - Bochs configuration
+#
+# Fixes two issues found from a black-screen + no-persistence report:
+#
+# 1. Black screen: the previous config had no VBE extension enabled on
+#    the VGA card. C-OS's Multiboot2 header REQUIRES a 1024x768x32bpp
+#    linear framebuffer (see src/boot/boot.asm) - without "extension=vbe"
+#    here, Bochs's VGA BIOS can't satisfy that request at all and GRUB
+#    silently falls back to legacy 640x480 1bpp text/planar mode, which
+#    the kernel correctly detects as unusable and refuses to draw into
+#    (better than crashing, but the result is a black screen with no
+#    obvious cause unless you check the serial log for
+#    "[VGA] fb tag REJECTED").
+#
+# 2. No persistence: only a CD-ROM was attached (ata0-master), so
+#    "[VFS] No ATA disk detected" was the CORRECT and expected result -
+#    there was no disk to detect. A second ATA drive is added below as
+#    the actual persistent storage device.
+#
+# Adjust the absolute paths below (romimage/vgaromimage/ata0-master/
+# ata1-master) to match your own Bochs installation and where you keep
+# C-OS_4.0.7_Demo.iso / storage.img.
+
+megs: 1024
+
+romimage: file="I:\Program Files\Bochs-3.0\bios.bin-1.13.0"
+vgaromimage: file="I:\Program Files\Bochs-3.0\VGABIOS-lgpl-latest.bin"
+
+# --- VBE extension: required for the 1024x768x32bpp linear framebuffer
+#     C-OS's Multiboot2 header asks for. Without this line the VGA card
+#     cannot expose that mode via its BIOS and GRUB falls back to a
+#     1bpp legacy text mode, which C-OS correctly refuses to draw into
+#     (black screen instead of a crash - check the serial log for
+#     "[VGA] fb tag REJECTED" / "no framebuffer visible" to confirm this
+#     is what's happening on your setup).
+vga: extension=vbe
+display_library: win32, options="gui_debug"
+
+# --- Boot CD-ROM (the C-OS ISO) ---
+ata0-master: type=cdrom, path="C:\Users\cs02z\Downloads\C-OS_4_0_7_paging_logs_fix\C-OS_4.0.7_Demo.iso", status=inserted
+boot: cdrom
+
+# --- Persistent storage disk ---
+# Without a second ATA drive attached, storage_init() correctly reports
+# "No ATA disk detected" and everything runs RAM-only (lost on every
+# reboot) by design - there is no bug there, just nothing to persist to.
+# Point this at a raw disk image at least 512MiB in size (the project's
+# own `make build/storage.img` target produces exactly that, already
+# zero-filled and ready for C-OS to format on first boot). Using a
+# second controller (ata1) here so it doesn't collide with the CD-ROM
+# on ata0.
+ata1-master: type=disk, mode=flat, path="storage.img", cylinders=0, heads=0, spt=0
+
+clock: sync=realtime
+cpu: count=1, ips=1000000
+com1: enabled=1, mode=file, dev="bochs_serial.log"
+log: bochslog.txt

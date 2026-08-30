@@ -1,0 +1,8 @@
+--- symlinks ---
+./src/third_party/brotli/research/dictionary.bin -> ../c/common/dictionary.bin
+--- special files ---
+s ./validation/usb2_hub_hid_validation_smp2.qmp
+s ./validation/css_and_usb_hub_diagnostic_smp2.qmp
+s ./validation/clean_distribution_smp4.qmp
+--- partial zip ---
+-rw-r--r-- 1 ubuntu ubuntu 98M Aug 26 19:01 /home/ubuntu/upload/C-OS_4_0_8_alpha_full_source_2026-08-27.zip

@@ -1,0 +1,36 @@
+--- resource lifecycle ---
+[NetSurf] engine initialised (content core + html/css/png/jpeg/bmp handlers + QuickJS backend + data:/file:/http:/https: fetchers; llcache=128MiB, QuickJS runtime=24MiB)
+[NetSurf/QuickJS] thread content=0000000000000000
+[NetSurf/QuickJS] page JavaScript context created
+[NSLOG] src/third_party/netsurf-all-3.11/netsurf/desktop/browser_window.c (navigate_internal_real):3527: Loading 'http://192.168.70.2:8090/svg_icon_selftest.html'
+[NSLOG] src/third_party/netsurf-all-3.11/netsurf/desktop/browser_window.c (navigate_internal_real):3527: Loading 'http://192.168.70.2:8090/svg_icon_selftest.html'
+GET /svg_icon_selftest.html HTTP/1.1
+User-Agent: NetSurf/3.11 (C-OS; x86_64; QuickJS)
+GET /svg_icon_selftest.html HTTP/1.1
+User-Agent: NetSurf/3.11 (C-OS; x86_64; QuickJS)
+[NSLOG] src/third_party/netsurf-all-3.11/netsurf/content/content.c (content_convert):79: content resource:user.css (0x404a5d8)
+[NSLOG] src/third_party/netsurf-all-3.11/netsurf/content/content.c (content_convert):79: content resource:default.css (0x405f2c0)
+[NetSurf/QuickJS] thread content=0000000004027508
+[NetSurf/QuickJS] page JavaScript context created
+[NetSurf/QuickJS] executing page script bytes=458
+[NetSurf/QuickJS] page script complete
+[NSLOG] src/third_party/netsurf-all-3.11/netsurf/content/content.c (content_convert):79: content http://192.168.70.2:8090/svg_icon_selftest.html (0x4027508)
+GET /svg_icon_selftest.svg HTTP/1.1
+User-Agent: NetSurf/3.11 (C-OS; x86_64; QuickJS)
+GET /svg_icon_selftest.ico HTTP/1.1
+User-Agent: NetSurf/3.11 (C-OS; x86_64; QuickJS)
+[NetSurf] HTTP fetch success: http://192.168.70.2:8090/svg_icon_selftest.svg status=200 mime=image/svg+xml
+[NetSurf] HTTP fetch success: http://192.168.70.2:8090/svg_icon_selftest.ico status=200 mime=image/vnd.microsoft.icon
+[NSLOG] src/third_party/netsurf-all-3.11/netsurf/content/content.c (content_convert):79: content http://192.168.70.2:8090/svg_icon_selftest.svg (0x4097700)
+[NSLOG] src/third_party/netsurf-all-3.11/netsurf/content/content.c (content_convert):79: content x-ns-css:0 (0x4097ad0)
+[NSLOG] src/third_party/netsurf-all-3.11/netsurf/content/content.c (content_convert):79: content http://192.168.70.2:8090/svg_icon_selftest.ico (0x4097488)
+GET /svg_icon_selftest.svg HTTP/1.1
+User-Agent: NetSurf/3.11 (C-OS; x86_64; QuickJS)
+GET /svg_icon_selftest.ico HTTP/1.1
+User-Agent: NetSurf/3.11 (C-OS; x86_64; QuickJS)
+[NetSurf] HTTP fetch success: http://192.168.70.2:8090/svg_icon_selftest.svg status=200 mime=image/svg+xml
+[NSLOG] src/third_party/netsurf-all-3.11/netsurf/content/content.c (content_convert):79: content http://192.168.70.2:8090/svg_icon_selftest.svg (0x40cf238)
+[NetSurf] HTTP fetch success: http://192.168.70.2:8090/svg_icon_selftest.ico status=200 mime=image/vnd.microsoft.icon
+[NSLOG] src/third_party/netsurf-all-3.11/netsurf/content/content.c (content_convert):79: content http://192.168.70.2:8090/svg_icon_selftest.ico (0x40e4800)
+User-Agent: NetSurf/3.11 (C-OS; x86_64; QuickJS)
+--- failures ---
