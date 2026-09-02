@@ -658,7 +658,8 @@ QUICKJS_CFLAGS = -DCONFIG_VERSION=\"cos-4.0.8-alpha\" -DCONFIG_BIGNUM=0 \
 	-D__STDC_NO_ATOMICS__=1 \
 	-DCONFIG_WORKER=0 \
 	-include alloca.h -Wno-unused-parameter -Wno-unused-function -Wno-sign-compare \
-	-Wno-implicit-function-declaration -Wno-error=implicit-function-declaration
+	-Wno-implicit-function-declaration -Wno-error=implicit-function-declaration \
+	-I$(NSALL_DIR)/libdom/include -I$(NSALL_DIR)/libwapcaplet/include
 
 # ---- NetSurf's own javascript-engine backend, implemented against
 # content/handlers/javascript/js.h using QuickJS (see that file's

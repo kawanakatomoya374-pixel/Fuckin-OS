@@ -39,6 +39,8 @@
 #include "cos_js_os_api.h"
 #include "cos_js_scheduler.h"
 #include "cos_js_web_api.h"
+#include "cos_dom_bindings.h"
+#include "quickjs_jit.h"
 #include "vga.h"
 #include "../netsurf-all-3.11/libdom/include/dom/events/event.h"
 #include "../netsurf-all-3.11/libdom/include/dom/events/event_listener.h"
@@ -4974,6 +4976,8 @@ bool cos_js_os_draw_overlay(void)
  * kmalloc/krealloc/kfree via the functions above - there is no
  * separate "JS heap" carved out of memory, it all comes from the same
  * kernel heap everything else in C-OS uses. */
+static cos_jit_context_t *g_cos_jit_ctx = NULL;
+
 JSRuntime* cos_js_new_runtime(void) {
     JSRuntime* rt = JS_NewRuntime2(&cos_qjs_malloc_funcs, NULL);
     if (rt) {
@@ -4997,6 +5001,8 @@ JSRuntime* cos_js_new_runtime(void) {
          * script depth. Keep in sync with GUI_MAIN_STACK_SIZE in kernel.c. */
         JS_SetMaxStackSize(rt, 128u * 1024u);
         cos_dom_register_class(rt);
+        /* Enable JIT engine */
+        g_cos_jit_ctx = cos_jit_init(rt);
     }
     return rt;
 }
@@ -5018,6 +5024,8 @@ JSContext* cos_js_new_context(JSRuntime* rt) {
          * bounded work here; GUI lifecycle polling resolves their Promise/XHR
          * completions after network I/O has finished. */
         cos_js_web_install(ctx);
+        /* Install complete DOM bindings (Window, Document, Element, Event, etc.) */
+        cos_dom_bindings_init(ctx);
     }
     return ctx;
 }
@@ -5354,4 +5362,17 @@ bool cos_js_dispatch_window_keydown(uint32_t key)
     }
     if (written < 0 || (size_t)written >= sizeof(script)) return false;
     return cos_js_eval_quiet(ctx, script, (size_t)written, "<browser-keydown>");
+}
+
+/* ==================== JIT Integration Functions ==================== */
+
+void cos_js_enable_jit(JSRuntime *rt) {
+    /* JIT is already enabled in cos_js_new_runtime() */
+    (void)rt;
+}
+
+cos_jit_context_t* cos_js_get_jit_context(JSRuntime *rt) {
+    extern cos_jit_context_t *g_cos_jit_ctx;
+    (void)rt;
+    return g_cos_jit_ctx;
 }

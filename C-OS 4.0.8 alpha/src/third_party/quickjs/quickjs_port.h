@@ -102,6 +102,11 @@ void cos_js_pump_pending_jobs(void);
 /* Drop cached libdom-to-JavaScript wrapper references before JS_FreeContext(). */
 void cos_js_release_context_dom_wrappers(JSContext *ctx);
 
+/* JIT engine integration */
+#include "quickjs_jit.h"
+void cos_js_enable_jit(JSRuntime *rt);
+cos_jit_context_t* cos_js_get_jit_context(JSRuntime *rt);
+
 #ifdef __cplusplus
 }
 #endif

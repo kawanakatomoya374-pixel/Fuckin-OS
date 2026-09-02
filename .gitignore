@@ -1,4 +1,13 @@
 ```
+# Compiled and build artifacts
+*.o
+*.obj
+*.a
+*.so
+*.dll
+*.exe
+*.out
+
 # Dependencies
 node_modules/
 venv/
@@ -6,42 +15,32 @@ venv/
 __pycache__/
 .mypy_cache/
 .pytest_cache/
-.julia/
-zig*/
+dist/
+build/
 target/
 .gradle/
 
-# Compiled/Build artifacts
-*.pyc
-*.class
-*.o
-*.exe
-*.dll
-*.so
-*.a
-*.obj
-*.out
-dist/
-build/
-coverage/
-htmlcov/
-*.log
-*.tmp
-
-# Environment
-.env
-.env.local
-*.env.*
-
-# Editors/IDE
+# Editors
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# System
+# Logs and temp files
+*.log
+*.tmp
+
+# System files
 .DS_Store
 Thumbs.db
+.env
+.env.local
+*.env.*
+
+# Coverage
+coverage/
+htmlcov/
+.coverage
 
 # Compressed files
 *.zip
