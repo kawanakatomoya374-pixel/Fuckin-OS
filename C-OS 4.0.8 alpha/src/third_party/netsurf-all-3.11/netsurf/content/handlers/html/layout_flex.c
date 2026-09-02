@@ -1052,6 +1052,18 @@ bool layout_flex(struct box *flex, int available_width,
 	struct flex_ctx *ctx;
 	bool success = false;
 
+	/* Flex layout cache: skip expensive re-calculation if width is unchanged */
+	if (flex->cos_flex_cache_flags & 0x1 &&
+	    flex->cos_flex_cached_width == available_width &&
+	    flex->cos_flex_cached_main_size != 0) {
+		/* Use cached results - same width as previous calculation */
+		flex->width = flex->cos_flex_cached_main_size;
+		flex->height = flex->cos_flex_cached_cross_size;
+		NSLOG(flex, INFO, "C-OS flex layout CACHE HIT box=%p width=%i",
+			flex, available_width);
+		return true;
+	}
+
 	ctx = layout_flex_ctx__create(content, flex);
 	if (ctx == NULL) {
 		return false;
@@ -1111,6 +1123,14 @@ bool layout_flex(struct box *flex, int available_width,
 	success = true;
 
 cleanup:
+	/* Cache the flex layout results for future reuse */
+	if (success) {
+		flex->cos_flex_cached_width = available_width;
+		flex->cos_flex_cached_main_size = flex->width;
+		flex->cos_flex_cached_cross_size = flex->height;
+		flex->cos_flex_cache_flags |= 0x1; /* Mark cache as valid */
+	}
+
 	layout_flex_ctx__destroy(ctx);
 
 	NSLOG(flex, DEEPDEBUG, "box %p: %s: w: %i, h: %i", flex,

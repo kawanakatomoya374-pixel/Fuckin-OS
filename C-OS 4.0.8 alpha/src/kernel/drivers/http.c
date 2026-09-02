@@ -28,10 +28,10 @@ extern ip_addr_t dhcp_get_ip(void);
  * request happened to be created last, which becomes incorrect as soon as
  * browser-owned workers overlap. */
 /* Every HTTP client owns its TCP socket, TLS session, receive staging and
- * decoding workspace. Limit active transports to two as the first safe stage:
+ * decoding workspace. Limit active transports to eight as the first safe stage:
  * this allows independent fetch workers to overlap while keeping memory and
  * descriptor pressure bounded until wider load testing is complete. */
-#define HTTP_MAX_ACTIVE_TRANSPORTS 2u
+#define HTTP_MAX_ACTIVE_TRANSPORTS 8u
 static volatile uint32_t g_http_active_transports = 0;
 static volatile uint32_t g_http_peak_active_transports = 0;
 /* Shared metadata is protected independently of transfer execution. This lets
@@ -61,7 +61,7 @@ static void http_spin_unlock(volatile uint32_t *lock) {
  * avoid repeated DNS/TCP/TLS setup without sharing mutable response buffers.
  * The current safe fetcher executes transports serially, so this bounded pool
  * needs no worker locking. */
-#define HTTP_KEEPALIVE_POOL_SIZE 4
+#define HTTP_KEEPALIVE_POOL_SIZE 16
 
 typedef struct {
     int active;

@@ -43,10 +43,8 @@ static net_iface_t* net_iface = NULL;
 static volatile bool e1000_rx_irq_pending = false;
 static volatile bool e1000_irq_runtime_enabled = false;
 /* Diagnostics are observed only from the deferred poll context; never print
- * from the hard IRQ path. They make IRQ-driven receive loss distinguishable
- * from TCP/HTTP framing failure during SMP integration testing. */
+ * from the hard IRQ path. */
 static volatile uint64_t e1000_irq_count = 0;
-static volatile uint64_t e1000_deferred_drains = 0;
 static volatile uint64_t e1000_deferred_frames = 0;
 static volatile uint32_t e1000_last_irq_cause = 0;
 
@@ -726,7 +724,6 @@ void e1000_poll(void) {
      * interrupt stack, but skip descriptor reads on idle net_poll() passes. */
     if (!__atomic_exchange_n(&e1000_rx_irq_pending, false, __ATOMIC_ACQ_REL)) return;
 
-    uint64_t drain = __atomic_add_fetch(&e1000_deferred_drains, 1u, __ATOMIC_RELAXED);
     uint64_t frames = 0;
     uint8_t packet[E1000_RX_BUFF_SIZE];
     int len;
@@ -738,17 +735,7 @@ void e1000_poll(void) {
     if (frames != 0u) {
         __atomic_fetch_add(&e1000_deferred_frames, frames, __ATOMIC_RELAXED);
     }
-    if (drain <= 8u || frames != 0u) {
-        serial_puts("[E1000] deferred drain irq=");
-        serial_putdec(__atomic_load_n(&e1000_irq_count, __ATOMIC_RELAXED));
-        serial_puts(" frames=");
-        serial_putdec(frames);
-        serial_puts(" total=");
-        serial_putdec(__atomic_load_n(&e1000_deferred_frames, __ATOMIC_RELAXED));
-        serial_puts(" icr=0x");
-        serial_puthex(__atomic_load_n(&e1000_last_irq_cause, __ATOMIC_RELAXED));
-        serial_puts("\n");
-    }
+    /* Serial logging for deferred drain completely removed to eliminate UART latency on every packet receive */
 
     /* The NIC was masked by the hard handler. Drain first, then rearm the
      * receive causes; an arrival between ICR read and IMS write is latched by

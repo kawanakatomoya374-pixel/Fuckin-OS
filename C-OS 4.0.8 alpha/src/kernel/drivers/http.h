@@ -12,19 +12,19 @@
 #define HTTP_PORT       80
 #define HTTPS_PORT      443
 
-#define HTTP_MAX_URL    2048
+#define HTTP_MAX_URL    8192
 #define HTTP_MAX_HOST   256
-#define HTTP_MAX_PATH   1024
+#define HTTP_MAX_PATH   4096
 /* Real HTML responses frequently carry several KiB of security and cache
  * headers before the first article text.  Keep enough wire data to preserve
  * meaningful page content for the NetSurf renderer. */
 /* NetSurf's HTML/CSS/DOM conversion must be able to retain substantial,
  * standards-oriented documents rather than a 64KiB/512KiB rendering prefix.
  * This is a per-document hard safety limit, not an attachment-specific path.
- * http_client_t is heap allocated; 10MiB fits the kernel allocator's 64MiB
- * maximum block while covering common article, application-shell, and local
- * document payloads. */
-#define HTTP_MAX_RESP   (10u * 1024u * 1024u)
+ * http_client_t is heap allocated; response buffer is now dynamically sized
+ * up to 128MiB to cover common article, application-shell, and local document
+ * payloads. */
+#define HTTP_MAX_RESP   (128u * 1024u * 1024u)
 
 #define HTTP_OK         200
 #define HTTP_FOUND      302
@@ -46,12 +46,17 @@ typedef struct {
     char path[HTTP_MAX_PATH];
     
     int status_code;
-    char response[HTTP_MAX_RESP];
+    /* Response buffer is dynamically allocated to support up to HTTP_MAX_RESP
+     * without bloating sizeof(http_client_t). This enables efficient keepalive
+     * pooling while allowing large document handling. */
+    char *response;
     uint64_t response_len;
+    uint64_t response_capacity;
     /* Request-local I/O and content-decoding buffers. They prevent two
      * transport workers from sharing TLS plaintext staging or gzip/Brotli
      * output when HTTP parallelism is enabled. */
-    char receive_chunk[16 * 1024];
+    char *receive_chunk;
+    uint64_t receive_chunk_capacity;
     char *decode_workspace;
     
     int connected;

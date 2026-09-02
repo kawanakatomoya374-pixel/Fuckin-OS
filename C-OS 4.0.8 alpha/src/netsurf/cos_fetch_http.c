@@ -383,11 +383,11 @@ struct cos_http_fetch_context {
 static struct cos_http_fetch_context *ring = NULL;
 static struct cos_http_fetch_context *worker_head = NULL;
 static struct cos_http_fetch_context *worker_tail = NULL;
-/* Match the HTTP transport semaphore. Two independent fetch workers improve
- * CSS/image latency while keeping TCP sockets, 512KiB response buffers and
+/* Match the HTTP transport semaphore. Eight independent fetch workers improve
+ * CSS/image latency while keeping TCP sockets, dynamic response buffers and
  * E1000 descriptor pressure strictly bounded. */
-#define FETCH_HTTP_WORKER_LIMIT 2u
-#define FETCH_HTTP_WORKER_STACK (512u * 1024u)
+#define FETCH_HTTP_WORKER_LIMIT 8u
+#define FETCH_HTTP_WORKER_STACK (1024u * 1024u)
 static uint32_t worker_count = 0;
 
 
@@ -766,12 +766,10 @@ static void fetch_http_send_error_document(struct cos_http_fetch_context *c,
  * backed by a real network client instead of in-memory URI parsing.
  * Returns false only while a prepared response still has owner-thread body
  * slices left to deliver; the caller retains that fetch in the ring. */
-#define COS_FETCH_HTTP_DELIVERY_CHUNK (12u * 1024u)
 
-/* Deliver at most one bounded body segment from the GUI owner thread. The
- * transport worker has already finished by this point, so yielding between
- * calls never races the response buffer. Returning false asks fetch_http_poll
- * to retain this context for the next GUI pass. */
+/* Deliver the entire prepared body in one synchronous callback. The transport
+ * worker has already finished, and keeping the delivery atomic eliminates the
+ * 2,400ms+ owner_delivery_ms observed with chunked delivery on large documents. */
 static bool fetch_http_deliver_prepared_slice(struct cos_http_fetch_context *c)
 {
     if (c == NULL || !c->response_prepared) return true;
@@ -781,18 +779,12 @@ static bool fetch_http_deliver_prepared_slice(struct cos_http_fetch_context *c)
         if (c->owner_delivery_start_tick == 0) {
             c->owner_delivery_start_tick = get_timer_ticks();
         }
-        size_t remaining = c->delivery_length - c->delivery_offset;
-        size_t amount = remaining > COS_FETCH_HTTP_DELIVERY_CHUNK
-            ? COS_FETCH_HTTP_DELIVERY_CHUNK : remaining;
+        /* Deliver the entire payload in one FETCH_DATA callback. */
         msg.type = FETCH_DATA;
         msg.data.header_or_data.buf = c->delivery_payload + c->delivery_offset;
-        msg.data.header_or_data.len = amount;
+        msg.data.header_or_data.len = c->delivery_length - c->delivery_offset;
         fetch_http_send_callback(&msg, c);
-        c->delivery_offset += amount;
-        if (c->delivery_offset < c->delivery_length) {
-            gui_request_redraw();
-            return false;
-        }
+        c->delivery_offset = c->delivery_length;
     }
     msg.type = FETCH_FINISHED;
     fetch_http_send_callback(&msg, c);

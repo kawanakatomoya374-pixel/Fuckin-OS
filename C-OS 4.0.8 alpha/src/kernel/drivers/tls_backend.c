@@ -383,6 +383,20 @@ static const br_x509_trust_anchor TLS_TRUST_ANCHORS[] = {
 static const char *tls_alpn_http1[] = { "http/1.1" };
 static const char *tls_alpn_http2[] = { "h2", "http/1.1" };
 
+/* TLS session parameter cache for BearSSL - 32 slots for session resumption */
+#define TLS_SESSION_CACHE_SIZE 32
+
+typedef struct {
+    char host[256];
+    uint16_t port;
+    br_ssl_session_parameters params;
+    uint64_t last_used;
+    bool valid;
+} tls_cache_entry_t;
+
+static tls_cache_entry_t tls_session_cache[TLS_SESSION_CACHE_SIZE];
+static uint32_t tls_cache_index = 0;
+
 struct tls_session {
     socket_t* socket;
     br_ssl_client_context client;
@@ -392,6 +406,10 @@ struct tls_session {
     /* Per-session cadence. A global poll counter coupled independent TLS
      * handshakes and becomes a data race as soon as multiple transports run. */
     uint32_t poll_since_yield;
+    /* Cached session parameters for resumption */
+    br_ssl_session_parameters cached_params;
+    bool has_cached_params;
+    int cache_slot;
 };
 
 /* BearSSL deliberately starts with no PRNG state.  Seed it from the x86
@@ -575,6 +593,25 @@ static tls_session_t* tls_connect_with_alpn(const char* host, uint64_t port,
         return NULL;
     }
     memset(session, 0, sizeof(*session));
+    session->has_cached_params = false;
+    session->cache_slot = -1;
+
+    /* Check session cache for existing session parameters */
+    uint64_t current_time = timer_get_ticks();
+    for (int i = 0; i < TLS_SESSION_CACHE_SIZE; i++) {
+        if (tls_session_cache[i].valid &&
+            strcmp(tls_session_cache[i].host, host) == 0 &&
+            tls_session_cache[i].port == port) {
+            /* Found cached session for this host */
+            memcpy(&session->cached_params, &tls_session_cache[i].params, sizeof(br_ssl_session_parameters));
+            session->has_cached_params = true;
+            session->cache_slot = i;
+            serial_puts("[TLS] Session cache HIT for ");
+            serial_puts(host);
+            serial_puts("\n");
+            break;
+        }
+    }
 
     session->socket = socket_create(AF_INET, SOCK_STREAM, 0);
     if (!session->socket) {

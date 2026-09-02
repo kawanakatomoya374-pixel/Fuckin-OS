@@ -451,6 +451,27 @@ struct box {
 	 */
 	struct browser_window *iframe;
 
+	/**
+	 * Flex layout cache: cached width for which flex calculations were done.
+	 * If the current width matches this value, skip expensive flex re-calculation.
+	 */
+	int cos_flex_cached_width;
+
+	/**
+	 * Flex layout cache: cached main size result from previous flex calculation.
+	 */
+	int cos_flex_cached_main_size;
+
+	/**
+	 * Flex layout cache: cached cross size result from previous flex calculation.
+	 */
+	int cos_flex_cached_cross_size;
+
+	/**
+	 * Flex layout cache: flags indicating which values are valid.
+	 */
+	unsigned int cos_flex_cache_flags;
+
 };
 
 
