@@ -20,8 +20,8 @@
 
 /* Per-JSRuntime limit for untrusted page scripts.  This is intentionally
  * separate from NetSurf's shared resource/cache budget: JavaScript has a
- * deterministic 64MiB ceiling even when HTML/CSS/image caches are larger. */
-#define COS_QUICKJS_RUNTIME_MEMORY_LIMIT_BYTES (64u * 1024u * 1024u)
+ * deterministic 512MiB ceiling even when HTML/CSS/image caches are larger. */
+#define COS_QUICKJS_RUNTIME_MEMORY_LIMIT_BYTES (512u * 1024u * 1024u)
 
 #ifdef __cplusplus
 extern "C" {

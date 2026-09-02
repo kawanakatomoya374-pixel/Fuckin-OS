@@ -19,18 +19,18 @@ extern void gui_request_redraw(void);
 #include <stdint.h>
 #include <string.h>
 
-#define COS_WEB_CONTEXT_MAX       8
-#define COS_WEB_REQUEST_MAX       8
-#define COS_WEB_LOCAL_AREAS       12
-#define COS_WEB_SESSION_AREAS     12
-#define COS_WEB_STORAGE_ITEMS     32
-#define COS_WEB_ORIGIN_MAX        320
+#define COS_WEB_CONTEXT_MAX       64
+#define COS_WEB_REQUEST_MAX       128
+#define COS_WEB_LOCAL_AREAS       64
+#define COS_WEB_SESSION_AREAS     64
+#define COS_WEB_STORAGE_ITEMS     512
+#define COS_WEB_ORIGIN_MAX        512
 #define COS_WEB_URL_MAX           HTTP_MAX_URL
-#define COS_WEB_METHOD_MAX        12
-#define COS_WEB_BODY_MAX          (64u * 1024u)
-#define COS_WEB_STORAGE_KEY_MAX   96
-#define COS_WEB_STORAGE_VALUE_MAX 1024
-#define COS_WEB_STORAGE_QUOTA     (24u * 1024u)
+#define COS_WEB_METHOD_MAX        16
+#define COS_WEB_BODY_MAX          (64u * 1024u * 1024u)
+#define COS_WEB_STORAGE_KEY_MAX   256
+#define COS_WEB_STORAGE_VALUE_MAX (1024u * 1024u)
+#define COS_WEB_STORAGE_QUOTA     (16u * 1024u * 1024u)
 #define COS_WEB_STORAGE_FILE      "/.cos_web_storage_v1"
 #define COS_WEB_STORE_MAGIC       0x43575331u /* CWS1 */
 

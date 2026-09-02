@@ -3883,7 +3883,9 @@ void cos_js_pump_pending_jobs(void)
     JSRuntime *rt = JS_GetRuntime(active);
     if (rt == NULL) return;
 
-    for (unsigned int i = 0; i < 8; ++i) {
+    /* Execute all pending microtasks without artificial batch limits.
+     * Promise chains and async/await continuations drain completely. */
+    for (;;) {
         JSContext *job_ctx = NULL;
         int rc = JS_ExecutePendingJob(rt, &job_ctx);
         if (rc <= 0) {
