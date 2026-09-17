@@ -1,0 +1,3 @@
+{"QMP": {"version": {"qemu": {"micro": 2, "minor": 2, "major": 8}, "package": "Debian 1:8.2.2+ds-0ubuntu1.18"}, "capabilities": ["oob"]}}
+{"return": {}}
+{"error": {"class": "GenericError", "desc": "Input handler not found for event type abs"}}

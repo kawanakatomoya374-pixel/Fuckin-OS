@@ -1,0 +1,17 @@
+<!doctype html>
+<meta charset="utf-8">
+<div id="root" data-q="a&amp;b&quot;c"><span>one &lt; two</span><br><input disabled></div>
+<pre id="result">pending</pre>
+<script>
+(function () {
+  var result = document.getElementById('result');
+  try {
+    var root = document.getElementById('root');
+    var html = root.outerHTML;
+    var inner = root.innerHTML;
+    var ok = html.indexOf('<DIV') === 0 && html.indexOf('data-q="a&amp;b&quot;c"') >= 0 && html.indexOf('<SPAN>one &lt; two</SPAN>') >= 0 && html.indexOf('<BR>') >= 0 && html.indexOf('</BR>') < 0 && inner.indexOf('<SPAN>one &lt; two</SPAN>') === 0 && inner.indexOf('<DIV') < 0;
+    result.textContent = ok ? 'PASS: serializer' : 'FAIL: ' + html;
+    console.log(ok ? 'SERIALIZER_PASS' : 'SERIALIZER_FAIL ' + html);
+  } catch (e) { result.textContent = 'FAIL: ' + e; console.log('SERIALIZER_FAIL ' + e); }
+}());
+</script>

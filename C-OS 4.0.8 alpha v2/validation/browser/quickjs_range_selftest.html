@@ -1,0 +1,41 @@
+<!doctype html>
+<meta charset="utf-8">
+<div id="root">hello range</div><pre id="result">pending</pre>
+<script>
+(function () {
+  var result = document.getElementById('result');
+  try {
+    var root = document.getElementById('root');
+    var r = document.createRange();
+    r.selectNodeContents(root);
+    var c = r.cloneRange();
+    var clonedContents = r.cloneContents();
+    var cloneContentsOk = clonedContents.textContent === root.textContent && r.toString() === root.textContent;
+    var cmp = r.compareBoundaryPoints(0, c);
+    c.detach();
+    var editNode = document.createElement('div');
+    editNode.textContent = 'abcdef';
+    var editRange = document.createRange();
+    editRange.selectNodeContents(editNode);
+    editRange.deleteContents();
+    var editOk = editNode.textContent === '' && editRange.collapsed;
+    var parent = document.createElement('div');
+    var first = document.createElement('i');
+    var second = document.createElement('b');
+    parent.appendChild(first);
+    parent.appendChild(second);
+    var boundaryRange = document.createRange();
+    boundaryRange.setStartBefore(second);
+    boundaryRange.setEndAfter(first);
+    var boundaryOk = boundaryRange.startContainer === parent && boundaryRange.startOffset === 1 && boundaryRange.endContainer === parent && boundaryRange.endOffset === 1;
+    var inserted = document.createElement('em');
+    boundaryRange.collapse(true);
+    boundaryRange.insertNode(inserted);
+    var insertOk = parent.childNodes[1] === inserted && parent.childNodes.length === 3;
+    if (r.startContainer === root && r.endContainer === root && !r.collapsed && c.toString() === root.textContent && cmp === 0 && editOk && boundaryOk && cloneContentsOk && insertOk) {
+      result.textContent = 'PASS: Range';
+      console.log('RANGE_PASS');
+    } else { result.textContent = 'FAIL: Range values'; console.log('RANGE_FAIL values'); }
+  } catch (e) { result.textContent = 'FAIL: ' + e; console.log('RANGE_FAIL ' + e); }
+}());
+</script>

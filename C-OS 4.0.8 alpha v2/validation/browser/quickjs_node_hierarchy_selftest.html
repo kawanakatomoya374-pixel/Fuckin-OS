@@ -1,0 +1,94 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Node hierarchy / global constructors self-test</title>
+<p id="result">RUNNING</p>
+<div id="a"><span id="b">x</span><!--c--></div>
+<script>
+(function () {
+  'use strict';
+  var checks = [];
+  function check(name, cond) {
+    if (!cond) throw new Error(name + ' failed');
+    checks.push(name);
+  }
+  try {
+    var a = document.getElementById('a');
+    var b = document.getElementById('b');
+    var comment = a.childNodes[1];
+
+    /* --- instanceof chain for real, already-existing nodes --- */
+    check('el instanceof HTMLElement', a instanceof HTMLElement);
+    check('el instanceof Element', a instanceof Element);
+    check('el instanceof Node', a instanceof Node);
+    check('el instanceof EventTarget', a instanceof EventTarget);
+    check('el NOT instanceof Text', !(a instanceof Text));
+
+    check('text instanceof CharacterData', b.firstChild instanceof CharacterData);
+    check('text instanceof Node', b.firstChild instanceof Node);
+    check('text instanceof Text', b.firstChild instanceof Text);
+    check('text NOT instanceof Element', !(b.firstChild instanceof Element));
+
+    check('comment instanceof CharacterData', comment instanceof CharacterData);
+    check('comment instanceof Comment', comment instanceof Comment);
+    check('comment NOT instanceof Text', !(comment instanceof Text));
+
+    var frag = document.createDocumentFragment();
+    check('fragment instanceof Node', frag instanceof Node);
+    check('fragment instanceof DocumentFragment', frag instanceof DocumentFragment);
+    check('fragment NOT instanceof Element', !(frag instanceof Element));
+
+    /* --- existing methods still work after re-parenting the prototype --- */
+    check('existing method survives: getAttribute', typeof a.getAttribute === 'function');
+    a.setAttribute('data-x', '1');
+    check('existing method still functions', a.getAttribute('data-x') === '1');
+    check('addEventListener survives', typeof a.addEventListener === 'function');
+
+    /* --- Node/Element/HTMLElement/EventTarget/CharacterData are abstract --- */
+    var threw = 0;
+    try { new Node(); } catch (e) { if (e instanceof TypeError) threw++; }
+    try { new Element(); } catch (e) { if (e instanceof TypeError) threw++; }
+    try { new HTMLElement(); } catch (e) { if (e instanceof TypeError) threw++; }
+    try { new EventTarget(); } catch (e) { if (e instanceof TypeError) threw++; }
+    try { new CharacterData(); } catch (e) { if (e instanceof TypeError) threw++; }
+    check('5 abstract constructors all throw TypeError', threw === 5);
+
+    /* --- Text/Comment/DocumentFragment are concretely constructible --- */
+    var t = new Text('hello');
+    check('new Text creates a real text node', t instanceof Text && t.data === 'hello');
+    var c = new Comment('note');
+    check('new Comment creates a real comment', c instanceof Comment && c.data === 'note');
+    var f = new DocumentFragment();
+    check('new DocumentFragment creates a real fragment', f instanceof DocumentFragment);
+
+    /* the constructed nodes must be real and usable, not inert placeholders */
+    a.appendChild(t);
+    check('constructed Text is really attached', a.lastChild === t && a.lastChild.data === 'hello');
+
+    /* --- custom-element-style subclassing (class extends HTMLElement) --- */
+    class MyThing extends HTMLElement {
+      greet() { return 'hi from ' + this.tagName; }
+    }
+    check('HTMLElement.prototype reachable for subclassing',
+          Object.getPrototypeOf(MyThing.prototype) === HTMLElement.prototype);
+    /* Cannot actually instantiate MyThing via `new` (no upgrade/registry
+     * mechanism here), but a real element retrofitted onto that prototype
+     * chain via setPrototypeOf must still work like the real DOM element it
+     * is - this is the shape libraries rely on even without full custom
+     * elements support. */
+    Object.setPrototypeOf(a, MyThing.prototype);
+    check('retrofitted subclass method works', a.greet() === 'hi from ' + a.tagName);
+    check('retrofitted element still instanceof HTMLElement', a instanceof HTMLElement);
+    check('retrofitted element DOM methods still work', a.getAttribute('data-x') === '1');
+
+    document.getElementById('result').textContent = 'PASS ' + checks.length;
+    if (typeof console !== 'undefined' && console.log) {
+      console.log('NODE_HIERARCHY_PASS ' + checks.length + ' ' + checks.join('|'));
+    }
+  } catch (error) {
+    document.getElementById('result').textContent = 'FAIL ' + error;
+    if (typeof console !== 'undefined' && console.log) {
+      console.log('NODE_HIERARCHY_FAIL ' + error + ' after:' + checks.join('|'));
+    }
+  }
+}());
+</script>

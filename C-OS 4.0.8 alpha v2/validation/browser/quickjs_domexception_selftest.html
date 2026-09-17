@@ -1,0 +1,13 @@
+<!doctype html>
+<pre id="result">pending</pre>
+<script>
+(function () {
+  var result = document.getElementById('result');
+  try {
+    var e = new DOMException('bad argument', 'TypeMismatchError');
+    var ok = e instanceof DOMException && e.name === 'TypeMismatchError' && e.message === 'bad argument' && e.code === 17 && e.toString() === 'TypeMismatchError: bad argument' && DOMException.INDEX_SIZE_ERR === 1 && DOMException.NOT_FOUND_ERR === 8 && DOMException.ABORT_ERR === 20;
+    result.textContent = ok ? 'PASS: DOMException' : 'FAIL: DOMException';
+    console.log(ok ? 'DOMEXCEPTION_PASS' : 'DOMEXCEPTION_FAIL values');
+  } catch (err) { result.textContent = 'FAIL: ' + err; console.log('DOMEXCEPTION_FAIL ' + err); }
+}());
+</script>

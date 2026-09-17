@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ja">
+<head><meta charset="utf-8"><title>C-OS QuickJS self-test</title></head>
+<body>
+<h1 id="title">QuickJS DOM self-test</h1>
+<div id="result">RUNNING</div>
+<script>
+(function () {
+  var checks = [];
+  function check(name, value) { checks.push(name + ': ' + (value ? 'PASS' : 'FAIL')); }
+  var title = document.getElementById('title');
+  check('getElementById', !!title);
+  check('querySelector', document.querySelector('#title') === title);
+  var created = document.createElement('span');
+  created.className = 'created';
+  created.textContent = 'created';
+  document.body.appendChild(created);
+  check('createElement/appendChild', document.querySelector('.created') === created);
+  created.classList.add('active');
+  check('classList', created.classList.contains('active'));
+  created.style.display = 'inline';
+  created.style.position = 'relative';
+  created.style.borderRadius = '6px';
+  created.style.fontWeight = '700';
+  check('style/CSSOM', created.style.display === 'inline' &&
+        created.style.position === 'relative' &&
+        created.style.borderRadius === '6px' &&
+        created.style.fontWeight === '700');
+  var fragment = document.createDocumentFragment();
+  var fragmentChild = document.createElement('strong');
+  fragmentChild.textContent = 'fragment-child';
+  fragment.appendChild(fragmentChild);
+  check('DocumentFragment', fragment.childNodes.length === 1 &&
+        fragment.firstChild === fragmentChild);
+  document.body.appendChild(fragment);
+  check('Fragment insertion', document.body.textContent.indexOf('fragment-child') >= 0);
+  localStorage.setItem('cos-self-test', 'ok');
+  check('localStorage', localStorage.getItem('cos-self-test') === 'ok');
+  localStorage.removeItem('cos-self-test');
+  check('Storage.removeItem', localStorage.getItem('cos-self-test') === null);
+  check('fetch', typeof fetch === 'function');
+  check('XMLHttpRequest', typeof XMLHttpRequest === 'function');
+  var eventSeen = false;
+  created.addEventListener('cos-test', function () { eventSeen = true; });
+  created.dispatchEvent(new Event('cos-test'));
+  check('Event dispatch', eventSeen);
+  var passed = checks.every(function (line) { return line.indexOf('PASS') >= 0; });
+  document.getElementById('result').textContent = (passed ? 'PASS' : 'FAIL') + '\n' + checks.join('\n');
+  document.title = passed ? 'C-OS QuickJS PASS' : 'C-OS QuickJS FAIL';
+})();
+</script>
+</body>
+</html>

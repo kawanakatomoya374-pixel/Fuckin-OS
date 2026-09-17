@@ -1,0 +1,15 @@
+<!doctype html>
+<pre id="result">pending</pre>
+<script>
+(function () {
+  var result = document.getElementById('result');
+  var target = document.createElement('div');
+  var a = false, b = false, c = false;
+  try { new MutationObserver(function () {}).observe(target, {attributeOldValue: true}); } catch (e) { a = true; }
+  try { new MutationObserver(function () {}).observe(target, {characterDataOldValue: true}); } catch (e) { b = true; }
+  try { new MutationObserver(function () {}).observe(target, {childList: true}); c = true; } catch (e) {}
+  var ok = a && b && c;
+  result.textContent = ok ? 'PASS: Mutation options' : 'FAIL: option validation';
+  console.log(ok ? 'MUTATION_OPTIONS_PASS' : 'MUTATION_OPTIONS_FAIL');
+}());
+</script>

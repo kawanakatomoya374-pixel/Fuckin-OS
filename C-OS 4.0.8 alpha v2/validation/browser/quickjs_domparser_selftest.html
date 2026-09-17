@@ -1,0 +1,18 @@
+<!doctype html>
+<pre id="result">pending</pre>
+<script>
+(function () {
+  var result = document.getElementById('result');
+  try {
+    var parser = new DOMParser();
+    var parsed = parser.parseFromString('<p data-x="1">hello</p>', 'text/html');
+    var serialized = new XMLSerializer().serializeToString(parsed.body);
+    var rejected = false;
+    try { parser.parseFromString('<p>x</p>', 'text/plain'); } catch (e) { rejected = e && e.name === 'TypeError'; }
+    var converted = parser.parseFromString(123, 'text/html');
+    var ok = parsed.contentType === 'text/html' && parsed.body && serialized.indexOf('<BODY>') === 0 && serialized.indexOf('<P data-x="1">hello</P>') >= 0 && rejected && converted.contentType === 'text/html';
+    result.textContent = ok ? 'PASS: DOMParser/XMLSerializer' : 'FAIL: ' + serialized + ' rejected=' + rejected;
+    console.log(ok ? 'DOMPARSER_PASS' : 'DOMPARSER_FAIL ' + serialized + ' rejected=' + rejected);
+  } catch (e) { result.textContent = 'FAIL: ' + e; console.log('DOMPARSER_FAIL ' + e); }
+}());
+</script>

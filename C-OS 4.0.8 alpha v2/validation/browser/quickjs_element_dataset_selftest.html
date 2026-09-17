@@ -1,0 +1,18 @@
+<!doctype html>
+<div id="result">pending</div>
+<script>
+(function () {
+  var result = document.getElementById('result');
+  try {
+    var el = document.createElement('div');
+    el.setAttribute('data-user-id', '42');
+    el.setAttribute('data-mode', 'test');
+    var read = el.dataset && el.dataset.userId === '42' && el.dataset.mode === 'test';
+    if (el.dataset) el.dataset.userId = '43';
+    var write = el.getAttribute('data-user-id') === '43';
+    var ok = read && write;
+    result.textContent = ok ? 'PASS: dataset' : 'FAIL: read=' + read + ' write=' + write + ' dataset=' + el.dataset;
+    console.log(ok ? 'DATASET_PASS' : 'DATASET_FAIL');
+  } catch (e) { result.textContent = 'FAIL: ' + e; console.log('DATASET_FAIL ' + e); }
+}());
+</script>

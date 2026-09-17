@@ -1,0 +1,95 @@
+# C-OS 4.0.8 alpha: UEFI Secure Boot
+
+## 概要
+
+C-OSは、従来のBIOS+UEFI hybrid ISOとは別に、**UEFI-first Secure Boot ISO**とFAT形式の**EFI System Partition（ESP）**を生成できる。Secure Boot版は、`grub_secure.cfg`と起動対象の`kernel.elf`を同一のstandalone GRUB PE/COFFイメージに内包し、そのイメージを署名する構成である。
+
+> Firmwareが検証する対象は `EFI/BOOT/BOOTX64.EFI` である。このファイルに、外部設定ファイルや外部kernelへのフォールバックを持たないGRUB設定と、正確なkernel ELFが内包される。したがって、署名検証を通ったGRUBが別の未署名kernelへ切り替わる経路はSecure Boot構成に存在しない。
+
+| 項目 | 通常hybrid ISO | Secure Boot成果物 |
+|---|---|---|
+| 出力 | `C-OS_4.0.8_alpha.iso` | `build/secureboot/C-OS_4.0.8_alpha_secure.iso` と `.esp` |
+| BIOS起動 | 対応 | 対象外（UEFI-first） |
+| UEFI起動 | 対応 | 対応 |
+| Firmware署名検証 | なし | `BOOTX64.EFI`をdb信頼証明書で検証 |
+| kernelの保護 | ISO上の外部`/boot/kernel.elf` | 署名済みstandalone GRUBに内包 |
+| 秘密鍵 | 不要 | ソース・ESP・ISOに含めない |
+
+## 開発用の所有鍵を生成する
+
+鍵はソースツリー外にのみ作成する。生成先は既定で`~/.local/share/c-os-secureboot`であり、ディレクトリ権限は0700、秘密鍵は0600である。
+
+```bash
+cd /home/ubuntu/c-os-work/c-os
+make secureboot-dev-keys
+```
+
+生成物は次のとおりである。
+
+| ファイル | 用途 | 配布可否 |
+|---|---|---|
+| `C-OS-dev-secureboot.key` | 署名用秘密鍵 | **不可** |
+| `C-OS-dev-secureboot.pem` | X.509公開証明書（PEM） | 可 |
+| `C-OS-dev-secureboot.cer` | X.509公開証明書（DER） | 可 |
+| `C-OS-dev-secureboot.esl` | UEFI Signature List | 可 |
+
+この開発鍵はローカル検証用であり、製品用PK/KEK/dbとして使ってはならない。実運用ではHSMまたは厳格な鍵管理下のオフライン署名鍵を使い、証明書の失効・更新方針を定める必要がある。
+
+## 署名済みESPとUEFI ISOをビルドする
+
+`make -j2`による通常の差分ビルドの後、秘密鍵と公開証明書を明示的に渡す。
+
+```bash
+make -j2 secureboot-iso \
+  SECUREBOOT_KEY="$HOME/.local/share/c-os-secureboot/C-OS-dev-secureboot.key" \
+  SECUREBOOT_CERT="$HOME/.local/share/c-os-secureboot/C-OS-dev-secureboot.pem"
+```
+
+この処理は次を実行する。
+
+1. `grub-mkstandalone`でGRUB、Secure Boot専用設定、kernelを1つのPE/COFFへ内包する。
+2. `sbsign`で`BOOTX64.EFI`へAuthenticode署名を付与し、`sbverify`で確認する。
+3. `EFI/BOOT/BOOTX64.EFI`を持つ64MiB FAT ESPを作成する。
+4. 同じESPをEl Torito EFI boot imageとして含むUEFI-first ISOを作成する。
+5. 署名者、El Torito設定、SHA-256を`build/secureboot/manifest.txt`へ記録する。
+
+公開DER証明書だけがESPの`EFI/COS/C-OS-secureboot-public.cer`へ格納される。private keyはcopyされない。
+
+## OVMFへの開発証明書登録と実証
+
+以下はQEMU/OVMF用の**開発検証**であり、実機のPK/KEK/db管理手順を置き換えるものではない。`virt-fw-vars`を用い、所有公開証明書をPK、KEK、dbへ登録する。
+
+```bash
+owner_guid=3b8bfa61-9c08-4c8a-8a04-3bceca0f4088
+cert="$HOME/.local/share/c-os-secureboot/C-OS-dev-secureboot.pem"
+
+virt-fw-vars -i /usr/share/OVMF/OVMF_VARS_4M.fd \
+  --set-pk "$owner_guid" "$cert" \
+  --add-kek "$owner_guid" "$cert" \
+  --add-db "$owner_guid" "$cert" \
+  --secure-boot \
+  -o build/OVMF_VARS_4M.cosdev-secboot.fd
+```
+
+署名済みISOのSMP8起動例は次のとおりである。
+
+```bash
+cp build/OVMF_VARS_4M.cosdev-secboot.fd build/OVMF_VARS_4M.cosdev-secboot.runtime.fd
+qemu-system-x86_64 \
+  -machine q35,smm=on -global driver=cfi.pflash01,property=secure,value=on \
+  -cpu max -smp 8 -m 1024M \
+  -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.secboot.fd \
+  -drive if=pflash,format=raw,file=build/OVMF_VARS_4M.cosdev-secboot.runtime.fd \
+  -cdrom build/secureboot/C-OS_4.0.8_alpha_secure.iso \
+  -serial stdio -no-reboot -no-shutdown
+```
+
+実証ではこの構成でkernel起動、SMP AP1〜AP7のworkload、`Online CPUs=8`、GUI desktop到達を確認した。さらに同じ変数ストアで未署名の通常hybrid ISOを起動するとOVMFが`Access Denied`として拒否し、kernel serialは開始されないことを確認している。
+
+## 制限と運用上の注意
+
+* Secure Bootの成果物は**UEFI-first**である。BIOS互換が必要な場合は通常hybrid ISOを利用するが、そこにSecure Boot強制はない。
+* OVMFの配布snakeoil鍵はパスフレーズ保護されており、C-OSの実証には使わない。所有開発鍵をdbへ登録する方式を採用した。
+* `OVMF_VARS_4M.cosdev-secboot.fd`は開発専用の変数ストアであり、外部へ配布してはならない。実機・製品では組織のPK/KEK/dbと鍵ローテーション手順を使う。
+* GRUBまたはkernelを変更した場合は必ず`secureboot-iso`を再実行し、manifestの`sbverify`とSHA-256を確認する。
+* HTTP/NetSurf等のOS機能はSecure Boot後もSMP8で検証対象だが、Secure Bootは起動時完全性を担保する層であり、実行中のアプリ隔離やネットワーク信頼を単独では提供しない。

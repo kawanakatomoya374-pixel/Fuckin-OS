@@ -1,0 +1,21 @@
+<!doctype html>
+<div id="host"></div><pre id="result">pending</pre>
+<script>
+(function () {
+  var result = document.getElementById('result');
+  try {
+    var host = document.getElementById('host');
+    var root = host.attachShadow({mode: 'open', delegatesFocus: true});
+    var child = document.createElement('span');
+    child.textContent = 'shadow';
+    root.appendChild(child);
+    var closedHost = document.createElement('div');
+    var closedRoot = closedHost.attachShadow({mode: 'closed'});
+    var closedOk = closedRoot.mode === 'closed' && closedRoot.host === closedHost && closedHost.shadowRoot === null;
+    var rootNodeOk = root.nodeType === 11 && root.nodeName === '#document-fragment' && root.getRootNode() === root;
+    var ok = root.mode === 'open' && root.host === host && root.delegatesFocus === true && host.shadowRoot === root && root.childNodes.length === 1 && root.childNodes[0] === child && closedOk && rootNodeOk;
+    result.textContent = ok ? 'PASS: Shadow DOM' : 'FAIL: Shadow DOM';
+    console.log(ok ? 'SHADOW_PASS' : 'SHADOW_FAIL values');
+  } catch (e) { result.textContent = 'FAIL: ' + e; console.log('SHADOW_FAIL ' + e); }
+}());
+</script>

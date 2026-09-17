@@ -1,0 +1,11 @@
+shared folder
+=============
+
+this folder is for shared files.
+accessible by all users.
+
+- downloads
+- shared documents
+- public data
+
+maintained by kt

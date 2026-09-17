@@ -1,0 +1,97 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Layout geometry (box tree) self-test</title>
+<style>
+  body { margin: 0; padding: 0; }
+  #a { width: 300px; height: 100px; padding: 10px; border: 5px solid black; margin: 0; }
+  #b { width: 120px; height: 40px; padding: 0; border: 0; }
+  #hidden { display: none; }
+</style>
+<p id="result">RUNNING</p>
+<div id="a"><div id="b">inner</div></div>
+<div id="hidden">nope</div>
+<script>
+function cosRunLayoutChecks() {
+  'use strict';
+  var checks = [];
+  function check(name, cond, detail) {
+    if (!cond) throw new Error(name + ' failed' + (detail ? ' (' + detail + ')' : ''));
+    checks.push(name);
+  }
+  try {
+    var a = document.getElementById('a');
+    var b = document.getElementById('b');
+    var hidden = document.getElementById('hidden');
+
+    var ra = a.getBoundingClientRect();
+    check('rect is an object', ra && typeof ra === 'object');
+    check('rect has all members',
+      typeof ra.x === 'number' && typeof ra.y === 'number' &&
+      typeof ra.width === 'number' && typeof ra.height === 'number' &&
+      typeof ra.top === 'number' && typeof ra.left === 'number' &&
+      typeof ra.right === 'number' && typeof ra.bottom === 'number');
+
+    /* border box = content 300 + padding 10*2 + border 5*2 = 330 */
+    check('border-box width', ra.width === 330, 'got ' + ra.width);
+    /* content 100 + padding 20 + border 10 = 130 */
+    check('border-box height', ra.height === 130, 'got ' + ra.height);
+
+    check('right = left + width', ra.right === ra.left + ra.width);
+    check('bottom = top + height', ra.bottom === ra.top + ra.height);
+    check('x mirrors left', ra.x === ra.left && ra.y === ra.top);
+
+    check('offsetWidth matches rect', a.offsetWidth === ra.width,
+          a.offsetWidth + ' vs ' + ra.width);
+    check('offsetHeight matches rect', a.offsetHeight === ra.height, a.offsetHeight + ' vs ' + ra.height);
+
+    /* client box excludes border: 300 + 20 = 320, 100 + 20 = 120 */
+    check('clientWidth excludes border', a.clientWidth === 320, 'got ' + a.clientWidth);
+    check('clientHeight excludes border', a.clientHeight === 120, 'got ' + a.clientHeight);
+
+    /* nested element sits inside the padding+border of its parent */
+    var rb = b.getBoundingClientRect();
+    check('inner width', rb.width === 120, 'got ' + rb.width);
+    check('inner is inset by border+padding', rb.left === ra.left + 15,
+          rb.left + ' vs ' + (ra.left + 15));
+    check('inner is below parent top edge', rb.top === ra.top + 15,
+          rb.top + ' vs ' + (ra.top + 15));
+    check('inner is inside parent', rb.left >= ra.left && rb.top >= ra.top &&
+          rb.right <= ra.right && rb.bottom <= ra.bottom);
+
+    /* display:none has no box - a real browser reports an all-zero rect */
+    var rh = hidden.getBoundingClientRect();
+    check('display:none is zero rect',
+      rh.width === 0 && rh.height === 0 && rh.top === 0 && rh.left === 0);
+    check('display:none offsetWidth is 0', hidden.offsetWidth === 0);
+
+    /* a detached element has no box either */
+    var detached = document.createElement('div');
+    var rd = detached.getBoundingClientRect();
+    check('detached is zero rect', rd.width === 0 && rd.height === 0);
+
+    var rects = a.getClientRects();
+    check('getClientRects returns a list', rects.length >= 1);
+    check('getClientRects[0] matches bounding rect',
+      rects[0].width === ra.width && rects[0].height === ra.height);
+
+    document.getElementById('result').textContent = 'PASS ' + checks.length;
+    if (typeof console !== 'undefined' && console.log) {
+      console.log('LAYOUT_GEOMETRY_PASS ' + checks.length + ' ' + checks.join('|'));
+    }
+  } catch (error) {
+    document.getElementById('result').textContent = 'FAIL ' + error;
+    if (typeof console !== 'undefined' && console.log) {
+      console.log('LAYOUT_GEOMETRY_FAIL ' + error + ' after:' + checks.join('|'));
+    }
+  }
+}
+/* Layout geometry only exists after NetSurf has built the box tree, which
+ * happens in html_finish_conversion() - after inline scripts have run during
+ * parsing. Querying during parse legitimately finds no box and reports zeros,
+ * so the checks are deferred to the load event. */
+if (typeof window !== 'undefined' && window.addEventListener) {
+  window.addEventListener('load', cosRunLayoutChecks);
+} else {
+  cosRunLayoutChecks();
+}
+</script>

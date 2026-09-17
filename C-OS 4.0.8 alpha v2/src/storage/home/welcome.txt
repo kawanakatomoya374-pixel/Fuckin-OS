@@ -1,0 +1,21 @@
+welcome to c-os 4.0.0 beta!
+============================
+
+this is your home directory.
+files here are private to you.
+
+quick links:
+- docs/ for documents
+- media/ for media files
+- shared/ for shared files
+
+features:
+- fat32 filesystem (4gb)
+- ram filesystem
+- gui desktop
+- file manager
+- storage manager
+
+enjoy c-os!
+
+created by kt
