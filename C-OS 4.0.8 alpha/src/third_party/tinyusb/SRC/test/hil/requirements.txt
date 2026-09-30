@@ -1,4 +1,0 @@
-fs
-hid
-pyfatfs
-pyserial

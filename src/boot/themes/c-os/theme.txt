@@ -1,0 +1,40 @@
+# C-OS GRUB theme - matches the boot splash's palette (dark navy gradient,
+# accent blue #4D9FFF) so the very first thing a person sees already looks
+# like C-OS rather than a stock GRUB menu.
+title-text: ""
+desktop-image: "background.png"
+desktop-color: "#0b0e16"
+
+terminal-font: "C-OS Menu 14"
+
++ boot_menu {
+    left = 20%
+    top = 54%
+    width = 60%
+    height = 32%
+    item_height = 34
+    item_padding = 8
+    item_spacing = 6
+    icon_width = 0
+    icon_height = 0
+
+    item_color = "#8b95a8"
+    selected_item_color = "#ffffff"
+
+    item_font = "C-OS Menu 14"
+    selected_item_font = "C-OS Menu Bold 14"
+}
+
++ progress_bar {
+    id = "__timeout__"
+    left = 37%
+    top = 92%
+    width = 26%
+    height = 14
+    font = "C-OS Small 11"
+    text_color = "#6c768a"
+    fg_color = "#4d9fff"
+    bg_color = "#1e2433"
+    border_color = "#2c3b57"
+    text = "@TIMEOUT_NOTIFICATION_MIDDLE@"
+}

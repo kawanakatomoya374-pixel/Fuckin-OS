@@ -1,0 +1,141 @@
+#!/bin/sh
+# cos-cc - build an external program or library for C-OS.
+#
+# WHY A WRAPPER RATHER THAN A LINKER SCRIPT
+# -----------------------------------------
+# The obvious approach is a custom linker script, and validation/cos_programs/
+# has two (cos-pie.ld, cos-lib.ld) for anyone who needs explicit control over
+# layout. They work - the loader accepts what they produce - but they do NOT
+# get PT_GNU_RELRO, because `ld` only emits that header from its own internal
+# script's relro bookkeeping, and reproducing it in a hand-written script is
+# fiddly and version-dependent. Verified directly: the same sources linked
+# with -T cos-pie.ld have no PT_GNU_RELRO, and linked through the compiler
+# driver do.
+#
+# So the recommended path is the compiler driver's default script plus the
+# handful of flags C-OS actually requires. That also means an external
+# project's own build system usually needs nothing more than CC=cos-cc.
+#
+# WHAT THE FLAGS ARE FOR
+# ----------------------
+#   -ffreestanding        no host libc is present; do not assume one
+#   -nostdlib             ditto at link time
+#   -fno-stack-protector  the guard needs a libc-provided __stack_chk_fail
+#   -fPIE / -fPIC         the loader places the image; it is not fixed
+#   --no-dynamic-linker   suppress PT_INTERP. A program carrying it is asking
+#                         to be started by an ld.so; C-OS links it in-kernel
+#                         instead and REFUSES an image with PT_INTERP rather
+#                         than jumping into a program whose GOT was never
+#                         populated.
+#   -z now                bind eagerly. The kernel does not do lazy PLT
+#                         binding (that needs a ring3 resolver trampoline and
+#                         a permanently writable GOT), so asking for it would
+#                         be asking for something that is not there.
+#   -z relro              produce PT_GNU_RELRO, which the loader honours by
+#                         write-protecting the GOT once relocation is done.
+#   -z noexecstack        the loader reads PT_GNU_STACK and, where NX is
+#                         enabled, enforces it.
+#
+# Usage:
+#   cos-cc -o hello.c-os    hello.c [more.c ...]
+#   cos-cc --lib -o mylib.c-osll mylib.c
+#   cos-cc --static -o tiny.c-os tiny.c      # ET_EXEC, no dynamic section
+#
+# Environment:
+#   COS_ROOT   the C-OS source tree (default: the tree this script lives in)
+#   CC         the compiler to drive (default: gcc)
+set -e
+
+COS_ROOT="${COS_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
+CC="${CC:-gcc}"
+
+INC="$COS_ROOT/userland/include"
+LIBDIR="$COS_ROOT/build/userland"
+CRT0="$LIBDIR/cos_crt0.o"
+RTLD="$LIBDIR/cos_rtld.o"
+LIBCOS="$LIBDIR/libcos.a"
+
+MODE=exec
+OUT=""
+ARGS=""
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --lib)    MODE=lib ;;
+        --static) MODE=static ;;
+        -o)       OUT="$2"; shift ;;
+        *)        ARGS="$ARGS $1" ;;
+    esac
+    shift
+done
+
+if [ -z "$OUT" ]; then
+    echo "cos-cc: no output file (-o) given" >&2
+    exit 2
+fi
+
+# -nostdinc + explicit system dirs: without it, `#include <stdio.h>` in a
+# .c-os program silently resolved to the HOST's glibc headers - declarations
+# for a library that is never linked, full of glibc-internal macros. Now the
+# system include path is exactly: the compiler's own freestanding headers
+# (stdint.h, stddef.h, stdarg.h, stdbool.h, limits.h, float.h) and C-OS's
+# standard C library headers (userland/include/libc: stdio.h, stdlib.h,
+# string.h, ctype.h, math.h, time.h, ...). cos.h stays reachable as before.
+GCC_INC=$($CC -print-file-name=include)
+COMMON="-ffreestanding -nostdlib -fno-stack-protector -fno-builtin \
+        -fno-asynchronous-unwind-tables -nostdinc -isystem $GCC_INC \
+        -isystem $INC/libc -I$INC"
+# libgcc last, always. -nostdlib drops it, and the compiler emits calls
+# into it for things that have no instruction: 128-bit division, 64-bit
+# division on some targets, __builtin_popcount without -mpopcnt. Those
+# turn into link errors that name a symbol like __udivti3 and give no
+# hint where it came from - exactly the failure this project hit while
+# building the printf engine.
+LIBGCC="-lgcc"
+LINK="-Wl,-z,now -Wl,-z,relro -Wl,-z,noexecstack"
+
+case "$MODE" in
+lib)
+    # A library has no entry point. That is not cosmetic: both a PIE and a
+    # shared object are ET_DYN, so the kernel tells them apart by whether
+    # e_entry is zero (see cos_elf_is_runnable).
+    #
+    # -soname matters more than it looks - the linker records it as
+    # DT_SONAME and the loader dedupes by SONAME as well as by path, so a
+    # library reached through two different paths loads once instead of
+    # twice with two divergent copies of its globals.
+    SONAME=$(basename "$OUT")
+    # shellcheck disable=SC2086
+    $CC $COMMON -fPIC -shared -Wl,-soname,"$SONAME" $LINK \
+        -o "$OUT" $ARGS $LIBGCC
+    ;;
+static)
+    # ET_EXEC, fixed address, no dynamic section. Still supported, and the
+    # right choice for a hand-written assembly test or anything that must
+    # not depend on a library being present.
+    # shellcheck disable=SC2086
+    $CC $COMMON -fno-pie -no-pie -Wl,-e,_start $LINK \
+        -o "$OUT" $ARGS ${CRT0:+"$CRT0"} ${RTLD:+"$RTLD"} \
+        ${LIBCOS:+"$LIBCOS"} $LIBGCC
+    ;;
+*)
+    # shellcheck disable=SC2086
+    $CC $COMMON -fPIE -pie -Wl,--no-dynamic-linker -Wl,-e,_start $LINK \
+        -o "$OUT" $ARGS ${CRT0:+"$CRT0"} ${RTLD:+"$RTLD"} \
+        ${LIBCOS:+"$LIBCOS"} $LIBGCC
+    ;;
+esac
+
+# A quick sanity report, because the two ways this silently goes wrong -
+# an accidental PT_INTERP and a missing entry point - are both visible
+# here and neither is obvious from a successful link.
+if command -v readelf >/dev/null 2>&1; then
+    if readelf -lW "$OUT" 2>/dev/null | grep -q INTERP; then
+        echo "cos-cc: WARNING: $OUT carries PT_INTERP; C-OS will refuse it" >&2
+    fi
+    if [ "$MODE" != lib ] && \
+       readelf -hW "$OUT" 2>/dev/null | grep -q "Entry point address: *0x0$"; then
+        echo "cos-cc: WARNING: $OUT has no entry point; it will load as a library" >&2
+    fi
+fi
+echo "cos-cc: built $OUT"

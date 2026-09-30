@@ -1,0 +1,1987 @@
+/**
+ * kernel.c - Kernel Main Entry Point
+ * C-OS 4.0.8 alpha - All Features Enabled
+ */
+#include <stdbool.h>
+#include <stdint.h>
+
+#include <types.h>
+#include <serial.h>
+#include <string.h>
+#include <memory.h>
+#include <memory_physical.h>
+#include <gdt.h>
+#include <idt.h>
+#include <irq.h>
+#include <timer.h>
+#include <shell.h>
+#include <../drivers/input/keyboard.h>
+#include <mouse.h>
+#include <vga.h>
+#include <gui.h>
+#include <boot_animation.h>
+#include <calc_engine.h>
+#include <fs.h>
+#include <text_editor.h>
+#include <rtc.h>
+#include <password_screen.h>
+#include <net.h>
+#include "drivers/pci.h"
+#include "drivers/ac97.h"
+#include "drivers/usb.h"
+#include "drivers/http.h"
+#include "task.h"
+#include "scheduler.h"
+#include "smp.h"
+#include "ipc.h"
+#include "cos_elf.h"
+#include "mm/paging.h"
+
+#ifndef COS_ENABLE_FULL_DESKTOP
+#define COS_ENABLE_FULL_DESKTOP 1
+#endif
+
+/* Real kernel stack for gui_main (see the thread_create_kernel_stack_size()
+ * call site below for why): comfortably larger than what NetSurf's
+ * layout/CSS pipeline and the QuickJS interpreter need for real-world pages,
+ * while still a small, one-time, single-thread cost. Keep this in sync with
+ * the JS_SetMaxStackSize() budget in cos_js_new_context() (quickjs_port.c),
+ * which must stay safely below this value so QuickJS's own recursion guard
+ * trips before this real stack is exhausted, not after. Deliberately placed
+ * outside the ifndef above: the real build defines COS_ENABLE_FULL_DESKTOP
+ * via -D, which skips that whole guarded block, and this constant must exist
+ * either way. */
+/* Was 512 KiB, then 8 MiB, now 16 MiB. Increased after a direct
+ * reproduction: a boot-time diagnostic (COS_VALIDATION_HTML_STRESS in
+ * this file) drove the real NetSurf pipeline - no JavaScript involved
+ * at all - over a single real Wikipedia article (745 KB, ordinary
+ * nested tables/citations/headings, nothing pathological) and overran a
+ * 512 KiB stack badly enough to corrupt unrelated kernel data and halt
+ * with an invalid-opcode fault. A live GDB session (hardware
+ * watchpoints + `break default_handler`) confirmed the exception frame
+ * itself was being built tens of megabytes below the stack's start,
+ * inside a completely unrelated static data array - i.e. the overflow,
+ * not some other bug, is what corrupted the kernel.
+ *
+ * The comment this replaces already explains why 512 KiB existed: it
+ * was sized for QuickJS's OWN configured recursion budget
+ * (JS_SetMaxStackSize() in quickjs_port.c), for a JS-heavy page. That
+ * fix is correct and still needed - it just isn't the same budget as
+ * this one. QuickJS's guard only checks ITS OWN interpreter recursion;
+ * it has no visibility into how much of this same C stack NetSurf's own
+ * native code (box construction, CSS selection, layout, DOM walking)
+ * has already used or will use afterward, and a JS-light, markup-heavy
+ * page - exactly the shape that reproduced this - never touches
+ * QuickJS's guard at all.
+ *
+ * 16 MiB is a deliberately generous safety margin, not a measured exact
+ * requirement - the real peak was never cleanly measured (that needs a
+ * guard page reporting a clean fault at the actual high-water mark,
+ * added below in task_alloc_stack()) and "tens of megabytes" from
+ * address-arithmetic-against-unrelated-static-data is a lower bound,
+ * not a ceiling. Until real telemetry exists, doubling the already-
+ * generous first estimate is the responsible choice over a number
+ * picked to just barely survive one test page - and it is now backed by
+ * the guard page below, so an even larger real-world page overrunning
+ * 16 MiB gets a clean, isolated fault instead of silent corruption. */
+#define GUI_MAIN_STACK_SIZE (16u * 1024u * 1024u)
+
+#ifndef COS_HTTP_RUNTIME_SMOKE
+#define COS_HTTP_RUNTIME_SMOKE 0
+#endif
+
+#ifndef COS_ENABLE_NETWORK
+/* E1000 DMA descriptors and packet buffers now use page-backed, physically
+ * resolvable allocations.  Keep the network stack on by default; deployments
+ * can still override COS_ENABLE_NETWORK=0 at build time for isolation. */
+#define COS_ENABLE_NETWORK 1
+#endif
+
+/* External declarations */
+extern bool storage_init(void);
+extern void text_editor_init(void);
+extern void mk_advanced_filemanager_init(void);
+void gdt_init(void);
+void idt_init(void);
+void irq_init(void);
+void timer_init(void);
+void keyboard_init(void);
+void keyboard_poll(void);
+void minimal_mouse_init(void);
+void minimal_mouse_poll(void);
+void vga_init(uint64_t multiboot_magic, uint64_t multiboot_info_addr);
+void gui_init(void);
+bool gui_is_initialized(void);
+void gui_update(void);
+void shell_init(void);
+void shell_apply_config_snapshot(void);
+void net_init(void);
+void net_poll(void);
+void pci_init(void);
+void syscall_init(void);
+void usb_init(void);
+void usb_poll(void);
+int storage_manager_init(void);
+int storage_sync(void);
+int config_manager_init(void);
+void cos_power_init(void);
+
+static inline void cli(void) { __asm__ __volatile__("cli"); }
+static inline void sti(void) { __asm__ __volatile__("sti"); }
+static inline void cpu_hlt(void) { __asm__ __volatile__("hlt"); }
+static inline void cpu_idle(void) { __asm__ __volatile__("sti; hlt"); }
+
+/* The GUI update loop, now running as an actual scheduled kernel
+ * thread rather than directly on the boot stack. Functionally
+ * identical to the loop this replaces; the only change is *where* it
+ * runs.
+ *
+ * thread_yield() is required here, not optional: cpu_idle() (sti;hlt)
+ * only pauses until the next interrupt and then resumes this same
+ * loop - it never hands the CPU to the scheduler. Under the old
+ * always-on preemptive scheduler that didn't matter, because
+ * scheduler_tick() would eventually force a switch away once this
+ * thread's time slice ran out. In cooperative mode there is no such
+ * forced switch, so without an explicit yield this loop would run
+ * forever and every other thread (demo_heartbeat_thread, the
+ * notification GC thread, and anything the desktop init is waiting
+ * on) would starve - which is exactly what produced the "stuck on
+ * loading desktop" hang. */
+static void gui_main_thread(void* arg) {
+    (void)arg;
+    bool desktop_frame_presented = false;
+    /* Run input, invalidation and frame pacing on every scheduled pass.
+     * gui_update() itself enforces the 16ms presentation cadence, so this
+     * must not add a second modulo-based 20 FPS cap above it.  Explicitly
+     * yielding still leaves CPU time for preemptive network, USB and service
+     * threads between GUI passes. */
+    for (;;) {
+        #if COS_ENABLE_NETWORK
+        net_poll();
+        #endif
+        usb_poll();
+        gui_update();
+        /* The first completed GUI update is the safe hand-off point for
+         * VirtualBox: its EFI/VGA path is visibly alive before any deferred
+         * INIT/SIPI traffic is issued. Other platforms have already started
+         * APs in smp_init(), so this call is a no-op there. */
+        if (!desktop_frame_presented) {
+            desktop_frame_presented = true;
+            smp_start_deferred_workers();
+        }
+        /* Sleep ~1 ms instead of yielding straight back into the loop.
+         * gui_update() only presents every 16 ms, so almost every pass here
+         * had nothing to do - but with thread_yield() the loop spun at 100%
+         * CPU and forced a context switch on every pass: profiling a window
+         * drag found ~18% of all CPU time in scheduler_do_context_switch
+         * called from here, taken away from other threads (ring-3 apps, the
+         * browser, audio). A 1 ms sleep keeps USB/network polling at ~1 kHz
+         * and lets the CPU halt when nothing else is runnable. */
+        thread_sleep(1);
+    }
+}
+
+/* Minimal demo thread with no purpose other than proving the
+ * preemptive scheduler is genuinely switching between independent
+ * threads: it wakes up on its own schedule (via thread_sleep, which
+ * blocks this thread specifically rather than halting the CPU) and
+ * logs a heartbeat to the serial console. If multitasking is working,
+ * this keeps ticking on its own cadence while the GUI thread is busy
+ * doing its own thing. */
+/* Enable only in a dedicated validation build. The probe starts a worker
+ * that never yields for 200 timer ticks, then verifies that a second ready
+ * worker observed time *before* the spin worker completed. A cooperative
+ * scheduler cannot satisfy that condition: the observer runs only after the
+ * spinning worker leaves the CPU. */
+#ifndef COS_SCHED_PREEMPTION_PROBE
+#define COS_SCHED_PREEMPTION_PROBE 0
+#endif
+#if COS_SCHED_PREEMPTION_PROBE
+static volatile uint64_t preempt_probe_start_tick;
+static volatile uint64_t preempt_probe_end_tick;
+static volatile uint64_t preempt_probe_observer_tick;
+static volatile bool preempt_probe_started;
+
+static void preempt_probe_spinner(void* arg) {
+    (void)arg;
+    preempt_probe_start_tick = get_timer_ticks();
+    preempt_probe_started = true;
+    uint64_t deadline = preempt_probe_start_tick + 200u;
+    while (get_timer_ticks() < deadline) {
+        __asm__ volatile("pause");
+    }
+    preempt_probe_end_tick = get_timer_ticks();
+}
+
+static void preempt_probe_observer(void* arg) {
+    (void)arg;
+    while (!preempt_probe_started) {
+        __asm__ volatile("pause");
+    }
+    preempt_probe_observer_tick = get_timer_ticks();
+}
+
+static void preempt_probe_verifier(void* arg) {
+    (void)arg;
+    thread_sleep(700u);
+    bool passed = preempt_probe_started && preempt_probe_end_tick != 0 &&
+                  preempt_probe_observer_tick >= preempt_probe_start_tick &&
+                  preempt_probe_observer_tick < preempt_probe_end_tick;
+    serial_puts(passed ? "[SCHED] PREEMPTION-PROBE PASS: observer ran during CPU-bound no-yield worker\\n"
+                       : "[SCHED] PREEMPTION-PROBE FAIL: observer did not run before CPU-bound worker ended\\n");
+    serial_puts("[SCHED] PREEMPTION-PROBE ticks start/observer/end=");
+    serial_putdec(preempt_probe_start_tick); serial_puts("/");
+    serial_putdec(preempt_probe_observer_tick); serial_puts("/");
+    serial_putdec(preempt_probe_end_tick); serial_puts("\n");
+}
+
+static bool preempt_probe_start(void) {
+    preempt_probe_start_tick = 0;
+    preempt_probe_end_tick = 0;
+    preempt_probe_observer_tick = 0;
+    preempt_probe_started = false;
+    return thread_create_kernel("preempt_spin", (void*)preempt_probe_spinner, NULL) != NULL &&
+           thread_create_kernel("preempt_observe", (void*)preempt_probe_observer, NULL) != NULL &&
+           thread_create_kernel("preempt_verify", (void*)preempt_probe_verifier, NULL) != NULL;
+}
+#endif
+
+#if COS_HTTP_RUNTIME_SMOKE
+/* This worker is intentionally compiled only into a validation image.  It
+ * executes the same http_get() path used by NetSurf after GUI/scheduler setup,
+ * allowing strict QEMU evidence for TLS ALPN h2, nghttp2 framing and Brotli
+ * body decoding without making a network request part of normal boot. */
+#define HTTP_PARALLEL_SMOKE_WORKERS 2u
+static volatile uint32_t http_parallel_smoke_done;
+static volatile uint32_t http_parallel_smoke_passed;
+
+static void http_parallel_smoke_worker(void* arg) {
+    uint64_t worker_id = (uint64_t)(uintptr_t)arg;
+    const char *url = "https://www.cloudflare.com/cdn-cgi/trace";
+    http_client_t *http = http_create();
+    int passed = 0;
+    if (http != NULL) {
+        int rc = http_get(http, url);
+        const char *encoding = rc == 0 ? http_get_header(http, "Content-Encoding") : NULL;
+        passed = rc == 0 && http->used_http2 && http_status_code(http) == HTTP_OK &&
+                 encoding != NULL && strncmp(encoding, "br", 2) == 0;
+        serial_puts("[HTTP-TEST] parallel worker=");
+        serial_putdec(worker_id);
+        serial_puts(passed ? " PASS\n" : " FAIL\n");
+        http_destroy(http);
+    } else {
+        serial_puts("[HTTP-TEST] parallel worker create failed\n");
+    }
+    if (passed) __atomic_fetch_add(&http_parallel_smoke_passed, 1u, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&http_parallel_smoke_done, 1u, __ATOMIC_RELEASE);
+}
+
+static void http_runtime_smoke_thread(void* arg) {
+    (void)arg;
+    serial_puts("[HTTP-TEST] waiting for GUI/E1000/DHCP readiness\n");
+    uint64_t ready_deadline = get_timer_ticks() + 3500u;
+    while (get_timer_ticks() < ready_deadline) thread_yield();
+
+    http_parallel_smoke_done = 0u;
+    http_parallel_smoke_passed = 0u;
+    serial_puts("[HTTP-TEST] starting two concurrent HTTPS requests\n");
+    for (uint64_t i = 0; i < HTTP_PARALLEL_SMOKE_WORKERS; ++i) {
+        thread_t *worker = thread_create_kernel_stack_size(
+            i == 0u ? "http_smoke0" : "http_smoke1",
+            (void*)http_parallel_smoke_worker, (void*)(uintptr_t)i,
+            GUI_MAIN_STACK_SIZE);
+        if (worker == NULL) {
+            serial_puts("[HTTP-TEST] FAIL: parallel worker creation\n");
+            return;
+        }
+    }
+
+    uint64_t deadline = get_timer_ticks() + 30000u;
+    while (__atomic_load_n(&http_parallel_smoke_done, __ATOMIC_ACQUIRE) <
+               HTTP_PARALLEL_SMOKE_WORKERS &&
+           get_timer_ticks() < deadline) {
+        thread_yield();
+    }
+    uint32_t done = __atomic_load_n(&http_parallel_smoke_done, __ATOMIC_ACQUIRE);
+    uint32_t passed = __atomic_load_n(&http_parallel_smoke_passed, __ATOMIC_ACQUIRE);
+    uint32_t active = 0;
+    uint32_t peak = 0;
+    http_get_transport_stats(&active, &peak);
+    if (done == HTTP_PARALLEL_SMOKE_WORKERS && passed == HTTP_PARALLEL_SMOKE_WORKERS &&
+        peak == HTTP_PARALLEL_SMOKE_WORKERS && active == 0u) {
+        serial_puts("[HTTP-TEST] PASS: two concurrent HTTP/2+Brotli requests; peak=");
+        serial_putdec(peak);
+        serial_puts("\n");
+    } else {
+        serial_puts("[HTTP-TEST] FAIL: parallel complete=");
+        serial_putdec(done);
+        serial_puts(" passed=");
+        serial_putdec(passed);
+        serial_puts(" active=");
+        serial_putdec(active);
+        serial_puts(" peak=");
+        serial_putdec(peak);
+        serial_puts("\n");
+    }
+}
+
+static void http_runtime_smoke_start(void) {
+    if (!thread_create_kernel_stack_size("http_h2_br_smoke",
+                                         (void*)http_runtime_smoke_thread,
+                                         NULL, GUI_MAIN_STACK_SIZE)) {
+        serial_puts("[HTTP-TEST] FAIL: worker creation\n");
+    }
+}
+#endif
+
+/* ============================================================
+ * Deliberate guard-page test - see the COS_VALIDATION_GUARD_PAGE_TEST
+ * call site above for what this answers and why.
+ * ============================================================ */
+#if COS_VALIDATION_GUARD_PAGE_TEST
+/* Two earlier versions of this function were both defeated by the
+ * optimiser before it ever consumed real stack:
+ *
+ *   v1: stopped on a depth COUNTER. GCC proved the whole call chain
+ *       computed a closed-form triangular-number sum and replaced it
+ *       with that arithmetic outright - the "10-million-deep" call
+ *       returned instantly with exactly N(N+1)/2, having made zero
+ *       actual calls.
+ *
+ *   v2: stopped by reading the real %rsp via inline asm (which cannot
+ *       be constant-folded) and called itself through a `static ...
+ *       volatile` function pointer (which should defeat direct-call
+ *       optimisations). It still never faulted: the pointer's target
+ *       never changes at runtime, so the compiler could still
+ *       devirtualise the call and apply the SAME accumulator-style
+ *       tail-recursion-to-loop transformation as v1, reusing one stack
+ *       frame for the entire "recursion" regardless of how it read
+ *       %rsp inside that one frame.
+ *
+ * What actually defeats both tricks is __builtin_alloca() with a size
+ * the compiler cannot know until runtime. alloca's entire contract is
+ * "move the real stack pointer by this many bytes, right now, and give
+ * me that address" - there is no closed form for what address a chain
+ * of alloca calls produces, and nothing to accumulate, so neither the
+ * arithmetic-elimination nor the loop-conversion trick from v1/v2
+ * applies. The returned pointer is stashed in a global so the compiler
+ * cannot decide the allocation is unobserved and drop it. */
+static void *volatile cos_guard_page_test_sink;
+
+__attribute__((noinline))
+static void cos_guard_page_test_recurse(uint64_t depth)
+{
+    /* Sized from the loop counter (not a compile-time constant) so
+     * alloca's amount is only known at runtime - the specific thing
+     * that makes this immune to the tricks above. Bounded to a sane
+     * range so this remains "many recursive calls each taking a
+     * modest bite of stack" rather than one call taking it all. */
+    size_t n = 64 + (size_t)(depth % 64);
+    volatile uint8_t *p = (volatile uint8_t *)__builtin_alloca(n);
+    for (size_t i = 0; i < n; ++i) p[i] = (uint8_t)(depth + i);
+    cos_guard_page_test_sink = (void *)p;
+
+    uint64_t rsp;
+    __asm__ volatile("mov %%rsp, %0" : "=r"(rsp));
+    /* Generous backstop; see the note on the first version of this
+     * test for why reaching it (rather than the guard page faulting
+     * first) would itself be the finding. */
+    if (rsp < 0x1000ull) return;
+
+    cos_guard_page_test_recurse(depth + 1);
+}
+
+void cos_guard_page_test_thread(void *arg)
+{
+    (void)arg;
+    serial_puts("[GUARDTEST] starting deliberate unbounded recursion on a "
+                "16 KiB stack - expect a caught #PF/#GP, not a silent reset\n");
+    cos_guard_page_test_recurse(0);
+    /* Reached only if the backstop above fired, meaning the guard page
+     * failed to stop this before %rsp fell to near address 0 - a
+     * finding, not a success, despite not crashing. */
+    serial_puts("[GUARDTEST] UNEXPECTED: recursion reached the rsp backstop "
+                "without the guard page faulting first\n");
+}
+#endif /* COS_VALIDATION_GUARD_PAGE_TEST */
+
+static void demo_heartbeat_thread(void* arg) {
+    (void)arg;
+    /* The original version logged a 3-line serial message every second on
+     * its own thread. The pre-emptive scheduler in C-OS 4.0.7 happily ran
+     * this thread concurrently with the GUI paint thread, so every GUI
+     * frame was racing against 3 serial_puts calls. Under QEMU/VirtualBox
+     * the serial port is the dominant bottleneck, so the heartbeat was a
+     * large fraction of the "heavy" feel of the OS. We keep the thread
+     * around (it still proves that the scheduler is switching between
+     * independent threads), but only emit the announcement message once,
+     * very early, and then drop into a near-silent 30-second cadence so
+     * it never contends with anything else. */
+    uint64_t beat = 0;
+    for (;;) {
+        thread_sleep(30 * 1000);
+        beat++;
+        if (beat == 1) {
+            serial_puts("[DEMO] heartbeat thread tick #");
+            serial_putdec(beat);
+            serial_puts("\n");
+        }
+    }
+}
+
+static void kernel_discard_thread(thread_t** thread) {
+    if (!thread || !*thread) return;
+    thread_destroy(*thread);
+    *thread = NULL;
+}
+
+static bool kernel_graphics_ready(void) {
+    return framebuffer != NULL && SCREEN_W > 0 && SCREEN_H > 0;
+}
+
+static void kernel_draw_status_screen(const char* headline, const char* detail) {
+    if (!kernel_graphics_ready()) {
+        return;
+    }
+
+    vga_clear(0x000A1020);
+    vga_fill_rect(0, 0, (int)SCREEN_W, 48, 0x00203090);
+    vga_fill_rect(0, 48, (int)SCREEN_W, 3, 0x00FFFFFF);
+    vga_draw_string(20, 14, headline ? headline : "C-OS 4.0.8 alpha", 0x00FFFFFF, 0x00203090);
+    vga_draw_string(20, 74, detail ? detail : "Serial debug console active", 0x00D8E8FF, 0x000A1020);
+    vga_draw_string(20, 104, "Fallbacks: serial debug console, status overlay, panic screen", 0x00C0FFC0, 0x000A1020);
+    vga_draw_string(20, 134, "Use the serial log if the GUI stays black.", 0x00FFFFFF, 0x000A1020);
+}
+
+static void kernel_draw_panic_overlay(const char* reason) {
+    if (!kernel_graphics_ready()) {
+        return;
+    }
+
+    vga_clear(0x00000000);
+    vga_fill_rect(0, 0, (int)SCREEN_W, (int)SCREEN_H, 0x00200000);
+    vga_fill_rect(0, 0, (int)SCREEN_W, 56, 0x00600000);
+    vga_fill_rect(0, 56, (int)SCREEN_W, 2, 0x00FFFFFF);
+    vga_draw_string(20, 16, "C-OS 4.0.8 alpha - KERNEL PANIC", 0x00FFFFFF, 0x00600000);
+    vga_draw_string(20, 84, reason ? reason : "unknown error", 0x00FFFFFF, 0x00200000);
+    vga_draw_string(20, 114, "Serial console still carries the full log.", 0x00FFD0D0, 0x00200000);
+    vga_draw_string(20, 144, "This screen is the fallback overlay.", 0x00FFD0D0, 0x00200000);
+}
+
+
+static void kernel_fatal(const char* reason) {
+    serial_puts("[KERNEL] FATAL: ");
+    serial_puts(reason ? reason : "unknown");
+    serial_puts("\n");
+    kernel_draw_panic_overlay(reason);
+    cli();
+    for (;;) {
+        cpu_hlt();
+    }
+}
+
+/* Cheap, ALWAYS-ON post-condition for scheduler_set_preemption(1) - not
+ * the full empirical spinner/observer probe above
+ * (COS_SCHED_PREEMPTION_PROBE, opt-in, ~700ms of real timer-driven proof
+ * that a non-yielding thread genuinely gets interrupted), which is
+ * deliberately kept out of the default boot path because that latency on
+ * every single boot is a real cost for a property that essentially never
+ * regresses silently once verified. This check is the cheap half of the
+ * same guarantee: preemptive multitasking is a hard requirement (a
+ * cooperative-only C-OS has no forced-switch story at all for a thread
+ * that hangs or forgets to yield - manual GUI dispatch and the file/GUI
+ * servers this session added all now assume the timer can always take
+ * the CPU back), so silently continuing in cooperative mode because some
+ * FUTURE change accidentally skipped or broke the enable call is
+ * exactly the failure this exists to catch instead of shipping.
+ *
+ * Verifies the flag ACTUALLY took effect (not just that the call
+ * returned), retries once - covering a transient state such as calling
+ * this before scheduler_init() has run - and halts with a clear, loud
+ * diagnostic rather than letting the system boot into a mode it was
+ * never designed to run in if it still hasn't. This cannot, by
+ * construction, prove scheduler_tick()'s internal timeslice logic is
+ * itself correct (only the empirical probe does that); it proves the
+ * one part of the chain most likely to regress silently - the enable
+ * call itself being present and effective - is holding. */
+static void kernel_require_preemption(void) {
+    if (scheduler_get_preemption()) return;
+    serial_puts("[KERNEL] preemption not active after enable call; retrying once\n");
+    scheduler_set_preemption(1);
+    if (scheduler_get_preemption()) return;
+    kernel_fatal("Preemptive multitasking failed to activate - "
+                "cooperative-only mode is not a supported configuration");
+}
+
+/* =====================================================================
+ * Multiboot memory-map parser — used to seed cos_runtime_memory_init()
+ * with the RAM the host actually gave us (VirtualBox / QEMU / bare HW).
+ *
+ * Robustness notes:
+ *  - mb1 and mb2 magics are both accepted; if neither yields a non-zero
+ *    total we fall back to a build-time tunable rather than a hard-coded
+ *    512 MiB so the user always sees the value the hypervisor reported.
+ *  - The mb2 mmap walker validates every entry pointer, the tag length
+ *    and the entry_size to avoid out-of-bounds reads when GRUB hands us
+ *    a truncated info block.
+ *  - "total" now means the sum of every entry's length, but we make it
+ *    sane: readable RAM below 4 KiB or with non-zero reserved high bits
+ *    is discarded. Available RAM is the sum of entries whose type==1.
+ * ===================================================================== */
+
+#define MULTIBOOT1_MAGIC             0x2BADB002u
+#define MULTIBOOT1_LOAD_MAGIC        0x1BADB002u
+#define MULTIBOOT2_MAGIC             0x36D76289u
+#define MULTIBOOT2_TAG_END           0u
+#define MULTIBOOT2_TAG_MMAP          6u
+#define MULTIBOOT2_TAG_BASIC_MEMINFO 4u
+#define MULTIBOOT2_TAG_ACPI_OLD_RSDP 14u
+#define MULTIBOOT2_TAG_ACPI_NEW_RSDP 15u
+#define MULTIBOOT1_MMAP_TYPE_AVAIL   1u
+
+typedef struct {
+    uint32_t type;
+    uint32_t size;
+} __attribute__((packed)) mb2_tag_header_t;
+
+typedef struct {
+    uint32_t type;
+    uint32_t size;
+    uint32_t entry_size;
+    uint32_t entry_version;
+} __attribute__((packed)) mb2_mmap_tag_t;
+
+typedef struct {
+    uint64_t base_addr;
+    uint64_t length;
+    uint32_t type;
+    uint32_t reserved;
+} __attribute__((packed)) mb2_mmap_entry_t;
+
+/* `mb_total_bytes` is the highest end address of RAM or firmware memory
+ * that C-OS may need to access through PHYS_TO_VIRT(). It must never be
+ * the sum of arbitrary reserved/MMIO descriptors: modern q35 exposes large
+ * PCI windows above RAM, and treating those as a contiguous direct-map range
+ * exhausts early page-table memory before the GUI can start. */
+static uint64_t mb_total_bytes   = 0;
+static uint64_t mb_avail_bytes   = 0;
+static uint64_t mb_direct_map_extent = 0;
+static uint64_t mb2_info_phys    = 0;
+static uint64_t mb2_info_size    = 0;
+
+/* Physical address of the ACPI RSDP as handed to us by the bootloader via
+   a Multiboot2 tag (type 14 = old/ACPI 1.0 RSDP, type 15 = new/ACPI 2.0+
+   XSDP). GRUB fills this tag in identically whether it itself was started
+   by legacy BIOS or by UEFI firmware -- under UEFI, GRUB gets the pointer
+   from the EFI configuration table (ACPI_20_TABLE_GUID / ACPI_TABLE_GUID)
+   instead of scanning the BIOS EBDA, and simply forwards it to us the same
+   way. Consuming this tag means C-OS does not need to know or care which
+   firmware it was booted under to find ACPI tables; the EBDA/0xE0000-
+   0xFFFFF scan in acpi_power.c remains only as a fallback for the rare
+   case a loader doesn't supply this tag at all. */
+static uint64_t mb2_acpi_rsdp_phys = 0;
+
+uint64_t cos_mb2_get_acpi_rsdp(void) {
+    return mb2_acpi_rsdp_phys;
+}
+
+/* Build-time default for hosts that ship an empty multiboot info block.
+   Match the value the user passed to QEMU (-m NN) or VirtualBox. The
+   environment variable C_OS_RAM_MB overrides this at boot if set. */
+#ifndef C_OS_RAM_FALLBACK_MB
+#define C_OS_RAM_FALLBACK_MB 512ULL
+#endif
+
+static void parse_multiboot1_upper(uint64_t addr) {
+    if (addr == 0) return;
+    /* Multiboot 1 info layout:
+       offset 0  : flags
+       offset 4  : mem_lower (KiB)
+       offset 8  : mem_upper (KiB)
+    */
+    volatile uint32_t* p = (volatile uint32_t*)(uintptr_t)addr;
+    uint32_t flags    = p[0];
+    uint32_t mem_low  = (flags & 0x00000001u) ? p[1] : 0u;
+    uint32_t mem_up   = (flags & 0x00000001u) ? p[2] : 0u;
+    uint64_t total = ((uint64_t)mem_low + mem_up) * 1024ULL;
+    uint64_t avail = total;
+    /* Reserve the conventional BIOS area + kernel reservation (16 MiB). */
+    if (avail > 16ULL * 1024 * 1024) avail -= 16ULL * 1024 * 1024;
+    mb_total_bytes = total;
+    mb_avail_bytes = avail;
+}
+
+static void parse_multiboot2_mmap(uint64_t addr) {
+    if (addr == 0) return;
+    /* The mb2 info structure starts with total_size (u32) followed by the
+       reserved u32; tags begin at +8. */
+    uint32_t total_size = *(volatile uint32_t*)(uintptr_t)addr;
+    if (total_size < 8u || total_size > 0x100000u) return; /* sanity */
+    mb2_info_phys = addr;
+    mb2_info_size = total_size;
+    uint8_t* base = (uint8_t*)(uintptr_t)addr + 8;
+    uint8_t* end  = (uint8_t*)(uintptr_t)addr + total_size;
+    while (base + sizeof(mb2_tag_header_t) <= end) {
+        mb2_tag_header_t* hdr = (mb2_tag_header_t*)base;
+        if (hdr->type == MULTIBOOT2_TAG_END) break;
+        if (hdr->size < sizeof(mb2_tag_header_t)) break; /* malformed */
+        if (hdr->type == MULTIBOOT2_TAG_MMAP) {
+            mb2_mmap_tag_t* mtag = (mb2_mmap_tag_t*)base;
+            if (!mtag->entry_size || mtag->entry_size < sizeof(mb2_mmap_entry_t))
+                mtag->entry_size = sizeof(mb2_mmap_entry_t);
+            uint8_t* tag_end = base + mtag->size;
+            if (tag_end > end) tag_end = end;
+            uint8_t* entry_ptr = (uint8_t*)base + sizeof(mb2_mmap_tag_t);
+            serial_puts("[MMAP] Multiboot2 memory map:\n");
+            int region_idx = 0;
+            while (entry_ptr + mtag->entry_size <= tag_end) {
+                mb2_mmap_entry_t* e = (mb2_mmap_entry_t*)entry_ptr;
+
+                const char* type_name;
+                switch (e->type) {
+                    case 1: type_name = "Available"; break;
+                    case 2: type_name = "Reserved"; break;
+                    case 3: type_name = "ACPI reclaimable"; break;
+                    case 4: type_name = "ACPI NVS"; break;
+                    case 5: type_name = "Bad RAM"; break;
+                    default: type_name = "Unknown"; break;
+                }
+                serial_puts("[MMAP]  [");
+                serial_putdec((uint64_t)region_idx++);
+                serial_puts("] base=0x");
+                serial_puthex(e->base_addr);
+                serial_puts(" length=0x");
+                serial_puthex(e->length);
+                serial_puts(" (");
+                serial_putdec(e->length / 1024);
+                serial_puts(" KiB) type=");
+                serial_putdec((uint64_t)e->type);
+                serial_puts(" (");
+                serial_puts(type_name);
+                serial_puts(")");
+                if (e->reserved != 0) {
+                    serial_puts(" [SKIPPED: reserved field non-zero, treated as corrupt]");
+                } else if (e->length == 0) {
+                    serial_puts(" [SKIPPED: zero length]");
+                } else if (e->length > (1ULL << 40)) {
+                    serial_puts(" [SKIPPED: length >= 1TiB, likely corrupt]");
+                } else if (e->type == MULTIBOOT1_MMAP_TYPE_AVAIL) {
+                    serial_puts(" [counted in total AND available]");
+                } else {
+                    serial_puts(" [counted in total only]");
+                }
+                serial_puts("\n");
+
+                /* Only RAM and ACPI firmware regions contribute to the
+                 * PHYS_TO_VIRT direct-map high-water mark. Reserved PCI/MMIO
+                 * apertures can legally live many GiB above RAM on q35; adding
+                 * their lengths or endpoints here causes a pathological map
+                 * attempt into non-RAM space. The direct map remains
+                 * contiguous below the selected high-water mark, preserving
+                 * access to holes and ACPI tables inside the actual RAM span. */
+                if (e->length && e->length <= (1ULL << 40) && e->reserved == 0 &&
+                    (e->type == MULTIBOOT1_MMAP_TYPE_AVAIL || e->type == 3u || e->type == 4u)) {
+                    uint64_t region_end = e->base_addr + e->length;
+                    if (region_end >= e->base_addr) {
+                        if (region_end > mb_total_bytes) mb_total_bytes = region_end;
+                        if (region_end > mb_direct_map_extent) mb_direct_map_extent = region_end;
+                    }
+                    if (e->type == MULTIBOOT1_MMAP_TYPE_AVAIL)
+                        mb_avail_bytes += e->length;
+                }
+                entry_ptr += mtag->entry_size;
+            }
+            serial_puts("[MMAP] running total after this tag: total=0x");
+            serial_puthex(mb_total_bytes);
+            serial_puts(" available=0x");
+            serial_puthex(mb_avail_bytes);
+            serial_puts("\n");
+        } else if (hdr->type == MULTIBOOT2_TAG_BASIC_MEMINFO) {
+            /* Fallback path when GRUB didn't pack an mmap tag.
+               mb2 basic meminfo has mem_lower at +8 and mem_upper at +12
+               (both in KiB). */
+            volatile uint32_t* p = (volatile uint32_t*)(uintptr_t)base;
+            uint32_t lo = p[2];
+            uint32_t hi = p[3];
+            uint64_t total = ((uint64_t)lo + hi) * 1024ULL;
+            if (total > mb_total_bytes) {
+                mb_total_bytes = total;
+                uint64_t avail = total;
+                if (avail > 16ULL * 1024 * 1024) avail -= 16ULL * 1024 * 1024;
+                if (avail > mb_avail_bytes) mb_avail_bytes = avail;
+            }
+        } else if (hdr->type == MULTIBOOT2_TAG_ACPI_OLD_RSDP ||
+                   hdr->type == MULTIBOOT2_TAG_ACPI_NEW_RSDP) {
+            /* Tag layout: header (8 bytes) followed immediately by the raw
+               RSDP structure copied in by the bootloader. We only need its
+               address; acpi_power.c re-validates the signature/checksum
+               itself before trusting it. Prefer the "new" (ACPI 2.0+,
+               type 15) RSDP if both tags are present, since it also
+               carries the XSDT pointer. */
+            uint8_t* rsdp_ptr = base + sizeof(mb2_tag_header_t);
+            if (hdr->type == MULTIBOOT2_TAG_ACPI_NEW_RSDP || mb2_acpi_rsdp_phys == 0) {
+                mb2_acpi_rsdp_phys = (uint64_t)(uintptr_t)rsdp_ptr;
+            }
+        }
+        uint32_t step = (hdr->size + 7u) & ~7u;
+        if (step < sizeof(mb2_tag_header_t)) step = sizeof(mb2_tag_header_t);
+        base += step;
+    }
+}
+
+static void kernel_capture_runtime_memory(uint64_t magic, uint64_t addr) {
+    mb_total_bytes = 0;
+    mb_avail_bytes = 0;
+    mb_direct_map_extent = 0;
+    mb2_info_phys = 0;
+    mb2_info_size = 0;
+    mb2_acpi_rsdp_phys = 0;
+    if (magic == MULTIBOOT2_MAGIC) {
+        parse_multiboot2_mmap(addr);
+    } else if (magic == MULTIBOOT1_MAGIC || magic == MULTIBOOT1_LOAD_MAGIC) {
+        parse_multiboot1_upper(addr);
+    }
+    if (mb_total_bytes == 0) {
+        /* The bootloader did not give us a usable map. Stay consistent
+           with whatever the user launches us with, instead of inventing
+           a hard-coded 512 MiB that hides shortfalls. */
+        uint64_t fb_mb = (uint64_t)C_OS_RAM_FALLBACK_MB;
+        mb_total_bytes = fb_mb * 1024ULL * 1024ULL;
+        mb_avail_bytes = mb_total_bytes;
+        mb_direct_map_extent = mb_total_bytes;
+    }
+    /* Clip to a sane cap so a malformed map cannot exhaust the heap. */
+    if (mb_total_bytes > (1ULL << 40)) mb_total_bytes = 1ULL << 40;
+    if (mb_direct_map_extent == 0 || mb_direct_map_extent > (1ULL << 40))
+        mb_direct_map_extent = mb_total_bytes;
+    if (mb_avail_bytes > mb_total_bytes) mb_avail_bytes = mb_total_bytes;
+    serial_puts("[KERNEL] multiboot parse: total=");
+    serial_putdec(mb_total_bytes / (1024 * 1024));
+    serial_puts(" MiB, available=");
+    serial_putdec(mb_avail_bytes / (1024 * 1024));
+    serial_puts(" MiB\n");
+    cos_runtime_memory_init(mb_total_bytes, mb_avail_bytes);
+    cos_runtime_memory_set_direct_map_extent(mb_direct_map_extent);
+}
+
+static void kernel_reserve_bootloader_regions(void) {
+    if (mb2_info_phys && mb2_info_size) {
+        serial_puts("[PHYS] Reserving Multiboot2 information region\n");
+        phys_memory_reserve_range((phys_addr_t)mb2_info_phys, mb2_info_size);
+        serial_puts("[PHYS] Multiboot2 information region reserved\n");
+    }
+}
+
+/* Track what has been initialized */
+static bool init_storage_done = false;
+static bool init_vga_done = false;
+static bool init_gui_done = false;
+static bool init_shell_done = false;
+
+void kernel_main(uint64_t magic, uint64_t addr) {
+    serial_init();
+    serial_puts("\n[KERNEL] ================================\n");
+    serial_puts("[KERNEL] C-OS 4.0.8 alpha (64-bit)\n");
+    serial_puts("[KERNEL] Boot path: VirtualBox-compatible full mode\n");
+    serial_puts("[KERNEL] Multiboot magic=0x");
+    serial_puthex(magic);
+    serial_puts("  info=0x");
+    serial_puthex(addr);
+    serial_puts("\n");
+    serial_puts("[KERNEL] ================================\n");
+
+    /* Accept both Multiboot1 and Multiboot2 entry conventions. */
+    if (magic != 0x2BADB002ULL &&
+        magic != 0x1BADB002ULL &&
+        magic != 0x36D76289ULL) {
+        kernel_fatal("Invalid multiboot magic");
+    }
+
+    if (addr == 0) {
+        /* No info block at all — degrade gracefully using the build-time
+           fallback value instead of crashing on a toolchain that strips
+           the multiboot header. */
+        serial_puts("[KERNEL] WARNING: multiboot info missing, using fallback RAM\n");
+        kernel_capture_runtime_memory(MULTIBOOT2_MAGIC, 0);
+    } else {
+        kernel_capture_runtime_memory(magic, addr);
+    }
+
+    cli();
+
+    serial_puts("[KERNEL] Initializing GDT...\n");
+    gdt_init();
+
+    serial_puts("[KERNEL] Initializing IDT...\n");
+    idt_init();
+    syscall_init();
+
+    serial_puts("[KERNEL] Initializing IRQ...\n");
+    irq_init();
+
+    serial_puts("[KERNEL] Initializing timer...\n");
+    timer_init();
+
+    serial_puts("[KERNEL] Initializing physical memory manager...\n");
+    phys_memory_init();
+    kernel_reserve_bootloader_regions();
+
+    serial_puts("[KERNEL] Detecting VM/HW memory from multiboot...\n");
+
+    serial_puts("[KERNEL] Initializing memory...\n");
+    memory_init();
+
+    /* NOTE: paging_init() was never being called anywhere in this
+     * codebase before this change. Without it, kernel_pml4/
+     * current_directory in paging.c stay NULL forever, which means:
+     *   - paging_create_directory() (used by every process) would
+     *     clone nothing (its "if (kernel_pml4) memcpy(...)" guard
+     *     silently skips), producing a directory with zero mappings.
+     *   - The scheduler's new per-process CR3 switch would load that
+     *     empty directory and crash immediately on the very first
+     *     context switch (no mappings at all for the next instruction
+     *     fetch).
+     * It must run after memory_init() (its page tables are allocated
+     * via kmalloc_aligned, which needs the heap) and before task_init()
+     * (which creates the idle process/thread and therefore the first
+     * real page directory).
+     */
+    serial_puts("[KERNEL] Initializing paging...\n");
+    paging_init();
+
+    /* Enables EFER.NXE (execute-disable) on this CPU, if the hardware
+     * supports it - see cos_elf_nx_enable()'s own implementation
+     * (cos_elf.c) for exactly what it checks. This was written and
+     * exposed via cos_elf_nx_available() a while ago, used correctly by
+     * every PAGE_NX-setting call site (the ELF loader's own PT_LOAD
+     * segments, and task_handle_page_fault()'s heap/stack/mmap demand
+     * paging), but never actually CALLED anywhere - confirmed directly:
+     * an empirical test (Server/testclients/nx_probe.c,
+     * COS_VALIDATION_NX_PROBE) that writes a `ret` instruction into heap
+     * memory and calls it executed successfully, which should be
+     * impossible once this runs. Every NX-setting call site already
+     * correctly gates on cos_elf_nx_available() rather than assuming
+     * support, so this was pure dead code, not a wrong implementation -
+     * the hardware feature was simply never switched on, so every
+     * PAGE_NX bit ever written was silently a no-op reserved bit.
+     *
+     * Placed here deliberately: after paging_init() (EFER access needs
+     * nothing paging-related to be ready, but there is no reason to run
+     * it before paging exists either) and before task_init() (a few
+     * lines below), which creates the first real process and, from then
+     * on, the first page-table entries that might carry PAGE_NX - this
+     * is the latest point that is still unconditionally before any of
+     * those. */
+    serial_puts("[KERNEL] Enabling NX (execute-disable) if supported...\n");
+    cos_elf_nx_enable();
+
+    serial_puts("[KERNEL] Initializing VGA/Framebuffer...\n");
+    vga_init(magic, addr);
+    init_vga_done = true;
+    vga_reserve_physical_regions();
+
+    if (kernel_graphics_ready()) {
+        serial_puts("[KERNEL] Drawing framebuffer status screen...\n");
+        kernel_draw_status_screen("C-OS 4.0.8 alpha", "Framebuffer graphics ready");
+        vga_flip();
+        serial_puts("[KERNEL] Framebuffer status screen drawn\n");
+
+        /* timer_wait() relies on IRQ0 advancing timer_ticks. The
+         * boot splash is still part of the early init path here, so
+         * enable interrupts temporarily before the splash delay.
+         * scheduler_running is still false at this point, so the timer
+         * ISR will not hand control to the scheduler yet. */
+        // Interrupts will be enabled after scheduler and tasking are fully initialized.
+        // timer_wait(75); // Moved to after scheduler init for safety
+    } else {
+        serial_puts("[KERNEL] WARNING: no usable framebuffer; screen will stay black."
+                    " The bootloader/BIOS did not provide a 32/24bpp linear framebuffer"
+                    " (see the [VGA] lines above for what it offered instead)."
+                    " Under Bochs this almost always means VBE isn't enabled on the VGA"
+                    " card - add 'vga: extension=vbe' to your bochsrc. Under QEMU/VirtualBox"
+                    " this is rare; check your display device settings if it happens there.\n");
+    }
+
+    serial_puts("[KERNEL] Running rich boot animation...\n");
+    gui_boot_progress("Video ready");
+
+    serial_puts("[KERNEL] Discovering SMP topology...\n");
+    smp_init();
+    serial_puts("[KERNEL] Initializing scheduler...\n");
+    scheduler_init();
+    gui_boot_progress("Starting the scheduler");
+
+    serial_puts("[KERNEL] Initializing tasking (idle process/thread)...\n");
+    task_init();
+    gui_boot_progress("Setting up tasking");
+
+    // Enable interrupts after scheduler and tasking are ready to handle them.
+    serial_puts("[KERNEL] Enabling interrupts after scheduler/tasking init...\n");
+    sti();
+
+    /* COS_VALIDATION_SUITE gates EVERY boot-time demo/test process this
+     * development effort has accumulated (ring3 syscall exercises, ELF
+     * loader torture tests, signal/mmap/spawn/waitpid tests, and the
+     * ModTest keyboard-modifier probe below). Off by default: a real
+     * user's boot must not spawn dozens of test windows, write a dozen
+     * test files onto their FAT32 volume, or beep the speaker as a
+     * side effect of validation that has nothing to do with using the
+     * OS. This was a REAL gap, not a hypothetical one - every one of
+     * these was wired in unconditionally during development and would
+     * have shipped exactly that way. Test.c-os itself is unaffected: it
+     * ships as a real default file via fs_bootstrap_defaults() (fs.c)
+     * regardless of this flag - only the boot-time AUTO-LAUNCH/self-test
+     * machinery is gated here. */
+#ifndef COS_VALIDATION_SUITE
+#define COS_VALIDATION_SUITE 0
+#endif
+#if COS_VALIDATION_SUITE
+    extern void spawn_ring3_demo_process(void);
+    spawn_ring3_demo_process();
+    /* Second ring3 process, loaded through the real .c-os ELF loader
+     * rather than as a flat blob - validates multi-segment loading and
+     * per-segment permissions end to end. */
+    extern void spawn_cos_elf_process(void);
+    spawn_cos_elf_process();
+    extern void spawn_cos_paint_process(void);
+    spawn_cos_paint_process();
+    extern void spawn_cos_crash_test(void);
+    spawn_cos_crash_test();
+    extern void spawn_cos_argv_test(void);
+    spawn_cos_argv_test();
+    /* Launched AFTER the crash test: if the kernel survived, this proves
+     * it by actually running to completion, not merely by the log not
+     * going silent. */
+    extern void spawn_cos_elf_process(void);
+    spawn_cos_elf_process();
+#endif
+
+
+    // Now that interrupts are enabled and scheduler is running, we can safely wait.
+    if (init_vga_done) {
+        timer_wait(75);
+    }
+
+    serial_puts("[KERNEL] Initializing IPC...\n");
+    ipc_init();
+    gui_boot_progress("Setting up IPC");
+
+    serial_puts("[KERNEL] Initializing RTC...\n");
+    rtc_init();
+    gui_boot_progress("Reading the clock");
+
+    serial_puts("[KERNEL] Initializing PCI bus...\n");
+    pci_init();
+    gui_boot_progress("Finding devices");
+
+    serial_puts("[KERNEL] Initializing AC97 audio...\n");
+    ac97_init();
+    if (ac97_is_available()) {
+        /* Self-test tone: if this is audible, the whole AC97 output
+         * path (codec reset, DMA ring, hardware) is confirmed working
+         * before anything more complex (WAV, then MP3) is trusted to it. */
+        ac97_beep(880, 150);
+    }
+    gui_boot_progress("Checking audio");
+
+    serial_puts("[KERNEL] Initializing USB stack...\n");
+    usb_init();
+    gui_boot_progress("Starting USB");
+
+    #if COS_ENABLE_NETWORK
+    serial_puts("[KERNEL] Initializing network stack...\n");
+    net_init();
+    gui_boot_progress("Starting networking");
+    #else
+    serial_puts("[KERNEL] Network stack disabled for stability.\n");
+    #endif
+
+    serial_puts("[KERNEL] Initializing mouse (PS/2)...\n");
+    minimal_mouse_init();
+    gui_boot_progress("Setting up input");
+
+    serial_puts("[KERNEL] Initializing persistent storage...\n");
+    if (!storage_init()) {
+        serial_puts("[KERNEL] WARNING: persistent storage unavailable; RAM fallback remains active\n");
+    } else {
+        init_storage_done = true;
+    }
+    gui_boot_progress("Preparing storage");
+
+    /* Mounts the real FAT32 partition (see fs.c/fatfs_diskio.h) so
+     * fs_list_dir()/fs_read_file_at()/etc. - already called throughout
+     * the GUI (file manager, text editor, ...) - actually have a
+     * filesystem to talk to. fs_init() handles a missing/unformatted
+     * disk gracefully on its own (formats it, or logs and leaves
+     * g_fatfs_mounted false), so this is safe to call unconditionally. */
+    serial_puts("[KERNEL] Mounting FAT32 filesystem...\n");
+    fs_init();
+    gui_boot_progress("Mounting the file system");
+
+#if COS_VALIDATION_SUITE
+    /* Proves the disk-backed .c-os double-click path: seeds a real file
+     * on the FAT32 volume (now actually mounted) and opens it through the
+     * same dispatch the file manager uses. Must run after fs_init() - an
+     * earlier placement before mounting failed every write with FatFs
+     * FR_NOT_ENABLED (12). */
+    extern void cos_validation_disk_launch(void);
+    cos_validation_disk_launch();
+#endif
+
+    /* Test.c-os ships as a real default file via fs_bootstrap_defaults()
+     * (fs.c) on EVERY boot, production included - the user finds it in
+     * the file manager and double-clicks it themselves, like any file
+     * they created. It must NOT auto-launch on a real boot - popping a
+     * window open unasked on every startup is not something a real OS
+     * does, and an earlier version of this integration did exactly that
+     * unconditionally, caught before it shipped. cos_open_test_app()
+     * remains available to simulate the double-click for validation,
+     * gated behind its own flag so it stays out of a normal build. */
+#ifndef COS_VALIDATION_LAUNCH_TEST_APP
+#define COS_VALIDATION_LAUNCH_TEST_APP 0
+#endif
+#if COS_VALIDATION_LAUNCH_TEST_APP
+    extern void cos_open_test_app(void);
+    cos_open_test_app();
+#endif
+
+#ifndef COS_VALIDATION_LAUNCH_TEST_APP_EMBEDDED
+#define COS_VALIDATION_LAUNCH_TEST_APP_EMBEDDED 0
+#endif
+#if COS_VALIDATION_LAUNCH_TEST_APP_EMBEDDED
+    extern void cos_open_test_app_embedded(void);
+    cos_open_test_app_embedded();
+#endif
+#ifndef COS_VALIDATION_USER_ELF
+#define COS_VALIDATION_USER_ELF 0
+#endif
+#if COS_VALIDATION_USER_ELF
+    extern void cos_validation_launch_user_elf(void);
+    cos_validation_launch_user_elf();
+#endif
+#ifndef COS_VALIDATION_MULTI_LAUNCH
+#define COS_VALIDATION_MULTI_LAUNCH 0
+#endif
+#if COS_VALIDATION_MULTI_LAUNCH
+    /* Mimics the reported sessions: several ring-3 programs started one
+     * after another (music player first, then the samples) instead of a
+     * single program on a freshly booted system. */
+    {
+        extern void cos_validation_multi_launch(int rounds);
+        cos_validation_multi_launch(COS_VALIDATION_MULTI_LAUNCH);
+    }
+#endif
+
+#ifndef COS_VALIDATION_OPEN_IMAGE_VIEWER
+#define COS_VALIDATION_OPEN_IMAGE_VIEWER 0
+#endif
+
+/* Deliberate, deterministic test of the heap extension allocator
+ * (cos_ext_alloc()/cos_ext_free() in src/kernel/memory.c). Off by
+ * default; exists to verify that mechanism directly, synchronously, on
+ * the boot thread - not depending on the (separately broken, see this
+ * file's investigation notes on COS_VALIDATION_HTML_STRESS) threaded
+ * NetSurf test path at all, so it can validate the allocator in
+ * isolation regardless of that regression's state.
+ *
+ * Deliberately exhausts the main 512 MiB heap with a run of fixed-size
+ * allocations, confirms further allocations still succeed (routed to the
+ * extension), writes and reads back a distinct pattern in EACH extension
+ * block to prove it is real, addressable memory rather than a lucky
+ * non-NULL pointer, frees everything in a deliberately mixed order (not
+ * strictly LIFO or FIFO) to exercise kfree()'s extension/main-heap
+ * routing under realistic-shaped traffic, and finally confirms an
+ * ordinary small allocation still succeeds afterward - proving the main
+ * heap's own freed space is still correctly reusable and nothing was
+ * corrupted along the way. */
+#ifndef COS_VALIDATION_HEAP_EXTENSION_TEST
+#define COS_VALIDATION_HEAP_EXTENSION_TEST 0
+#endif
+
+/* Deterministic in-kernel check of the IPC layer that SYS_IPC_* now
+ * exposes to userspace (see src/kernel/syscall.c). Off by default.
+ *
+ * This validates the layer the new syscalls sit on - send, blocking and
+ * non-blocking receive, payload integrity, and the shared-memory
+ * create/attach path - synchronously on the boot thread, so it does not
+ * depend on the scheduler running another thread first. It does NOT by
+ * itself prove the syscall wrappers marshal correctly (that needs a real
+ * userspace client); it proves the thing they call is sound, which is
+ * the half that would otherwise be hardest to debug through a syscall
+ * boundary. */
+#ifndef COS_VALIDATION_IPC_TEST
+#define COS_VALIDATION_IPC_TEST 0
+#endif
+#if COS_VALIDATION_IPC_TEST
+    {
+        serial_puts("[IPCTEST] starting\n");
+        int failures = 0;
+
+        process_t *self = process_get_current();
+        uint64_t self_pid = self ? self->pid : 0;
+        serial_puts("[IPCTEST] self_pid=");
+        serial_putdec(self_pid);
+        serial_puts("\n");
+
+        /* Send to self, then receive - the simplest complete round trip
+         * that exercises enqueue, the semaphore, and dequeue. */
+        static const char payload[] = "ipc-roundtrip-payload";
+        int rc = ipc_send(self_pid, 0x1234, payload, sizeof(payload));
+        if (rc != IPC_SUCCESS) {
+            ++failures;
+            serial_puts("[IPCTEST] send FAILED rc="); serial_putdec((uint64_t)(int64_t)rc);
+            serial_puts("\n");
+        } else {
+            uint64_t src = 0, type = 0, len = sizeof(payload);
+            char rxbuf[64];
+            memset(rxbuf, 0, sizeof(rxbuf));
+            /* Non-blocking-ish: a short timeout rather than WAIT_FOREVER,
+             * so a bug here cannot hang the entire boot. */
+            rc = ipc_receive(&src, &type, rxbuf, &len, 1000);
+            if (rc != IPC_SUCCESS) {
+                ++failures;
+                serial_puts("[IPCTEST] recv FAILED rc=");
+                serial_putdec((uint64_t)(int64_t)rc); serial_puts("\n");
+            } else {
+                bool ok = (src == self_pid) && (type == 0x1234) &&
+                          (len == sizeof(payload)) &&
+                          (memcmp(rxbuf, payload, sizeof(payload)) == 0);
+                if (!ok) {
+                    ++failures;
+                    serial_puts("[IPCTEST] roundtrip MISMATCH src=");
+                    serial_putdec(src); serial_puts(" type=");
+                    serial_putdec(type); serial_puts(" len=");
+                    serial_putdec(len); serial_puts("\n");
+                } else {
+                    serial_puts("[IPCTEST] roundtrip OK\n");
+                }
+            }
+        }
+
+        /* An empty queue must report a timeout rather than blocking
+         * forever or inventing a message - the distinction the syscall
+         * layer deliberately preserves in rax. */
+        {
+            uint64_t src = 0, type = 0, len = 8;
+            char tmp[8];
+            int trc = ipc_receive(&src, &type, tmp, &len, 50);
+            if (trc != IPC_ERROR_TIMEOUT) {
+                ++failures;
+                serial_puts("[IPCTEST] empty-queue expected TIMEOUT, got rc=");
+                serial_putdec((uint64_t)(int64_t)trc); serial_puts("\n");
+            } else {
+                serial_puts("[IPCTEST] empty-queue timeout OK\n");
+            }
+        }
+
+        /* Shared memory: create, attach, write, read back. This is the
+         * path a GUI server would use for a framebuffer, where the 1 KiB
+         * message limit is far too small.
+         *
+         * SKIPPED when running as a kernel-type process. Shared memory
+         * maps pages into the CALLER'S USER ADDRESS SPACE, and
+         * process_create() deliberately gives TASK_TYPE_KERNEL processes
+         * no page directory at all (task.c: `page_dir = (type ==
+         * TASK_TYPE_KERNEL) ? NULL : paging_create_directory()`), so
+         * ipc_request_shared_memory() correctly refuses with
+         * PERMISSION_DENIED. That is right behaviour, not a defect - a
+         * kernel thread has no user address space for a user mapping to
+         * live in. This hook runs on the boot thread, which is exactly
+         * such a process, so the honest thing is to skip and say so
+         * rather than report a failure that is really a property of
+         * where the test runs. Exercising this path for real needs a
+         * userspace client calling SYS_SHM_CREATE. */
+        if (self && self->page_dir == NULL) {
+            serial_puts("[IPCTEST] shm SKIPPED: kernel-type process has no user "
+                        "address space to map into (expected; needs a userspace "
+                        "client to exercise)\n");
+        } else {
+            uint64_t shm_id = 0;
+            int src_rc = ipc_request_shared_memory(8192, &shm_id);
+            if (src_rc != IPC_SUCCESS) {
+                ++failures;
+                serial_puts("[IPCTEST] shm_create FAILED rc=");
+                serial_putdec((uint64_t)(int64_t)src_rc); serial_puts("\n");
+            } else {
+                uint64_t addr = 0;
+                int arc = ipc_attach_shared_memory(shm_id, &addr);
+                if (arc != IPC_SUCCESS || addr == 0) {
+                    ++failures;
+                    serial_puts("[IPCTEST] shm_attach FAILED rc=");
+                    serial_putdec((uint64_t)(int64_t)arc); serial_puts("\n");
+                } else {
+                    volatile uint8_t *p = (volatile uint8_t *)(uintptr_t)addr;
+                    bool ok = true;
+                    for (int i = 0; i < 4096; ++i) p[i] = (uint8_t)(i & 0xFF);
+                    for (int i = 0; i < 4096; ++i) {
+                        if (p[i] != (uint8_t)(i & 0xFF)) { ok = false; break; }
+                    }
+                    if (!ok) {
+                        ++failures;
+                        serial_puts("[IPCTEST] shm readback MISMATCH\n");
+                    } else {
+                        serial_puts("[IPCTEST] shm create/attach/rw OK\n");
+                    }
+                }
+            }
+        }
+
+        serial_puts("[IPCTEST] ");
+        serial_puts(failures == 0 ? "PASSED" : "FAILED");
+        serial_puts("\n");
+    }
+#endif /* COS_VALIDATION_IPC_TEST */
+
+/* Spawns Server/fileserver/fileserver.c-os and Server/testclients/
+ * fileclient.c-os as two independently-scheduled userspace processes,
+ * proving the SYS_IPC_* syscalls (COS_VALIDATION_IPC_TEST above proves
+ * only the layer beneath them, called directly from kernel context) work
+ * across the real syscall boundary between two separate processes. Off
+ * by default; kept as its own flag rather than folded into
+ * COS_VALIDATION_SUITE so it can be run in isolation, without the many
+ * other spawned test programs that flag brings along competing for
+ * scheduling time. */
+#ifndef COS_VALIDATION_FILESERVER_TEST
+#define COS_VALIDATION_FILESERVER_TEST 0
+#endif
+#if COS_VALIDATION_FILESERVER_TEST
+    {
+        extern void spawn_cos_fileserver_test(void);
+        spawn_cos_fileserver_test();
+    }
+#endif
+
+/* Empirical proof the NX fix in task_handle_page_fault() (task.c)
+ * actually works - see Server/testclients/nx_probe.c and
+ * spawn_cos_nx_probe_test() (userspace_demo.c) for exactly what this
+ * checks and why. Off by default; its own dedicated flag rather than
+ * folded into COS_VALIDATION_FILESERVER_TEST so it can be run alone. */
+#ifndef COS_VALIDATION_NX_PROBE
+#define COS_VALIDATION_NX_PROBE 0
+#endif
+#if COS_VALIDATION_NX_PROBE
+    {
+        extern void spawn_cos_nx_probe_test(void);
+        spawn_cos_nx_probe_test();
+    }
+#endif
+
+/* Spawns Server/apps/hello_app.c-os - the first real, standalone .c-os
+ * GUI application - through the SAME path a user double-clicking it in
+ * the file manager would use (gui_open_file_in_app() ->
+ * cos_launch_elf_file()), not the embedded-image spawn every other test
+ * program on this page uses. Unlike COS_VALIDATION_HTML_STRESS/
+ * COS_VALIDATION_GUARD_PAGE_TEST above, this does NOT skip gui_main -
+ * the whole point is seeing this app's WIN_COS_APP window actually
+ * composited onto a normally-running desktop, which needs gui_main's
+ * own render loop active to happen at all. */
+#ifndef COS_VALIDATION_HELLO_APP_TEST
+#define COS_VALIDATION_HELLO_APP_TEST 0
+#endif
+#if COS_VALIDATION_HELLO_APP_TEST
+    {
+        extern void spawn_cos_hello_app_test(void);
+        spawn_cos_hello_app_test();
+    }
+#endif
+
+#if COS_VALIDATION_HEAP_EXTENSION_TEST
+    {
+        extern uint64_t cos_heap_get_total_size(void);
+        uint64_t heap_size = cos_heap_get_total_size();
+        serial_puts("[HEAPTEST] starting: exhaust the main heap, then verify "
+                    "the extension allocator\n");
+
+        /* Sized to comfortably exceed HEAP_SIZE (512 MiB) well before the
+         * fixed-size array below runs out of slots - 600 * 1 MiB = 600 MiB,
+         * intentionally more than the whole main heap by itself. */
+        #define COS_HEAPTEST_BLOCK_SIZE (1u * 1024u * 1024u)
+        #define COS_HEAPTEST_BLOCK_COUNT 600
+        static void *heaptest_blocks[COS_HEAPTEST_BLOCK_COUNT];
+        int allocated = 0;
+        int extension_hits = 0;
+        int failures = 0;
+
+        for (int i = 0; i < COS_HEAPTEST_BLOCK_COUNT; ++i) {
+            heaptest_blocks[i] = kmalloc(COS_HEAPTEST_BLOCK_SIZE);
+            if (!heaptest_blocks[i]) {
+                /* Expected once both the main heap AND the extension's
+                 * own cap are exhausted - not itself a failure, just the
+                 * natural end of available capacity for this test size. */
+                serial_puts("[HEAPTEST] allocation stopped at i=");
+                serial_putdec((uint64_t)i);
+                serial_puts(" (heap + extension capacity reached)\n");
+                break;
+            }
+            ++allocated;
+
+            /* A distinct, position-dependent byte pattern - not just a
+             * constant fill, which could pass even if writes silently
+             * landed on the SAME physical page for every allocation (a
+             * real bug this specific pattern would catch: each block's
+             * first byte encodes which allocation it is). */
+            uint8_t pattern = (uint8_t)(i & 0xFF);
+            memset(heaptest_blocks[i], pattern, COS_HEAPTEST_BLOCK_SIZE);
+
+            if ((uint64_t)i * COS_HEAPTEST_BLOCK_SIZE > heap_size) {
+                ++extension_hits;
+            }
+        }
+
+        serial_puts("[HEAPTEST] allocated ");
+        serial_putdec((uint64_t)allocated);
+        serial_puts(" blocks (");
+        serial_putdec((uint64_t)allocated * COS_HEAPTEST_BLOCK_SIZE / (1024 * 1024));
+        serial_puts(" MiB total)\n");
+
+        /* Verify EVERY allocated block's pattern before freeing anything -
+         * corruption in one block (e.g. an overlapping mapping) could
+         * otherwise be masked by freeing the very block that would have
+         * revealed it. */
+        for (int i = 0; i < allocated; ++i) {
+            uint8_t expected = (uint8_t)(i & 0xFF);
+            uint8_t *bytes = (uint8_t *)heaptest_blocks[i];
+            bool ok = true;
+            /* Sampled, not byte-by-byte over a full MiB per block - this
+             * is a correctness check on addressability and isolation,
+             * not a full memory scrub, and 600 MiB of byte-by-byte
+             * verification would itself cost real boot time. */
+            for (size_t off = 0; off < COS_HEAPTEST_BLOCK_SIZE; off += 4096) {
+                if (bytes[off] != expected) { ok = false; break; }
+            }
+            if (!ok) {
+                ++failures;
+                serial_puts("[HEAPTEST] CORRUPTION at block i=");
+                serial_putdec((uint64_t)i);
+                serial_puts("\n");
+            }
+        }
+
+        /* Free in a deliberately mixed order - every third block first,
+         * then the rest - rather than strictly forward or backward, so
+         * this is not accidentally only testing the easiest case for
+         * whichever allocator (main heap or extension) happens to prefer
+         * one direction. */
+        for (int i = 0; i < allocated; i += 3) {
+            kfree(heaptest_blocks[i]);
+            heaptest_blocks[i] = NULL;
+        }
+        for (int i = 0; i < allocated; ++i) {
+            if (heaptest_blocks[i]) {
+                kfree(heaptest_blocks[i]);
+                heaptest_blocks[i] = NULL;
+            }
+        }
+
+        /* The main heap's own freed space must still be usable - this
+         * would fail if the extension work had corrupted anything in the
+         * main heap's free-list/coalescing state on the way. */
+        void *sanity = kmalloc(4096);
+        bool sanity_ok = (sanity != NULL);
+        if (sanity) {
+            memset(sanity, 0x42, 4096);
+            uint8_t *sb = (uint8_t *)sanity;
+            for (int i = 0; i < 4096 && sanity_ok; ++i) {
+                if (sb[i] != 0x42) sanity_ok = false;
+            }
+            kfree(sanity);
+        }
+
+        serial_puts("[HEAPTEST] extension_hits=");
+        serial_putdec((uint64_t)extension_hits);
+        serial_puts(" corruption_failures=");
+        serial_putdec((uint64_t)failures);
+        serial_puts(" post_free_sanity_alloc=");
+        serial_puts(sanity_ok ? "OK" : "FAILED");
+        serial_puts("\n[HEAPTEST] ");
+        serial_puts((failures == 0 && sanity_ok) ? "PASSED" : "FAILED");
+        serial_puts("\n");
+    }
+#endif /* COS_VALIDATION_HEAP_EXTENSION_TEST */
+
+/* Deliberate, deterministic guard-page test. Off by default; exists to
+ * answer one narrow question without depending on a large real-world
+ * page or a slow build: does IST1 (see gdt.c/idt.c) actually let the
+ * kernel survive - as a clean, logged, attributable fault - a kernel
+ * thread genuinely walking off the bottom of its own stack into the
+ * unmapped guard page, rather than escalating to a double or triple
+ * fault?
+ *
+ * A too-small (16 KiB) stack plus unbounded recursion is guaranteed to
+ * hit the guard page quickly and reproducibly, which the real-world
+ * page tests earlier in this investigation could not promise - whether
+ * THEY overflowed depended on that page's specific markup shape.
+ *
+ * Declared here (off by default); the thread itself is created further
+ * down, alongside gui_main_thread_handle - see the comment there for
+ * why: this test thread lost a CPU-time race against a busy desktop
+ * for over a minute of wall-clock time without completing a few
+ * hundred loop iterations of trivial work, so gui_main is skipped for
+ * this run the same way COS_VALIDATION_HTML_STRESS already does. */
+#ifndef COS_VALIDATION_GUARD_PAGE_TEST
+#define COS_VALIDATION_GUARD_PAGE_TEST 0
+#endif
+
+/* COS_VALIDATION_HTML_STRESS: the boot-time HTML/CSS/DOM/layout stress
+ * test. Declared here (off by default) but no longer CALLED from this
+ * point - see the thread creation block below, right alongside
+ * gui_main_thread_handle, for why it moved and what runs it now. */
+#ifndef COS_VALIDATION_HTML_STRESS
+#define COS_VALIDATION_HTML_STRESS 0
+#endif
+
+#if COS_VALIDATION_SUITE
+    /* Heap + file syscall test. Runs after fs_init() because it writes and
+     * reads a real file on the FAT32 volume. */
+    extern void spawn_cos_memfile_test(void);
+    spawn_cos_memfile_test();
+
+    extern void spawn_cos_spawner_test(void);
+    spawn_cos_spawner_test();
+
+    extern void spawn_cos_waitpid_test(void);
+    spawn_cos_waitpid_test();
+
+    extern void spawn_cos_library_test(void);
+    spawn_cos_library_test();
+
+    extern void spawn_cos_untouched_test(void);
+    spawn_cos_untouched_test();
+
+    extern void spawn_cos_fd_test(void);
+    spawn_cos_fd_test();
+
+    extern void spawn_cos_signal_test(void);
+    spawn_cos_signal_test();
+
+    extern void spawn_cos_sigkill_test(void);
+    spawn_cos_sigkill_test();
+
+    extern void spawn_cos_extsym_test(void);
+    spawn_cos_extsym_test();
+
+    extern void spawn_cos_mmap_test(void);
+    spawn_cos_mmap_test();
+
+    extern void spawn_cos_mmap_write_fault_test(void);
+    spawn_cos_mmap_write_fault_test();
+    /* Proof of survival: launched right after the deliberate fault. */
+    extern void spawn_cos_elf_process(void);
+    spawn_cos_elf_process();
+
+    extern void spawn_cos_multiwaiter_test(void);
+    spawn_cos_multiwaiter_test();
+
+    extern void spawn_cos_signest_test(void);
+    spawn_cos_signest_test();
+
+    /* Deliberately LAST in the boot sequence: newly created windows
+     * become the focused window (active_window = window_count - 1, see
+     * gui_render_loop.c), so any window-creating test that runs AFTER
+     * this one would steal focus before external keyboard input (e.g.
+     * QMP send-key during interactive validation) could ever reach it.
+     * Confirmed as the actual cause of an earlier failed modifier-key
+     * test: modtest.c-os ran early, several later tests (mmap,
+     * mmap-write-fault) create their own windows, and by the time keys
+     * were sent focus had long since moved on. */
+    extern void spawn_cos_ctest(void);
+    spawn_cos_ctest();
+
+    extern void spawn_cos_deptest(void);
+    spawn_cos_deptest();
+
+    extern void spawn_cos_advtest(void);
+    spawn_cos_advtest();
+
+    extern void spawn_cos_libtest(void);
+    spawn_cos_libtest();
+
+    extern void spawn_cos_modtest(void);
+    spawn_cos_modtest();
+#endif /* COS_VALIDATION_SUITE */
+
+    serial_puts("[KERNEL] Initializing storage manager...\n");
+    (void)storage_manager_init();
+
+    serial_puts("[KERNEL] Initializing persistent config manager...\n");
+    (void)config_manager_init();
+    
+    /* Initialize TinyCC compiler for in-OS C compilation */
+    serial_puts("[KERNEL] TinyCC moved to userland - skipping kernel init\n");
+    
+    (void)calc_engine_init();
+
+    /* Initialize Security & Permissions before login screen */
+    extern int permission_manager_init(void);
+    serial_puts("[KERNEL] Initializing security systems...\n");
+    permission_manager_init();
+    gui_boot_progress("Securing the system");
+
+    serial_puts("[KERNEL] Initializing keyboard (PS/2)...\n");
+    keyboard_init();
+    gui_boot_progress("Almost there");
+
+// Interrupts already enabled after scheduler/tasking init.
+
+    /* NOTE: The boot password screen has been intentionally disabled.
+     * It ran a blocking event loop (see password_screen_enhanced.c) that
+     * waited on keyboard input before boot could continue; any stall in
+     * that loop (e.g. timer ticks not advancing, no keyboard event ever
+     * arriving) made the whole system appear to hang during boot.
+     * password_screen_show()/password_screen_init() are left in the tree
+     * and can be re-enabled later, but boot no longer depends on them. */
+    serial_puts("[KERNEL] Boot password screen disabled; skipping directly to desktop\n");
+
+    serial_puts("[KERNEL] Entering the modern desktop...\n");
+    // storage_sync is intentionally deferred until storage backend is confirmed healthy.
+    // cos_power_init();
+
+#if COS_ENABLE_FULL_DESKTOP
+    serial_puts("[KERNEL] Initializing GUI...\n");
+    gui_init();
+
+    /* Validation-only: opens the bundled sample photo in the standalone
+     * Image Viewer window (after gui_init() has populated the virtual
+     * desktop filesystem entries) so a boot screenshot can confirm the
+     * aspect-ratio fit fix and IDCT fast path in jpeg_viewer.c render
+     * correctly. Never enabled for a distribution image - see
+     * VALIDATION_OPEN_IMAGE_VIEWER in the root Makefile. */
+#if COS_VALIDATION_OPEN_IMAGE_VIEWER
+    extern void gui_open_file_in_app(const char* path, int file_type);
+    serial_puts("[VALIDATION] opening /desktop/test.webp in the Image Viewer\n");
+    gui_open_file_in_app("/desktop/test.webp", 0);
+#endif
+
+/* Validation-only: merges the first two desktop icons into an app
+ * folder and opens it, so a boot screenshot can confirm the folder
+ * tile (3x3 mini preview) and the open overlay (spring animation
+ * settled at its end state, frosted-glass translucency, full-size
+ * icons) all render correctly. Never enabled for a distribution image -
+ * see VALIDATION_CREATE_APP_FOLDER in the root Makefile. */
+#ifndef COS_VALIDATION_CREATE_APP_FOLDER
+#define COS_VALIDATION_CREATE_APP_FOLDER 0
+#endif
+#if COS_VALIDATION_CREATE_APP_FOLDER
+    {
+        extern bool gui_app_folder_try_merge(int source_idx, int target_idx);
+        extern void gui_app_folder_open(int desktop_icon_index);
+        serial_puts("[VALIDATION] merging desktop icons 0 and 1 into an app folder\n");
+        if (gui_app_folder_try_merge(0, 1)) {
+            /* Merging (source=0, target=1) removes index 0 from the
+             * desktop array and compacts it - the folder, which was
+             * created at the target's slot (index 1), shifts down to
+             * index 0 as a result. */
+            gui_app_folder_open(0);
+            serial_puts("[VALIDATION] app folder created and opened\n");
+        } else {
+            serial_puts("[VALIDATION] app folder merge FAILED\n");
+        }
+    }
+#endif
+
+/* Validation-only: opens Settings, jumps to the "GUI" tab (which has
+ * enough content to overflow a normal-sized window), and scrolls it
+ * partway down, so a boot screenshot can confirm the scrollbar thumb
+ * renders in the right place and content is reachable. Never enabled
+ * for a distribution image - see VALIDATION_OPEN_SETTINGS_SCROLL_TEST
+ * in the root Makefile. */
+#ifndef COS_VALIDATION_OPEN_SETTINGS_SCROLL_TEST
+#define COS_VALIDATION_OPEN_SETTINGS_SCROLL_TEST 0
+#endif
+#if COS_VALIDATION_OPEN_SETTINGS_SCROLL_TEST
+    {
+        extern int gui_find_window(int kind);
+        serial_puts("[VALIDATION] opening Settings and scrolling the GUI tab\n");
+        window_t* sw = gui_open_window(WIN_SETTINGS, gui_text("Settings", "設定"), 80, 60, 560, 420);
+        if (sw) {
+            int idx = gui_find_window(WIN_SETTINGS);
+            if (idx >= 0) {
+                windows[idx].settings_tab = 14; /* GUI tab */
+                windows[idx].settings_scroll = 90;
+                serial_puts("[VALIDATION] Settings opened at GUI tab, scroll=90\n");
+            }
+        } else {
+            serial_puts("[VALIDATION] Settings open FAILED\n");
+        }
+    }
+#endif
+
+/* Validation-only: opens the browser's built-in home page so a boot
+ * screenshot can show real rendered text (headings, body copy, links -
+ * a mix of sizes/weights) for inspecting cos_ns_font.c's output.
+ * Never enabled for a distribution image - see
+ * VALIDATION_OPEN_BROWSER_TEST in the root Makefile. */
+#ifndef COS_VALIDATION_OPEN_BROWSER_TEST
+#define COS_VALIDATION_OPEN_BROWSER_TEST 0
+#endif
+#if COS_VALIDATION_OPEN_BROWSER_TEST
+    {
+        serial_puts("[VALIDATION] opening NetSurf browser (c-os://home)\n");
+        window_t* bw = gui_open_window(WIN_BROWSER, gui_text("NetSurf", "NetSurf"), 40, 40, 960, 680);
+        if (!bw) {
+            serial_puts("[VALIDATION] Browser open FAILED\n");
+        }
+    }
+#endif
+
+/* Validation-only: opens a text editor window and forces XS font size,
+ * so a boot screenshot can show real rendered text at the new
+ * below-Small size next to the window chrome (which stays at whatever
+ * size it already was) for a size comparison. Never enabled for a
+ * distribution image - see VALIDATION_FORCE_XS_FONT in the root
+ * Makefile. */
+#ifndef COS_VALIDATION_FORCE_XS_FONT
+#define COS_VALIDATION_FORCE_XS_FONT 0
+#endif
+#if COS_VALIDATION_FORCE_XS_FONT
+    {
+        /* The flag's value is the pixel width to force (1..32). */
+        serial_puts("[VALIDATION] forcing font pixel width and opening a text editor\n");
+        gui_set_font_pixel_width(COS_VALIDATION_FORCE_XS_FONT);
+        serial_puts("[VALIDATION] vga_get_font_width()=");
+        serial_putdec(vga_get_font_width());
+        serial_puts("\n");
+        gui_open_window(WIN_TEXT_EDITOR, gui_text("Text Editor", "テキストエディタ"), 60, 60, 640, 420);
+    }
+#endif
+/* Validation-only: bring up VirtIO-GPU, then run the VirGL self-test so
+ * a screenshot can confirm the host GPU (not the CPU) produced the
+ * frame. See virtio_gpu_virgl_selftest(). */
+#ifndef COS_VALIDATION_VIRGL_SELFTEST
+#define COS_VALIDATION_VIRGL_SELFTEST 0
+#endif
+#if COS_VALIDATION_VIRGL_SELFTEST
+    {
+        extern bool virtio_gpu_virgl_selftest(void);
+        serial_puts("[VALIDATION] VirGL selftest: enabling GPU backend\n");
+        gui_set_render_backend(1);
+        serial_puts(virtio_gpu_virgl_selftest() ? "[VALIDATION] VirGL selftest PASSED\n"
+                                                : "[VALIDATION] VirGL selftest FAILED\n");
+    }
+#endif
+/* Validation-only: GPU draw mode step 1. Opens two windows so there is
+ * real window chrome on screen, then (value 1) switches rectangle fills
+ * to the host GPU via VirGL, or (value 2) leaves the same scene on the
+ * CPU path for a side-by-side comparison. */
+#ifndef COS_VALIDATION_VIRGL_GPU_FILL
+#define COS_VALIDATION_VIRGL_GPU_FILL 0
+#endif
+#if COS_VALIDATION_VIRGL_GPU_FILL
+    {
+        gui_open_window(WIN_SETTINGS, gui_text("Settings", "設定"), 360, 70, 600, 440);
+        gui_open_window(WIN_TEXT_EDITOR, gui_text("Text Editor", "テキストエディタ"), 140, 250, 520, 360);
+        if (COS_VALIDATION_VIRGL_GPU_FILL == 1) {
+            gui_set_render_backend(1);
+            serial_puts(vga_set_gpu_draw(true) ? "[VALIDATION] GPU fill mode ON\n"
+                                                : "[VALIDATION] GPU fill mode FAILED\n");
+            extern bool g_diag_cursor_watch;
+            g_diag_cursor_watch = true;
+        } else if (COS_VALIDATION_VIRGL_GPU_FILL == 3) {
+            /* Simple (present-only, no VirGL/shader) GPU backend - the
+             * one already reachable from Settings today. */
+            gui_set_render_backend(1);
+            serial_puts("[VALIDATION] simple GPU present-only backend selected\n");
+        } else {
+            serial_puts("[VALIDATION] GPU fill comparison scene (CPU path)\n");
+        }
+        extern bool gui_app_folder_try_merge(int source_idx, int target_idx);
+        extern void gui_app_folder_open(int desktop_icon_index);
+        if (gui_app_folder_try_merge(0, 1)) {
+            gui_app_folder_open(0);
+            serial_puts("[VALIDATION] app folder opened over GPU scene\n");
+        }
+    }
+#endif
+#ifndef COS_VALIDATION_VIRGL_ALPHA_PROBE
+#define COS_VALIDATION_VIRGL_ALPHA_PROBE 0
+#endif
+#if COS_VALIDATION_VIRGL_ALPHA_PROBE
+    {
+        gui_set_render_backend(1);
+        extern bool vga_set_gpu_draw(bool);
+        extern bool virtio_gpu_virgl_alpha_blit_selftest(void);
+        serial_puts("[VALIDATION] running VirGL alpha-blit probe\n");
+        if (vga_set_gpu_draw(true)) {
+            virtio_gpu_virgl_alpha_blit_selftest();
+            extern bool virtio_gpu_virgl_shader_blend_selftest(void);
+            virtio_gpu_virgl_shader_blend_selftest();
+        } else {
+            serial_puts("[VALIDATION] GPU draw mode unavailable\n");
+        }
+    }
+#endif
+#ifndef COS_VALIDATION_GPU_ROUNDTRIP
+#define COS_VALIDATION_GPU_ROUNDTRIP 0
+#endif
+#if COS_VALIDATION_GPU_ROUNDTRIP
+    {
+        serial_puts("[VALIDATION] GPU roundtrip: CPU -> GPU -> CPU\n");
+        serial_puts(gui_set_render_backend(1) ? "[VALIDATION] GPU on ok\n" : "[VALIDATION] GPU on FAILED\n");
+        gui_set_render_backend(0);
+        serial_puts("[VALIDATION] back on CPU\n");
+    }
+#endif
+#ifndef COS_VALIDATION_BROWSER_URL
+#define COS_VALIDATION_BROWSER_URL 0
+#endif
+#if COS_VALIDATION_BROWSER_URL
+    {
+        (void)gui_open_window(WIN_BROWSER, "NetSurf", 20, 20, 980, 700);
+        serial_puts("[VALIDATION] browser opened; navigation deferred until DNS is configured\n");
+    }
+#endif
+/* Validation-only: writes known test tones to the disk and plays one
+ * through the real music backend (1 = 440 Hz WAV, 2 = 880 Hz MP3), so the
+ * AC97 output can be recorded by QEMU (-audiodev wav) and checked by FFT. */
+#ifndef COS_VALIDATION_AUDIO_TEST
+#define COS_VALIDATION_AUDIO_TEST 0
+#endif
+#if COS_VALIDATION_AUDIO_TEST
+    {
+#include "cos_test_wav.h"
+#include "cos_test_mp3.h"
+        extern bool fs_write_file_at(const char* dir, const char* name, const char* data, uint64_t size);
+        extern int mk_mp3_load_file(const char* filename);
+        extern int mk_mp3_play(void);
+        bool w1 = fs_write_file_at("/desktop", "t440.wav", (const char*)cos_test_wav, cos_test_wav_len);
+        bool w2 = fs_write_file_at("/desktop", "t880.mp3", (const char*)cos_test_mp3, cos_test_mp3_len);
+        serial_puts(w1 && w2 ? "[VALIDATION] audio test files written\n" : "[VALIDATION] audio test file write FAILED\n");
+        const char* path = (COS_VALIDATION_AUDIO_TEST == 1) ? "/desktop/t440.wav" : "/desktop/t880.mp3";
+        serial_puts("[VALIDATION] playing ");
+        serial_puts(path);
+        serial_puts("\n");
+        int lr = mk_mp3_load_file(path);
+        int pr = mk_mp3_play();
+        serial_puts(lr == 0 && pr == 0 ? "[VALIDATION] load+play returned 0\n" : "[VALIDATION] load/play returned error\n");
+    }
+#endif
+#ifndef COS_VALIDATION_GPU_FULL_SETTINGS
+#define COS_VALIDATION_GPU_FULL_SETTINGS 0
+#endif
+#if COS_VALIDATION_GPU_FULL_SETTINGS
+    {
+        window_t* sw = gui_open_window(WIN_SETTINGS, gui_text("Settings", "設定"), 200, 60, 760, 560);
+        if (sw) sw->settings_tab = 14;
+        serial_puts("[VALIDATION] Settings opened on Display tab for GPU (Full) button test\n");
+    }
+#endif
+
+#ifndef COS_VALIDATION_GPU_FINISH
+#define COS_VALIDATION_GPU_FINISH 0
+#endif
+#if COS_VALIDATION_GPU_FINISH
+    {
+        gui_set_render_backend(1);
+        serial_puts(gui_set_gpu_full_draw(true) ? "[VALIDATION] GPU (Full) forced ON\n" : "[VALIDATION] GPU (Full) FAILED\n");
+        (void)gui_open_window(WIN_PAINT, gui_text("Paint", "ペイント"), 40, 40, 520, 420);
+        (void)gui_open_window(WIN_FILE_MGR, gui_text("Files", "ファイル"), 580, 40, 420, 460);
+        serial_puts("[VALIDATION] GPU-finish scene: Paint + File Manager (drive to thumbnails via real clicks)\n");
+    }
+#endif
+
+    init_gui_done = gui_is_initialized();
+    if (init_gui_done) {
+        serial_puts("[KERNEL] Entering GUI main loop...\n");
+        gui_sync_desktop_with_fs();
+        /* Run the GUI update loop as a real scheduled kernel thread
+         * (gui_main_thread below) instead of directly on the boot
+         * stack. A second demo thread (demo_heartbeat_thread) is
+         * created alongside it purely so the preemptive scheduler has
+         * more than one runnable thread to actually switch between -
+         * proof that multitasking is live, not just wired up and
+         * sitting idle. Once both are created, this original boot path
+         * has nothing further to do: the very next timer tick hands
+         * control to gui_main_thread (see the scheduler_switch_task
+         * fix for the prev==NULL case) and this stack is abandoned. */        bool gui_workers_ok = true;
+        /* gui_main is where cos_netsurf_browser_poll() and, through it,
+         * every bit of NetSurf's HTML/CSS/layout pipeline and the QuickJS
+         * interpreter actually run (see gui_update() in gui_lifecycle.c) -
+         * real pages put far more native C call depth on this thread than
+         * the KERNEL_STACK_SIZE (512 KiB) default sized for a typical small
+         * kernel worker. That mismatch let a JS-heavy page overrun the real
+         * stack silently: QuickJS's own recursion guard defaults to a 1 MiB
+         * budget (JS_DEFAULT_STACK_SIZE) whenever nothing configures it
+         * otherwise, so on an 8 KiB stack it could never actually trip
+         * before the real memory beneath the stack was already corrupted.
+         * GUI_MAIN_STACK_SIZE below gives this thread real headroom, and
+         * cos_js_new_context() in quickjs_port.c calls JS_SetMaxStackSize()
+         * with a matching, conservative budget so QuickJS's own guard is
+         * finally checking against a real number instead of a fictional
+         * one 128x too large for what actually exists. */
+        thread_t* gui_main_thread_handle;
+#if COS_VALIDATION_HTML_STRESS || COS_VALIDATION_GUARD_PAGE_TEST
+        /* This diagnostic thread and gui_main's own per-frame
+         * cos_netsurf_browser_poll()/redraw() calls both drive the SAME
+         * single, global, non-reentrant browser_window state
+         * (g_cos_ns_bw in cos_netsurf_browser.c - there is no facility
+         * in this codebase for two independent browsing sessions). Running
+         * both at once would not test the stack fix in isolation; it would
+         * introduce a genuine, unrelated data race on top of it and make
+         * any result untrustworthy either way. Since this build mode is
+         * off by default and exists solely to exercise this one pipeline
+         * under real conditions, gui_main is skipped for this run rather
+         * than given something harmless to do - the desktop compositing
+         * it would otherwise provide is a deliberate, documented sacrifice
+         * specific to this diagnostic configuration, not something a
+         * normal boot ever does without.
+         *
+         * COS_VALIDATION_GUARD_PAGE_TEST shares this same skip for a
+         * different reason: its test thread has no data race with
+         * gui_main, but it DOES have to compete for CPU with it on this
+         * scheduler's default priority - measured directly, a busy
+         * desktop left it running for over a minute of wall-clock time
+         * without completing even a few hundred loop iterations of
+         * trivial work. Skipping gui_main here is what makes the test
+         * finish in a practical amount of time, not a workaround for a
+         * bug in the guard page itself. */
+        gui_main_thread_handle = NULL;
+#if COS_VALIDATION_HTML_STRESS
+        serial_puts("[STRESS] gui_main skipped this boot: COS_VALIDATION_HTML_STRESS "
+                    "runs exclusively against the shared NetSurf browser-window "
+                    "state to avoid racing gui_main's own use of it\n");
+#else
+        serial_puts("[GUARDTEST] gui_main skipped this boot so the guard-page "
+                    "test thread is not starved of CPU time by the desktop\n");
+#endif
+#else
+        gui_main_thread_handle = thread_create_kernel_stack_size(
+            "gui_main", (void*)gui_main_thread, NULL, GUI_MAIN_STACK_SIZE);
+#endif
+        thread_t* demo_heartbeat_thread_handle = thread_create_kernel("demo_heartbeat", (void*)demo_heartbeat_thread, NULL);
+        if (!gui_main_thread_handle || !demo_heartbeat_thread_handle) {
+            gui_workers_ok = false;
+        }
+
+#if COS_VALIDATION_HTML_STRESS
+        /* Runs as a real kernel thread, on GUI_MAIN_STACK_SIZE - the
+         * SAME stack mechanism and SAME size gui_main itself uses (and,
+         * for this run, in gui_main's place - see immediately above) -
+         * so a survival here is evidence about the real browsing path,
+         * not a separate, differently-protected boot-time shortcut. Not
+         * gated into gui_workers_ok: a failure here should not be
+         * treated as a normal-boot failure, since this whole
+         * configuration already deliberately forgoes normal boot's
+         * desktop thread. */
+        extern void cos_netsurf_run_boot_html_stress_test_thread(void *arg);
+        /* Stack size for THIS thread specifically, separate from
+         * GUI_MAIN_STACK_SIZE, so the real question this investigation
+         * still has open - why does this real page's pipeline use as
+         * much stack as it does, and is it legitimate deep recursion or
+         * a runaway bug - can be answered directly: run it on a
+         * deliberately smaller stack, let the guard page + IST (see
+         * this file's own investigation notes) catch the resulting
+         * fault cleanly, and read the real RIP it reports instead of
+         * inferring depth from address arithmetic against unrelated
+         * static data the way the original reproduction had to.
+         *
+         * Defaults to GUI_MAIN_STACK_SIZE (this is what real browsing
+         * actually uses); override at build time to force a fault at a
+         * specific, controlled depth. */
+#ifndef COS_STRESS_TEST_STACK_SIZE
+#define COS_STRESS_TEST_STACK_SIZE GUI_MAIN_STACK_SIZE
+#endif
+        if (!thread_create_kernel_stack_size("html_stress_test",
+                (void*)cos_netsurf_run_boot_html_stress_test_thread, NULL,
+                COS_STRESS_TEST_STACK_SIZE)) {
+            serial_puts("[STRESS] FAILED: could not create the test thread\n");
+        }
+#endif
+
+#if COS_VALIDATION_GUARD_PAGE_TEST
+        /* Created here, alongside gui_main_thread_handle (skipped for
+         * this run - see the comment above), rather than earlier in
+         * boot: a first attempt created it before the scheduler even
+         * started, and it lost a CPU-time race against a busy desktop
+         * for over a minute of wall-clock time without completing a
+         * few hundred loop iterations of genuinely trivial work.
+         * Skipping gui_main here is what makes this finish promptly -
+         * not a workaround for anything wrong with the guard page
+         * itself, which this test is specifically here to exercise. */
+        extern void cos_guard_page_test_thread(void *arg);
+        if (!thread_create_kernel_stack_size("guard_page_test",
+                (void*)cos_guard_page_test_thread, NULL, 16u * 1024u)) {
+            serial_puts("[GUARDTEST] FAILED: could not create the test thread\n");
+        }
+#endif
+
+        /* Notification expiry also moves off the GUI thread's own
+         * cadence and onto its own schedule - see
+         * notification_center.c for why this used to be a bug when it
+         * lived inside draw_notifications(). */
+        extern int notification_center_start_gc_thread(void);
+        if (notification_center_start_gc_thread() != 0) {
+            gui_workers_ok = false;
+        }
+
+        if (!gui_workers_ok) {
+            kernel_discard_thread(&demo_heartbeat_thread_handle);
+            kernel_discard_thread(&gui_main_thread_handle);
+        }
+
+        if (gui_workers_ok) {
+            serial_puts("[KERNEL] Enabling preemptive multitasking...\n");
+            scheduler_set_preemption(1);
+            kernel_require_preemption();
+#if COS_HTTP_RUNTIME_SMOKE
+            http_runtime_smoke_start();
+#endif
+#if COS_SCHED_PREEMPTION_PROBE
+            if (!preempt_probe_start()) {
+                serial_puts("[SCHED] PREEMPTION-PROBE setup failed\n");
+            }
+#endif
+            serial_puts("[KERNEL] Starting scheduler and abandoning boot stack...\n");
+            scheduler_start();
+
+            /* The boot thread remains the low-priority service loop after
+             * scheduling begins.  Keep network and USB progress independent
+             * of GUI rendering so DHCP/TCP receive work is not starved. */
+            while (1) {
+#if COS_ENABLE_NETWORK
+                net_poll();
+#endif
+                usb_poll();
+                cpu_idle();
+            }
+        }
+    }
+
+    serial_puts("[KERNEL] Entering text-console fallback loop...\n");
+    kernel_draw_status_screen("C-OS 4.0.8 alpha", "GUI unavailable - text fallback active");
+    if (kernel_graphics_ready()) {
+        vga_flip();
+    }
+    serial_puts("[KERNEL] Enabling preemptive multitasking...\n");
+    scheduler_set_preemption(1);
+    kernel_require_preemption();
+    serial_puts("[KERNEL] Starting scheduler (fallback mode)...\n");
+    scheduler_start();
+
+    while (1) {
+        #if COS_ENABLE_NETWORK
+        net_poll();
+        #endif
+        usb_poll();
+        cpu_idle();
+    }
+#else
+    serial_puts("[KERNEL] GUI disabled - text fallback active\n");
+    kernel_draw_status_screen("C-OS 4.0.8 alpha", "GUI disabled - serial/text fallback active");
+    if (kernel_graphics_ready()) {
+        vga_flip();
+    }
+    serial_puts("[KERNEL] Enabling preemptive multitasking...\n");
+    scheduler_set_preemption(1);
+    kernel_require_preemption();
+    serial_puts("[KERNEL] Starting scheduler (minimal mode)...\n");
+    scheduler_start();
+
+    while (1) {
+        /* network disabled */
+        cpu_hlt();
+    }
+#endif
+
+    serial_puts("[KERNEL] ERROR: fell out of main loop!\n");
+    __builtin_trap();
+}

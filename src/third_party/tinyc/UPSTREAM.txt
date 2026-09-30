@@ -1,0 +1,15 @@
+TinyCC (tcc) - upstream mob branch snapshot
+============================================
+Source:   https://repo.or.cz/tinycc.git  (branch mob)
+Commit:   9db1105c  2026-09-26  "tccgen: Stop passing wrong buffer size to pstrcat in type_to_str"
+Version:  0.9.28rc  (release_0_9_27 + 1451 commits; 0.9.27 of Dec 2017 is the last
+          *tagged* release, all real development is on mob)
+Imported: 2026-09-28. Everything except tests/, win32/, examples/, tcc-doc.texi.
+
+Why mob and not the 0.9.27 tarball: the tree that used to be here was a partial
+mob snapshot (mid Jul - early Sep 2026 file by file, labelled "0.9.27") with no
+tcctools.c, include/ or lib/, so it could not be built into a working compiler.
+
+C-OS specific changes to this tree: NONE to upstream files. C-OS-only files live
+outside it (userland/programs/tcc/). This file records the provenance; to update,
+re-import from upstream and change the commit line above.
