@@ -22,6 +22,7 @@
 #include "cos_sdk_pack.h"
 #include "cos_jpfont.h"
 #include "cos_tcc_elf.h"
+#include "cos_py2c_elf.h"
 
 extern const unsigned char cos_asset_test_c_os[];
 extern const unsigned int cos_asset_test_c_os_len;
@@ -76,6 +77,7 @@ static const char k_readme[] =
     "                  music.c-os  - Music player (MP3 / OGG / WAV)\n"
     "                  test.c-os   - Text to binary converter\n"
     "                  tcc.c-os    - TinyCC 0.9.28rc, the C compiler\n"
+    "                  Py2C.c-os   - Python to C transpiler / Studio\n"
     "/apps/samples   Sample programs (source: userland/programs/samples)\n"
     "                  ui_gallery.c-os - cos_ui drawing demo\n"
     "                  tone.c-os       - audio API demo (plays a 660 Hz tone)\n"
@@ -117,6 +119,7 @@ void cos_system_layout_ensure(void) {
     if (music && mlen) ensure_file("/bin", "music.c-os", music, mlen);
     ensure_file("/bin", "test.c-os", cos_asset_test_c_os, cos_asset_test_c_os_len);
     ensure_file("/bin", "tcc.c-os", cos_tcc_elf, cos_tcc_elf_len);
+    ensure_file("/bin", "Py2C.c-os", cos_py2c_elf, cos_py2c_elf_len);
     {   /* the File Manager (also embedded in the kernel: the desktop starts it from memory) and the CJK font it draws with */
         extern const unsigned char *cos_files_image(unsigned int *len);
         unsigned int flen = 0; const unsigned char *files = cos_files_image(&flen);

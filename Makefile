@@ -107,7 +107,8 @@ INCLUDES =  -Isrc/include -Ibuild -I$(BUILD_DIR) -I$(SRCROOT)/include -I$(SRCROO
 	-I$(SRCROOT)/third_party/tinygl/include -I$(SRCROOT)/third_party/tinygl/src \
 	-I$(SRCROOT)/kernel/ai -I$(SRCROOT)/third_party/openssl/include \
 	-I$(SRCROOT)/third_party/acpica/source/include \
-		-I$(SRCROOT)/kernel/power \
+			-I$(SRCROOT)/kernel/power \
+			-I$(SRCROOT)/third_party/Py2C/include \
 		-I$(SRCROOT)/netsurf \
 		-I$(NSALL_DIR)/libdom/include -I$(NSALL_DIR)/libwapcaplet/include \
 
@@ -136,6 +137,8 @@ else
 WIKI_STRESS_OBJ := $(OBJ_DIR)/assets/wiki_stress_page.o
 endif
 BUILD_DIR = build
+P2C_DIR = $(SRCROOT)/third_party/Py2C
+P2C_LIB = $(P2C_DIR)/build/freestanding/libpython-code-to-c-core.a
 
 # ============================================================================
 # Host toolchain detection and preflight check
@@ -178,7 +181,7 @@ check-tools:
 	fi
 SRCROOT := $(if $(wildcard src/boot/linker.ld),src,.)
 KERNEL    = kernel.elf
-ISO       = C-OS_4.0.8_alpha.iso
+ISO       = C-OS_4.0.9_alpha.iso
 # Secure Boot output is intentionally separate from the conventional hybrid
 # ISO. Signing credentials must be supplied explicitly from outside this tree.
 SECUREBOOT_DIR ?= $(BUILD_DIR)/secureboot
@@ -260,6 +263,7 @@ OBJS = \
 	$(OBJ_DIR)/kernel/irq.o \
 	$(OBJ_DIR)/kernel/irq_handlers.o \
 	$(OBJ_DIR)/kernel/shell.o \
+	$(OBJ_DIR)/kernel/p2c_integration.o \
 	$(OBJ_DIR)/kernel/system/mk_mp3_backend.o \
 	$(OBJ_DIR)/third_party/minimp3/minimp3.o \
 	$(OBJ_DIR)/bios/bios.o \
@@ -312,6 +316,7 @@ OBJS = \
 	$(OBJ_DIR)/kernel/calc_engine.o \
 	$(OBJ_DIR)/gui/core/window/gui_windows.o \
 	$(OBJ_DIR)/gui/apps/tools/http_downloader_gui.o \
+	$(OBJ_DIR)/gui/apps/tools/py2c_studio.o \
 	$(OBJ_DIR)/gui/apps/system/password_screen.o \
 	$(OBJ_DIR)/gui/apps/system/password_screen_enhanced.o \
 	$(OBJ_DIR)/gui/browser/modern_browser.o \
@@ -886,6 +891,14 @@ $(OBJ_DIR)/kernel/kernel.o: $(SRCROOT)/kernel/kernel.c | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
+$(OBJ_DIR)/kernel/p2c_integration.o: $(SRCROOT)/kernel/p2c_integration.c | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+$(OBJ_DIR)/gui/apps/tools/py2c_studio.o: $(SRCROOT)/gui/apps/tools/py2c_studio.c | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
 $(OBJ_DIR)/kernel/io.o: $(SRCROOT)/kernel/io.c | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
@@ -958,6 +971,15 @@ $(OBJ_DIR)/kernel/cos_app_window.o: $(SRCROOT)/kernel/cos_app_window.c | $(OBJ_D
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
+# Py2C is a normal ring-3 C-OS application, just like Music and C-OS Studio.
+# It is linked against the freestanding Py2C core and installed as /bin/Py2C.c-os.
+PY2C_APP_SRC := userland/programs/py2c/main.c
+$(BUILD_DIR)/py2c/Py2C.c-os: $(PY2C_APP_SRC) userland/include/cos.h userland/include/cos_ui.h $(BUILD_DIR)/userland/libcos.a $(BUILD_DIR)/userland/cos_crt0.o $(P2C_LIB) tools/cos-cc | $(BUILD_DIR)
+	mkdir -p $(dir $@)
+	tools/cos-cc -O2 -I $(P2C_DIR)/include -o $@ $(PY2C_APP_SRC) $(P2C_LIB)
+$(BUILD_DIR)/cos_py2c_elf.h: $(BUILD_DIR)/py2c/Py2C.c-os tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_py2c_elf
+
 # The music player is a ring-3 program built with tools/cos-cc from
 # userland/programs/music and embedded into the kernel (cos_music.c).
 MUSIC_APP_SRC := userland/programs/music/music.c userland/programs/music/vorbis.c
@@ -991,7 +1013,7 @@ $(BUILD_DIR)/cos_sample_gallery_elf.h: $(BUILD_DIR)/sample_ui_gallery.c-os tools
 	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_sample_gallery_elf
 $(BUILD_DIR)/cos_sample_tone_elf.h: $(BUILD_DIR)/sample_tone.c-os tools/gen_cos_program.py
 	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_sample_tone_elf
-$(OBJ_DIR)/kernel/cos_system_layout.o: $(SRCROOT)/kernel/cos_system_layout.c $(BUILD_DIR)/cos_sample_gallery_elf.h $(BUILD_DIR)/cos_sample_tone_elf.h $(BUILD_DIR)/cos_tcc_elf.h $(BUILD_DIR)/cos_sdk_pack.h $(BUILD_DIR)/cos_jpfont.h $(BUILD_DIR)/cos_files_elf.h | $(OBJ_DIR)
+$(OBJ_DIR)/kernel/cos_system_layout.o: $(SRCROOT)/kernel/cos_system_layout.c $(BUILD_DIR)/cos_sample_gallery_elf.h $(BUILD_DIR)/cos_sample_tone_elf.h $(BUILD_DIR)/cos_tcc_elf.h $(BUILD_DIR)/cos_py2c_elf.h $(BUILD_DIR)/cos_sdk_pack.h $(BUILD_DIR)/cos_jpfont.h $(BUILD_DIR)/cos_files_elf.h | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
@@ -1869,11 +1891,14 @@ LDFLAGS = -m64 -nostdlib -nodefaultlibs -no-pie -T $(SRCROOT)/boot/linker.ld \
 # to keep re-scanning the whole group until nothing new resolves,
 # which is the standard fix for this and doesn't require reasoning
 # about the exact dependency graph by hand.
-$(KERNEL): $(OBJS) $(BEARSSL_LIB) $(NGHTTP2_LIB) $(ACPICA_LIB) $(COMPAT_LIB) $(QUICKJS_LIB) $(LWAPCAPLET_LIB) $(LPARSERUTILS_LIB) $(LUTF8PROC_LIB) $(LHUBBUB_LIB) $(LCSS_LIB) $(LDOM_LIB) $(LNSUTILS_LIB) $(NS_UTILS_LIB) $(NSBMP_LIB) $(SVGTINY_LIB) $(NS_CONTENT_LIB) $(NSJS_QUICKJS_LIB) $(TINYC_LIB)
+$(P2C_LIB):
+	$(MAKE) -C $(P2C_DIR) freestanding WARN_CFLAGS='-Wall -Wextra -Wno-unused-parameter' EXTRA_CFLAGS='-DPYTHON_CODE_TO_C_NO_LIBC_STUBS'
+
+$(KERNEL): $(OBJS) $(P2C_LIB) $(BEARSSL_LIB) $(NGHTTP2_LIB) $(ACPICA_LIB) $(COMPAT_LIB) $(QUICKJS_LIB) $(LWAPCAPLET_LIB) $(LPARSERUTILS_LIB) $(LUTF8PROC_LIB) $(LHUBBUB_LIB) $(LCSS_LIB) $(LDOM_LIB) $(LNSUTILS_LIB) $(NS_UTILS_LIB) $(NSBMP_LIB) $(SVGTINY_LIB) $(NS_CONTENT_LIB) $(NSJS_QUICKJS_LIB) $(TINYC_LIB)
 	@echo "[BUILD] Linking kernel..."
 	$(CXX) $(LDFLAGS) -o $(BUILD_DIR)/kernel.elf $(OBJS) \
 		-Wl,--start-group \
-		$(BEARSSL_LIB) $(NGHTTP2_LIB) $(ACPICA_LIB) $(COMPAT_LIB) $(QUICKJS_LIB) $(LWAPCAPLET_LIB) $(LPARSERUTILS_LIB) $(LUTF8PROC_LIB) $(LHUBBUB_LIB) $(LCSS_LIB) $(LDOM_LIB) $(LNSUTILS_LIB) $(NS_UTILS_LIB) $(NSBMP_LIB) $(SVGTINY_LIB) $(NS_CONTENT_LIB) $(NSJS_QUICKJS_LIB) $(TINYC_LIB) \
+			$(P2C_LIB) $(BEARSSL_LIB) $(NGHTTP2_LIB) $(ACPICA_LIB) $(COMPAT_LIB) $(QUICKJS_LIB) $(LWAPCAPLET_LIB) $(LPARSERUTILS_LIB) $(LUTF8PROC_LIB) $(LHUBBUB_LIB) $(LCSS_LIB) $(LDOM_LIB) $(LNSUTILS_LIB) $(NS_UTILS_LIB) $(NSBMP_LIB) $(SVGTINY_LIB) $(NS_CONTENT_LIB) $(NSJS_QUICKJS_LIB) $(TINYC_LIB) \
 		-Wl,--end-group \
 		$(TLS_BACKEND_EXTRA_LIBS)
 	cp $(BUILD_DIR)/kernel.elf $@

@@ -1,0 +1,5 @@
+print(list())
+print(tuple())
+print(list(reversed([1, 2, 3, 4])))
+print(list(reversed("abc")))
+print("".join(reversed("abc")))

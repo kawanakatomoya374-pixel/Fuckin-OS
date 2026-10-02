@@ -548,6 +548,7 @@ void gui_draw(void) {
         if (w->kind == WIN_FILE_MGR) draw_file_manager(i);
         else if (w->kind == WIN_TEXT_EDITOR) draw_text_editor(i);
         else if (w->kind == WIN_TERMINAL) draw_terminal(i);
+        else if (w->kind == WIN_TCC_IDE) draw_py2c_studio(i);
         else if (w->kind == WIN_SETTINGS) draw_settings(i);
         else if (w->kind == WIN_CALC) draw_calculator(i);
         else if (w->kind == WIN_CALC_GRAPH) draw_calc_graph(i);
@@ -821,6 +822,7 @@ window_t* gui_open_window(int kind, const char* title, int x, int y, int w, int 
         win->sheet_initialized = TRUE;
     }
     if (kind == WIN_TCC_IDE) {
+        py2c_studio_init(win);
     }
     if (kind == WIN_HTTP_DOWNLOADER) {
         http_downloader_init(win);

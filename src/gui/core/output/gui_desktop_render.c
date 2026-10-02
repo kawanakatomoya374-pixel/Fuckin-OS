@@ -207,6 +207,7 @@ static icon_badge_t gui_icon_badge_for_kind(int kind, bool hov) {
         case WIN_JPEG:            top = rgb(108, 194, 228); bot = rgb(54, 150, 192);  break;
         case WIN_MEMORY_MGR:      top = rgb(144, 172, 212); bot = rgb(90, 120, 166);  break;
         case WIN_HTTP_DOWNLOADER: top = rgb(100, 190, 154); bot = rgb(50, 146, 110);  break;
+        case WIN_TCC_IDE:         top = rgb(55, 170, 205);  bot = rgb(20, 90, 132);   break;
         default:                  top = rgb(154, 166, 186); bot = rgb(106, 120, 142); break;
     }
     if (hov) { top = lighten(top, 18); bot = lighten(bot, 14); }
@@ -717,6 +718,7 @@ void gui_draw_app_icon(int kind, int x, int y, int size, bool hov) {
         case WIN_JPEG:            gui_glyph_image(x, y, size, badge);    break;
         case WIN_MEMORY_MGR:      gui_glyph_memory(x, y, size, badge);   break;
         case WIN_HTTP_DOWNLOADER: gui_glyph_download(x, y, size, badge); break;
+        case WIN_TCC_IDE:         gui_glyph_terminal(x, y, size, badge); break;
         default:                  gui_glyph_generic(x, y, size, badge);  break;
     }
 }
@@ -934,4 +936,3 @@ void draw_desktop_icons(void) {
         vga_draw_string(label_x, label_y, label_buf, C_TEXT_LIGHT, 0xFFFFFFFF);
     }
 }
-

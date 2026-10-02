@@ -175,7 +175,7 @@ static bool gui_terminal_command_allowed(const char* cmd) {
 
     static const char* const allowed[] = {
         "help", "clear", "cls", "ls", "cd", "pwd", "cat", "date", "time", "uname", "df", "ps", "echo",
-        "history", "settings", "theme", "wallpaper", "autoscroll", "sysinfo", "version", "dir", "quit"
+        "history", "settings", "theme", "wallpaper", "autoscroll", "sysinfo", "version", "dir", "quit", "py2c", "open"
     };
     for (size_t j = 0; j < sizeof(allowed) / sizeof(allowed[0]); j++) {
         if (strcmp(first, allowed[j]) == 0) return true;
@@ -850,6 +850,8 @@ static void handle_keyboard_for_window(int idx) {
             } else if (!ctrl && ascii >= 32 && ascii < 127) {
                 char tmp[2] = { ascii, '\0' }; text_editor_insert_text(w, tmp);
             }
+        } else if (w->kind == WIN_TCC_IDE) {
+            py2c_studio_handle_key(idx, ascii, key, ctrl);
         } else if (w->kind == WIN_VOXEL_GAME) {
             voxel_games_handle_key(idx, &ev);
         } else if (w->kind == WIN_TINYGL_VIEWER) {
@@ -1278,6 +1280,9 @@ void gui_handle_input(void) {
                     goto gui_handle_input_finish;
                 } else if (w->kind == WIN_CALC) {
                     handle_calculator_click(i, mx, my);
+                    goto gui_handle_input_finish;
+                } else if (w->kind == WIN_TCC_IDE) {
+                    py2c_studio_handle_click(i, mx, my);
                     goto gui_handle_input_finish;
                 } else if (w->kind == WIN_TEXT_EDITOR) {
                     /* Toolbar button clicks */
@@ -1757,4 +1762,3 @@ gui_handle_input_finish:
         }
     }
 }
-

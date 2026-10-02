@@ -1,0 +1,6 @@
+print("key=value=tail".partition("="))
+print("key=value=tail".rpartition("="))
+print("alpha".partition("/"))
+print("alpha".rpartition("/"))
+print("::head".partition("::"))
+print("tail::".rpartition("::"))

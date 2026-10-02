@@ -1,0 +1,6 @@
+print("a\tb".expandtabs())
+print("ab\tc".expandtabs(4))
+print("a\tb\tc".expandtabs(4))
+print("a\tb\ncc\td".expandtabs(4))
+print("a\tb".expandtabs(0))
+print("a\tb".expandtabs(-2))

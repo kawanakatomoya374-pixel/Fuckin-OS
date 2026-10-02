@@ -1,0 +1,11 @@
+# 整数リテラル: 16/8/2 進と '_' 区切り（CPython 準拠）
+print(0x1f, 0o17, 0b1011)
+print(1_000_000, 0b1_0, 0x1_0)
+print(-0x10, +0o10, 0XFF, 0O7, 0B11)
+print(1_000.5, 1e3, 2.5e-2)
+print(0x7FFFFFFFFFFFFFFF, 0x1000_0000)
+print(max(0x10, 0b1000, 0o17), min(0x10, 0b1000, 0o17))
+print(len(range(0x10)), list(range(0b11, 0o10)))
+print("%d %x %o" % (0x1f, 0x1f, 0o17))
+print(0x1f == 31, 0b1011 > 0o12)
+print(sorted([0x10, 0o10, 0b10, 1_0]))

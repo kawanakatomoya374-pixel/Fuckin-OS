@@ -619,6 +619,7 @@ void cmd_grep(int argc, char** argv);
 void cmd_find(int argc, char** argv);
 void cmd_nano(int argc, char** argv);
 void cmd_open(int argc, char** argv);
+void cmd_py2c(int argc, char** argv);
 void cmd_touch(int argc, char** argv);
 void cmd_rm(int argc, char** argv);
 void cmd_mkdir(int argc, char** argv);
@@ -697,6 +698,7 @@ static shell_command_t commands[] = {
     {"find", "Search file names in directories", cmd_find},
     {"nano", "Open a file in the text editor", cmd_nano},
     {"open", "Launch an app by name", cmd_open},
+    {"py2c", "Convert a Python file to C", cmd_py2c},
     {"pkg", "Package manager status", cmd_pkg},
     {"module", "Module loader status", cmd_module},
     {"widget", "Widget API status", cmd_widget},
@@ -1579,6 +1581,41 @@ void cmd_nano(int argc, char** argv) {
     shell_print("nano: opened "); shell_print_line(resolved);
 }
 
+extern int p2c_cos_convert(const char* source, char* output, size_t output_size,
+                           char* error, size_t error_size);
+
+void cmd_py2c(int argc, char** argv) {
+    if (argc < 2) {
+        shell_print_line("Usage: py2c <python-file> [output.c]");
+        return;
+    }
+    char resolved[FS_MAX_PATH];
+    shell_resolve_path(argv[1], resolved, sizeof(resolved));
+    char parent[FS_MAX_PATH]; char leaf[FS_MAX_PATH];
+    shell_split_path(resolved, parent, sizeof(parent), leaf, sizeof(leaf));
+    const char* source = fs_read_file_at(parent, leaf);
+    if (!source) { shell_print_line("py2c: cannot read input file"); return; }
+    static char generated[64u * 1024u];
+    static char error[512];
+    int rc = p2c_cos_convert(source, generated, sizeof(generated), error, sizeof(error));
+    if (rc != 0) {
+        shell_print("py2c: conversion failed: "); shell_print_line(error[0] ? error : "unknown error");
+        return;
+    }
+    if (argc >= 3) {
+        char out[FS_MAX_PATH]; char out_parent[FS_MAX_PATH]; char out_leaf[FS_MAX_PATH];
+        shell_resolve_path(argv[2], out, sizeof(out));
+        shell_split_path(out, out_parent, sizeof(out_parent), out_leaf, sizeof(out_leaf));
+        if (!fs_write_file_at(out_parent, out_leaf, generated, (uint64_t)strlen(generated))) {
+            shell_print_line("py2c: could not write output file"); return;
+        }
+        shell_print("py2c: generated "); shell_print_line(out);
+    } else {
+        shell_print_line("/* Py2C generated C */");
+        shell_print_line(generated);
+    }
+}
+
 void cmd_open(int argc, char** argv) {
     if (argc < 2) { shell_print_line("Usage: open app-name"); return; }
     if (strcmp(argv[1], "terminal") == 0) { gui_open_window(WIN_TERMINAL, "Terminal", 120, 80, 1024, 680); }
@@ -1587,7 +1624,7 @@ void cmd_open(int argc, char** argv) {
     else if (strcmp(argv[1], "editor") == 0 || strcmp(argv[1], "text") == 0) { gui_open_window(WIN_TEXT_EDITOR, "Text Editor", 140, 90, 900, 650); }
     else if (strcmp(argv[1], "browser") == 0 || strcmp(argv[1], "netsurf") == 0) { gui_open_window(WIN_BROWSER, "NetSurf", 120, 80, 1100, 760); }
     else if (strcmp(argv[1], "calc") == 0 || strcmp(argv[1], "calculator") == 0) { gui_open_window(WIN_CALC, "Calculator", 160, 100, 720, 520); }
-    else if (strcmp(argv[1], "tcc") == 0 || strcmp(argv[1], "tcc-ide") == 0) { gui_open_window(WIN_TCC_IDE, "TinyCC IDE", 100, 80, 900, 650); }
+    else if (strcmp(argv[1], "tcc") == 0 || strcmp(argv[1], "tcc-ide") == 0 || strcmp(argv[1], "py2c") == 0 || strcmp(argv[1], "py2c-studio") == 0) { gui_open_window(WIN_TCC_IDE, "Py2C Studio", 72, 52, 1120, 760); }
     else { shell_print("open: unknown app: "); shell_print_line(argv[1]); return; }
     shell_print("Launched app: "); shell_print_line(argv[1]);
 }

@@ -494,6 +494,10 @@ void music_player_handle_click(int idx, int mx, int my);
 void draw_paint_app(int idx);
 void draw_clock_app(int idx);
 void draw_sysinfo_app(int idx);
+void py2c_studio_init(window_t* w);
+void draw_py2c_studio(int idx);
+void py2c_studio_handle_click(int idx, int mx, int my);
+void py2c_studio_handle_key(int idx, char ascii, int scancode, bool ctrl);
 
 /* Input handlers */
 void handle_text_editor_key(int idx, char ascii, int scancode);

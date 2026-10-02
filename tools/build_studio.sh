@@ -26,7 +26,7 @@ mkdir -p "$OUT/sdk/include" "$OUT/sdk/lib" "$OUT/host_tcc"
 if [ ! -f "$OUT/host_tcc/libtcc1.a" ]; then
     rm -rf "$OUT/host_tcc"; mkdir -p "$OUT/host_tcc"
     cp -r "$TINYC"/. "$OUT/host_tcc/"
-    ( cd "$OUT/host_tcc" && ./configure --cc=gcc >/dev/null 2>&1 && make tcc libtcc1.a >/dev/null 2>&1 )
+    ( cd "$OUT/host_tcc" && sh ./configure --cc=gcc >/dev/null 2>&1 && make tcc libtcc1.a >/dev/null 2>&1 )
 fi
 cp "$OUT/host_tcc/libtcc1.a" "$OUT/sdk/lib/libtcc1.a"
 

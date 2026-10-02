@@ -671,6 +671,8 @@ static void desktop_icon_set_defaults(void) {
     desktop_icons[desktop_icon_count++] = (desktop_icon_t){x, y, "PHOTO.jpg", "/desktop/PHOTO.jpg", WIN_JPEG, false, 0, true, false};
     desktop_icon_grid_position_for_index(20, &x, &y);
     desktop_icons[desktop_icon_count++] = (desktop_icon_t){x, y, "C-OS Studio",   "", WIN_STUDIO,     false, 0, false, false};
+    desktop_icon_grid_position_for_index(21, &x, &y);
+    desktop_icons[desktop_icon_count++] = (desktop_icon_t){x, y, "Py2C Studio",   "", WIN_TCC_IDE,    false, 0, false, false};
     gui_localize_desktop_icons();
 }
 
@@ -689,6 +691,7 @@ static const char* desktop_icon_label_for_kind(int kind) {
         case WIN_PAINT: return gui_text("Paint", "ペイント");
         case WIN_MUSIC: return gui_text("MP3 Player", "MP3プレーヤー");
         case WIN_STUDIO: return gui_text("C-OS Studio", "C-OS Studio");
+        case WIN_TCC_IDE: return gui_text("Py2C Studio", "Py2C Studio");
         case WIN_JPEG: return gui_text("Image Viewer", "画像ビューア");
         case WIN_CLOCK: return gui_text("Clock", "時計");
         case WIN_SYSINFO: return gui_text("System Info", "システム情報");
@@ -1964,4 +1967,3 @@ void handle_text_editor_key(int idx, char ascii, int scancode) {
         w->text_cursor = tlen;
     }
 }
-
