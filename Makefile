@@ -39,7 +39,14 @@ VALIDATION_HTML_STRESS ?= 0
 # When BROWSER_FILE_SMOKE=1, tests may override this with any public HTTPS URL
 # (for example https://www.google.com/) without changing browser source code.
 BROWSER_SMOKE_START_URL ?= file:///browser/index.html
-CFLAGS  = -m64 -ffreestanding -nostdlib -fno-stack-protector -O0 -g \
+# track_flags(stamp, value): keeps a file whose content is `value`, rewriting it (and so bumping its mtime)
+# only when the value changes. Objects that depend on the stamp are rebuilt exactly when a flag they use
+# changed - make itself does not notice command-line variable changes.
+define track_flags
+$(shell mkdir -p $(dir $(1)))$(file >$(1).new,$(2))$(shell cmp -s $(1).new $(1) || cp $(1).new $(1))
+endef
+
+CFLAGS  = -m64 -ffreestanding -nostdlib -fstack-protector-strong -mstack-protector-guard=global -O0 -g \
           	-DCOS_LUA_LINKED=1 -DCOS_HTTP_RUNTIME_SMOKE=$(HTTP_RUNTIME_SMOKE) \
           	-DCOS_BROWSER_FILE_SMOKE=$(BROWSER_FILE_SMOKE) \
           	-DCOS_VALIDATION_OPEN_FILE_MANAGER=$(if $(VALIDATION_OPEN_FILE_MANAGER),$(VALIDATION_OPEN_FILE_MANAGER),0) \
@@ -54,11 +61,27 @@ CFLAGS  = -m64 -ffreestanding -nostdlib -fno-stack-protector -O0 -g \
           	-DCOS_VALIDATION_HELLO_APP_TEST=$(if $(VALIDATION_HELLO_APP_TEST),$(VALIDATION_HELLO_APP_TEST),0) \
           	-DCOS_VALIDATION_FORCE_GPU_RENDER=$(if $(VALIDATION_FORCE_GPU_RENDER),$(VALIDATION_FORCE_GPU_RENDER),0) \
           	-DCOS_VALIDATION_OPEN_IMAGE_VIEWER=$(if $(VALIDATION_OPEN_IMAGE_VIEWER),$(VALIDATION_OPEN_IMAGE_VIEWER),0) \
+          	-DCOS_VALIDATION_OPEN_PHOTO=$(if $(VALIDATION_OPEN_PHOTO),$(VALIDATION_OPEN_PHOTO),0) \
+	          	-DCOS_VALIDATION_OPEN_MEDIA=$(if $(VALIDATION_OPEN_MEDIA),$(VALIDATION_OPEN_MEDIA),0) \
+	          	-DCOS_VALIDATION_OPEN_VP9=$(if $(VALIDATION_OPEN_VP9),$(VALIDATION_OPEN_VP9),0) \
+	          	-DCOS_VALIDATION_OPEN_VP9_10BIT=$(if $(VALIDATION_OPEN_VP9_10BIT),$(VALIDATION_OPEN_VP9_10BIT),0) \
+	          	-DCOS_VALIDATION_OPEN_AV1_10BIT=$(if $(VALIDATION_OPEN_AV1_10BIT),$(VALIDATION_OPEN_AV1_10BIT),0) \
+	          	-DCOS_VALIDATION_OPEN_AV1=$(if $(VALIDATION_OPEN_AV1),$(VALIDATION_OPEN_AV1),0) \
+	          	-DCOS_VALIDATION_OPEN_H264_HIGH=$(if $(VALIDATION_OPEN_H264_HIGH),$(VALIDATION_OPEN_H264_HIGH),0) \
+	          	-DCOS_VALIDATION_OPEN_HEVC=$(if $(VALIDATION_OPEN_HEVC),$(VALIDATION_OPEN_HEVC),0) \
+	          	-DCOS_VALIDATION_OPEN_HEVC_HEV1_FRAG=$(if $(VALIDATION_OPEN_HEVC_HEV1_FRAG),$(VALIDATION_OPEN_HEVC_HEV1_FRAG),0) \
+	          	-DCOS_VALIDATION_OPEN_HEVC_HEV1=$(if $(VALIDATION_OPEN_HEVC_HEV1),$(VALIDATION_OPEN_HEVC_HEV1),0) \
+	          	-DCOS_VALIDATION_OPEN_HEVC_FRAG=$(if $(VALIDATION_OPEN_HEVC_FRAG),$(VALIDATION_OPEN_HEVC_FRAG),0) \
+	          	-DCOS_VALIDATION_OPEN_AV1_12BIT=$(if $(VALIDATION_OPEN_AV1_12BIT),$(VALIDATION_OPEN_AV1_12BIT),0) \
+	          	-DCOS_VALIDATION_OPEN_VP9_12BIT=$(if $(VALIDATION_OPEN_VP9_12BIT),$(VALIDATION_OPEN_VP9_12BIT),0) \
+	          	-DCOS_VALIDATION_OPEN_HEVC_12BIT=$(if $(VALIDATION_OPEN_HEVC_12BIT),$(VALIDATION_OPEN_HEVC_12BIT),0) \
+	          	-DCOS_VALIDATION_OPEN_HEVC_10BIT=$(if $(VALIDATION_OPEN_HEVC_10BIT),$(VALIDATION_OPEN_HEVC_10BIT),0) \
           	-DCOS_VALIDATION_CREATE_APP_FOLDER=$(if $(VALIDATION_CREATE_APP_FOLDER),$(VALIDATION_CREATE_APP_FOLDER),0) \
           	-DCOS_VALIDATION_OPEN_SETTINGS_SCROLL_TEST=$(if $(VALIDATION_OPEN_SETTINGS_SCROLL_TEST),$(VALIDATION_OPEN_SETTINGS_SCROLL_TEST),0) \
           	-DCOS_VALIDATION_OPEN_BROWSER_TEST=$(if $(VALIDATION_OPEN_BROWSER_TEST),$(VALIDATION_OPEN_BROWSER_TEST),0) \
           	-DCOS_VALIDATION_FORCE_XS_FONT=$(if $(VALIDATION_FORCE_XS_FONT),$(VALIDATION_FORCE_XS_FONT),0) \
           	-DCOS_VALIDATION_VIRGL_SELFTEST=$(if $(VALIDATION_VIRGL_SELFTEST),$(VALIDATION_VIRGL_SELFTEST),0) \
+	          -DCOS_VALIDATION_VIRGL_I420_SELFTEST=$(if $(VALIDATION_VIRGL_I420_SELFTEST),$(VALIDATION_VIRGL_I420_SELFTEST),0) \
           	-DCOS_VALIDATION_VIRGL_GPU_FILL=$(if $(VALIDATION_VIRGL_GPU_FILL),$(VALIDATION_VIRGL_GPU_FILL),0) \
           	-DCOS_VALIDATION_VIRGL_ALPHA_PROBE=$(if $(VALIDATION_VIRGL_ALPHA_PROBE),$(VALIDATION_VIRGL_ALPHA_PROBE),0) \
           	-DCOS_VALIDATION_GPU_ROUNDTRIP=$(if $(VALIDATION_GPU_ROUNDTRIP),$(VALIDATION_GPU_ROUNDTRIP),0) \
@@ -68,6 +91,19 @@ CFLAGS  = -m64 -ffreestanding -nostdlib -fno-stack-protector -O0 -g \
           	-DCOS_VALIDATION_MUSIC_OPEN=$(if $(VALIDATION_MUSIC_OPEN),$(VALIDATION_MUSIC_OPEN),0) \
           	-DCOS_VALIDATION_GPU_FULL_SETTINGS=$(if $(VALIDATION_GPU_FULL_SETTINGS),$(VALIDATION_GPU_FULL_SETTINGS),0) \
           	-DCOS_VALIDATION_GPU_FINISH=$(if $(VALIDATION_GPU_FINISH),$(VALIDATION_GPU_FINISH),0) \
+          	-DCOS_VALIDATION_LAUNCH_WIDGETS=$(if $(VALIDATION_LAUNCH_WIDGETS),$(VALIDATION_LAUNCH_WIDGETS),0) \
+          	-DCOS_VALIDATION_SYSMON=$(if $(VALIDATION_SYSMON),$(VALIDATION_SYSMON),0) \
+          	-DCOS_VALIDATION_KMOD=$(if $(VALIDATION_KMOD),1,0) \
+          	-DCOS_VALIDATION_TESTPROGS=$(if $(VALIDATION_TESTPROGS),1,0) \
+          	-DCOS_VALIDATION_NETSOCK=$(if $(VALIDATION_NETSOCK),$(VALIDATION_NETSOCK),0) \
+          	-DCOS_VALIDATION_MSGSRV=$(if $(VALIDATION_MSGSRV),$(VALIDATION_MSGSRV),0) \
+          	-DCOS_VALIDATION_FS=$(if $(VALIDATION_FS),$(VALIDATION_FS),0) \
+          	-DCOS_VALIDATION_SANDBOX=$(if $(VALIDATION_SANDBOX),$(VALIDATION_SANDBOX),0) \
+          	-DCOS_SMAP_AUDIT=$(if $(SMAP_AUDIT),$(SMAP_AUDIT),0) \
+          	-DCOS_VALIDATION_DISKBENCH=$(if $(VALIDATION_DISKBENCH),$(VALIDATION_DISKBENCH),0) \
+          	-DCOS_VALIDATION_USBAUDIO=$(if $(VALIDATION_USBAUDIO),$(VALIDATION_USBAUDIO),0) \
+          	-DCOS_VALIDATION_NET=$(if $(VALIDATION_NET),$(VALIDATION_NET),0) \
+          	-DCOS_VALIDATION_GUI_BENCH=$(if $(VALIDATION_GUI_BENCH),$(VALIDATION_GUI_BENCH),0) \
           	-DCOS_VALIDATION_MULTI_LAUNCH=$(if $(VALIDATION_MULTI_LAUNCH),$(VALIDATION_MULTI_LAUNCH),0) \
           	-DCOS_VALIDATION_LAUNCH_TEST_APP_EMBEDDED=$(if $(VALIDATION_LAUNCH_TEST_APP_EMBEDDED),$(VALIDATION_LAUNCH_TEST_APP_EMBEDDED),0) \
           	-DCOS_VALIDATION_BROWSER_URL=$(if $(VALIDATION_BROWSER_URL),$(VALIDATION_BROWSER_URL),0) \
@@ -87,7 +123,7 @@ CFLAGS  = -m64 -ffreestanding -nostdlib -fno-stack-protector -O0 -g \
 
 # ---- Host compiler flags (tools only) ----
 HOST_CFLAGS = -O2 -Wall -Wextra
-CXXFLAGS = -m64 -ffreestanding -nostdlib -fno-stack-protector -O0 -g \
+CXXFLAGS = -m64 -ffreestanding -nostdlib -fstack-protector-strong -mstack-protector-guard=global -O0 -g \
 	-fno-pic -fno-pie -fno-strict-aliasing -fno-builtin -mcmodel=kernel \
 	-mno-red-zone -msse2 -mfpmath=sse \
 	-fno-exceptions -fno-rtti -fno-threadsafe-statics -fno-use-cxa-atexit \
@@ -180,6 +216,16 @@ check-tools:
 		exit 1; \
 	fi
 SRCROOT := $(if $(wildcard src/boot/linker.ld),src,.)
+
+# make does not see changes to command-line variables (VALIDATION_OPEN_*=1 ...), so objects whose
+# source reads those macros would silently keep the old behaviour - which is why switching a validation
+# flag used to need `touch`/`make -B`. Track the full flag string in a stamp and make exactly those
+# objects depend on it.
+KERNEL_FLAG_STAMP := $(BUILD_DIR)/kernel_flags.stamp
+$(call track_flags,$(KERNEL_FLAG_STAMP),$(CFLAGS))
+KERNEL_FLAG_SRCS := $(shell grep -rlE 'COS_(VALIDATION|SCHED_PREEMPTION|STRESS_TEST|BROWSER_SMOKE|HTTP_RUNTIME|BROWSER_FILE)' $(SRCROOT) --include=*.c 2>/dev/null)
+$(patsubst $(SRCROOT)/%.c,$(OBJ_DIR)/%.o,$(KERNEL_FLAG_SRCS)): $(KERNEL_FLAG_STAMP)
+
 KERNEL    = kernel.elf
 ISO       = C-OS_4.0.9_alpha.iso
 # Secure Boot output is intentionally separate from the conventional hybrid
@@ -225,27 +271,41 @@ OBJS = \
 	$(OBJ_DIR)/kernel/syscall.o \
 	$(OBJ_DIR)/kernel/cos_elf.o \
 	$(OBJ_DIR)/kernel/cos_elf_link.o \
+	$(OBJ_DIR)/kernel/cos_pcache.o \
 	$(OBJ_DIR)/kernel/cos_futex.o \
 	$(OBJ_DIR)/kernel/cos_app_window.o \
 	$(OBJ_DIR)/kernel/cos_audio.o \
+	$(OBJ_DIR)/kernel/cos_kmod.o \
+	$(OBJ_DIR)/kernel/cos_bootupd.o \
 	$(OBJ_DIR)/kernel/cos_music.o \
+	$(OBJ_DIR)/kernel/cos_media.o \
 	$(OBJ_DIR)/kernel/cos_studio.o \
 	$(OBJ_DIR)/kernel/cos_files.o \
 	$(OBJ_DIR)/kernel/cos_bootsplash.o \
 	$(OBJ_DIR)/kernel/cos_clock.o \
-	$(OBJ_DIR)/kernel/cos_paint.o \
-	$(OBJ_DIR)/kernel/cos_settings.o \
-	$(OBJ_DIR)/kernel/cos_fm_support.o \
+	$(OBJ_DIR)/kernel/cos_sysapps.o \
+	$(OBJ_DIR)/kernel/cos_editor.o \
+	$(OBJ_DIR)/kernel/cos_calc.o \
+	$(OBJ_DIR)/kernel/cos_httpjob.o \
+	$(OBJ_DIR)/kernel/cos_socket.o \
+	$(OBJ_DIR)/kernel/cos_nettest.o \
+	$(OBJ_DIR)/kernel/cos_msgsrv.o \
+	$(OBJ_DIR)/kernel/cos_games.o \
+		$(OBJ_DIR)/kernel/cos_paint.o \
+		$(OBJ_DIR)/kernel/cos_messenger.o \
+		$(OBJ_DIR)/kernel/cos_ime_data.o \
+		$(OBJ_DIR)/kernel/cos_settings.o \
+		$(OBJ_DIR)/kernel/cos_terminal.o \
+		$(OBJ_DIR)/kernel/cos_fm_support.o \
 	$(OBJ_DIR)/kernel/cos_system_layout.o \
 	$(OBJ_DIR)/kernel/cos_fd.o \
-	$(OBJ_DIR)/gui/file_manager/efm_tree.o \
-	$(OBJ_DIR)/gui/file_manager/efm_winui.o \
-	$(OBJ_DIR)/gui/core/gui_file_drop.o \
+	$(OBJ_DIR)/kernel/cos_linux.o \
 	$(OBJ_DIR)/kernel/userspace_demo.o \
 	$(OBJ_DIR)/kernel/serial.o \
 	$(OBJ_DIR)/kernel/timer.o \
 	$(OBJ_DIR)/kernel/scheduler.o \
 	$(OBJ_DIR)/kernel/smp.o \
+	$(OBJ_DIR)/kernel/smp_user.o \
 	$(OBJ_DIR)/kernel/task.o \
 	$(OBJ_DIR)/kernel/sync.o \
 	$(OBJ_DIR)/kernel/ipc.o \
@@ -269,6 +329,7 @@ OBJS = \
 	$(OBJ_DIR)/bios/bios.o \
 	$(OBJ_DIR)/kernel/system/storage_manager.o \
 	$(OBJ_DIR)/kernel/security/permission_manager.o \
+	$(OBJ_DIR)/kernel/security/cos_security.o \
 	$(OBJ_DIR)/kernel/system/mk_storage_compat.o \
 			$(OBJ_DIR)/kernel/ai/lua_config.o \
 			$(OBJ_DIR)/kernel/ai/lua_bridge.o \
@@ -282,57 +343,29 @@ OBJS = \
 	$(TINYGL_OBJS) \
 	$(OBJ_DIR)/gui/core/output/gui_render_engine.o \
 	$(OBJ_DIR)/gui/core/gui_lifecycle.o \
+	$(OBJ_DIR)/gui/core/gui_shell_api.o \
+	$(OBJ_DIR)/kernel/cos_shell.o \
 	$(OBJ_DIR)/gui/core/window/gui_settings.o \
 	$(OBJ_DIR)/gui/core/output/gui_desktop_render.o \
 	$(OBJ_DIR)/gui/core/output/gui_taskbar_frame.o \
 	$(OBJ_DIR)/gui/core/window/gui_menus.o \
 	$(OBJ_DIR)/gui/core/input/gui_input.o \
+	$(OBJ_DIR)/gui/core/screenshot.o \
 	$(OBJ_DIR)/gui/core/gui_render_loop.o \
 	$(OBJ_DIR)/gui/notification_center.o \
 	$(OBJ_DIR)/gui/theme_system.o \
 	$(OBJ_DIR)/gui/components/boot_animation.o \
-	$(OBJ_DIR)/gui/apps/ui/modern_ui.o \
 	$(OBJ_DIR)/gui/core/window/gui_create_window.o \
 	$(OBJ_DIR)/gui/apps/common/gui_apps_common.o \
 	$(OBJ_DIR)/gui/apps/core/gui_apps_core.o \
 	$(OBJ_DIR)/gui/apps/core/gui_app_folder.o \
-	$(OBJ_DIR)/gui/apps/terminal/gui_apps_terminal.o \
-	$(OBJ_DIR)/gui/apps/calculator/gui_apps_calculator.o \
-	$(OBJ_DIR)/gui/apps/settings/gui_apps_settings.o \
-	$(OBJ_DIR)/gui/apps/about/gui_apps_about.o \
 	$(OBJ_DIR)/gui/apps/browser/gui_apps_browser.o \
-	$(OBJ_DIR)/gui/apps/taskmanager/gui_apps_taskmanager.o \
-	$(OBJ_DIR)/gui/apps/paint/gui_apps_paint.o \
-	$(OBJ_DIR)/gui/apps/clock/gui_apps_clock.o \
-	$(OBJ_DIR)/gui/apps/storage/gui_apps_storage.o \
-	$(OBJ_DIR)/gui/apps/memory/gui_apps_memory.o \
-	$(OBJ_DIR)/gui/apps/birthday/gui_apps_birthday.o \
-	$(OBJ_DIR)/gui/apps/music/gui_apps_music.o \
-	$(OBJ_DIR)/gui/apps/games/voxel_games_advanced.o \
-	$(OBJ_DIR)/gui/apps/games/tinygl_viewer.o \
-	$(OBJ_DIR)/gui/apps/games/games2d.o \
 	$(OBJ_DIR)/gui/core/gui_utils.o \
 	$(OBJ_DIR)/gui/apps/tools/calc_school_math.o \
 	$(OBJ_DIR)/kernel/calc_engine.o \
 	$(OBJ_DIR)/gui/core/window/gui_windows.o \
-	$(OBJ_DIR)/gui/apps/tools/http_downloader_gui.o \
-	$(OBJ_DIR)/gui/apps/tools/py2c_studio.o \
 	$(OBJ_DIR)/gui/apps/system/password_screen.o \
 	$(OBJ_DIR)/gui/apps/system/password_screen_enhanced.o \
-	$(OBJ_DIR)/gui/browser/modern_browser.o \
-	$(OBJ_DIR)/gui/browser/cos_browser.o \
-	$(OBJ_DIR)/gui/components/enhanced_context_menu.o \
-	$(OBJ_DIR)/gui/file_manager/efm_util.o \
-	$(OBJ_DIR)/gui/file_manager/efm_core.o \
-	$(OBJ_DIR)/gui/file_manager/efm_fileops.o \
-	$(OBJ_DIR)/gui/file_manager/efm_search_bookmark.o \
-	$(OBJ_DIR)/gui/file_manager/efm_thumbnail_preview.o \
-	$(OBJ_DIR)/gui/file_manager/efm_render.o \
-	$(OBJ_DIR)/gui/file_manager/efm_input.o \
-	$(OBJ_DIR)/gui/core/input/input_manager.o \
-	$(OBJ_DIR)/gui/core/output/gui_renderer.o \
-	$(OBJ_DIR)/gui/file_manager/file_manager_explorer.o \
-	$(OBJ_DIR)/gui/core/gui_file_manager_enhanced_bridge.o \
 	$(OBJ_DIR)/drivers/input/mouse.o \
 	$(OBJ_DIR)/fs/fs.o \
 	$(OBJ_DIR)/third_party/fatfs/ff.o \
@@ -340,15 +373,23 @@ OBJS = \
 	$(OBJ_DIR)/third_party/fatfs/diskio.o \
 	$(OBJ_DIR)/third_party/fatfs/ffsystem.o \
 	$(OBJ_DIR)/fs/fs_unified.o \
-	$(OBJ_DIR)/fs/text_editor.o \
+	$(OBJ_DIR)/fs/fat_fsck.o \
 	$(OBJ_DIR)/drivers/disk/storage.o \
-	$(OBJ_DIR)/drivers/disk/ide.o \
+	$(OBJ_DIR)/drivers/disk/ide_blk.o \
+	$(OBJ_DIR)/drivers/disk/ahci.o \
+	$(OBJ_DIR)/drivers/disk/disk_bench.o \
+	$(OBJ_DIR)/drivers/disk/nvme.o \
+	$(OBJ_DIR)/drivers/disk/fs_selftest.o \
 	$(OBJ_DIR)/drivers/disk/crc32_common.o \
 	$(OBJ_DIR)/kernel/drivers/arp.o \
 	$(OBJ_DIR)/kernel/drivers/dhcp.o \
 	$(OBJ_DIR)/kernel/drivers/dns.o \
 	$(OBJ_DIR)/kernel/drivers/udp.o \
 	$(OBJ_DIR)/kernel/drivers/tcp.o \
+	$(OBJ_DIR)/kernel/drivers/icmp.o \
+	$(OBJ_DIR)/kernel/drivers/ip6.o \
+	$(OBJ_DIR)/kernel/drivers/net_fw.o \
+	$(OBJ_DIR)/kernel/drivers/net_selftest.o \
 	$(OBJ_DIR)/kernel/drivers/http.o \
 	$(OBJ_DIR)/kernel/drivers/http2_client.o \
 	$(OBJ_DIR)/kernel/drivers/brotli_decoder.o \
@@ -359,7 +400,6 @@ OBJS = \
 	$(OBJ_DIR)/kernel/drivers/e1000.o \
 	$(OBJ_DIR)/kernel/drivers/ac97.o \
 	$(OBJ_DIR)/kernel/drivers/net.o \
-	$(OBJ_DIR)/kernel/filemanager/mk_advanced_filemanager.o \
 	$(OBJ_DIR)/cpp/browser_core.o \
 	$(OBJ_DIR)/cpp/module_registry.o \
 	$(OBJ_DIR)/cpp/storage_manager.o \
@@ -376,6 +416,9 @@ OBJS = \
 		$(OBJ_DIR)/apps/config_manager.o \
 	$(OBJ_DIR)/apps/jpeg_viewer.o \
 	$(OBJ_DIR)/apps/png_decoder.o \
+	$(OBJ_DIR)/apps/jpeg_codec.o \
+	$(OBJ_DIR)/apps/bmp_codec.o \
+	$(OBJ_DIR)/apps/image_scale.o \
 	$(OBJ_DIR)/third_party/ffmpeg_webp/vlc.o \
 	$(OBJ_DIR)/third_party/ffmpeg_webp/vp8dsp.o \
 	$(OBJ_DIR)/third_party/ffmpeg_webp/videodsp.o \
@@ -393,6 +436,20 @@ OBJS = \
 	$(OBJ_DIR)/assets/sample_beep_mp3.o \
 	$(OBJ_DIR)/assets/sample_photo_jpg.o \
 	$(OBJ_DIR)/assets/sample_test_webp.o \
+		$(OBJ_DIR)/assets/sample_test_mp4.o \
+		$(OBJ_DIR)/assets/sample_test_vp9_mp4.o \
+		$(OBJ_DIR)/assets/sample_test_vp9_10bit_mp4.o \
+		$(OBJ_DIR)/assets/sample_test_av1_10bit_mp4.o \
+		$(OBJ_DIR)/assets/sample_test_av1_mp4.o \
+		$(OBJ_DIR)/assets/sample_test_h264_high_mp4.o \
+		$(OBJ_DIR)/assets/sample_test_hevc_mp4.o \
+		$(OBJ_DIR)/assets/sample_test_hevc_hev1_frag_mp4.o \
+		$(OBJ_DIR)/assets/sample_test_hevc_hev1_mp4.o \
+		$(OBJ_DIR)/assets/sample_test_hevc_frag_mp4.o \
+		$(OBJ_DIR)/assets/sample_test_av1_12bit_mp4.o \
+		$(OBJ_DIR)/assets/sample_test_vp9_12bit_mp4.o \
+		$(OBJ_DIR)/assets/sample_test_hevc_12bit_mp4.o \
+		$(OBJ_DIR)/assets/sample_test_hevc10_mp4.o \
 	$(OBJ_DIR)/assets/netsurf_icon_png.o \
 	$(OBJ_DIR)/assets/sample_beep_wav.o \
 	$(OBJ_DIR)/assets/test_c_os.o \
@@ -401,8 +458,12 @@ OBJS = \
 	$(OBJ_DIR)/kernel/power/acpi_power.o \
 	$(OBJ_DIR)/kernel/drivers/usb.o \
 	$(OBJ_DIR)/kernel/drivers/tusb_port_pc.o \
+	$(OBJ_DIR)/kernel/drivers/tusb_hcd_dispatch.o \
+	$(OBJ_DIR)/kernel/drivers/xhci_hcd.o \
+	$(OBJ_DIR)/kernel/drivers/cos_devices.o \
 	$(OBJ_DIR)/kernel/drivers/tusb_hid_bridge.o \
 	$(OBJ_DIR)/kernel/drivers/tusb_msc_bridge.o \
+	$(OBJ_DIR)/kernel/drivers/usb_audio.o \
 	$(OBJ_DIR)/third_party/tinyusb/tusb.o \
 	$(OBJ_DIR)/third_party/tinyusb/tusb_fifo.o \
 	$(OBJ_DIR)/third_party/tinyusb/usbh.o \
@@ -895,10 +956,6 @@ $(OBJ_DIR)/kernel/p2c_integration.o: $(SRCROOT)/kernel/p2c_integration.c | $(OBJ
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
-$(OBJ_DIR)/gui/apps/tools/py2c_studio.o: $(SRCROOT)/gui/apps/tools/py2c_studio.c | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
 $(OBJ_DIR)/kernel/io.o: $(SRCROOT)/kernel/io.c | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
@@ -916,6 +973,10 @@ $(OBJ_DIR)/kernel/scheduler.o: $(SRCROOT)/kernel/scheduler.c | $(OBJ_DIR)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
 $(OBJ_DIR)/kernel/smp.o: $(SRCROOT)/kernel/smp.c $(SRCROOT)/include/smp.h | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+$(OBJ_DIR)/kernel/smp_user.o: $(SRCROOT)/kernel/smp_user.c $(SRCROOT)/include/smp_user.h $(SRCROOT)/include/smp.h | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
@@ -951,19 +1012,11 @@ $(OBJ_DIR)/kernel/syscall.o: $(SRCROOT)/kernel/syscall.c | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
-$(OBJ_DIR)/gui/file_manager/efm_winui.o: $(SRCROOT)/gui/file_manager/efm_winui.c | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-$(OBJ_DIR)/gui/core/gui_file_drop.o: $(SRCROOT)/gui/core/gui_file_drop.c | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-$(OBJ_DIR)/gui/file_manager/efm_tree.o: $(SRCROOT)/gui/file_manager/efm_tree.c | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
 $(OBJ_DIR)/kernel/cos_fd.o: $(SRCROOT)/kernel/cos_fd.c | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+$(OBJ_DIR)/kernel/cos_linux.o: $(SRCROOT)/kernel/cos_linux.c $(SRCROOT)/kernel/cos_linux.h | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
@@ -973,12 +1026,36 @@ $(OBJ_DIR)/kernel/cos_app_window.o: $(SRCROOT)/kernel/cos_app_window.c | $(OBJ_D
 
 # Py2C is a normal ring-3 C-OS application, just like Music and C-OS Studio.
 # It is linked against the freestanding Py2C core and installed as /bin/Py2C.c-os.
-PY2C_APP_SRC := userland/programs/py2c/main.c
-$(BUILD_DIR)/py2c/Py2C.c-os: $(PY2C_APP_SRC) userland/include/cos.h userland/include/cos_ui.h $(BUILD_DIR)/userland/libcos.a $(BUILD_DIR)/userland/cos_crt0.o $(P2C_LIB) tools/cos-cc | $(BUILD_DIR)
+# Japanese input (IME) shared by the text-entry programs
+IME_UI_SRCS = userland/lib/cosime.c userland/lib/cosime_ui.c userland/lib/stbi_all.c
+IME_UI_DEPS = userland/lib/cosime_romaji.inc userland/include/cosime.h userland/include/cosime_ui.h userland/include/cos_popup.h
+PY2C_APP_SRC := $(addprefix userland/programs/py2c/,main.c doc.c hl.c view.c run.c ui.c plugins.c) userland/programs/studio/studio_fonts.c $(P2C_DIR)/src/tools/c2py.c
+$(BUILD_DIR)/py2c/Py2C.c-os: $(PY2C_APP_SRC) userland/programs/py2c/p2.h userland/include/cos_plugin_py2c.h $(IME_UI_SRCS) $(IME_UI_DEPS) userland/include/cos.h userland/include/cos_ui.h $(BUILD_DIR)/userland/libcos.a $(BUILD_DIR)/userland/cos_crt0.o $(P2C_LIB) tools/cos-cc | $(BUILD_DIR)
 	mkdir -p $(dir $@)
-	tools/cos-cc -O2 -I $(P2C_DIR)/include -o $@ $(PY2C_APP_SRC) $(P2C_LIB)
+	tools/cos-cc -O2 -Wall -Wno-unused-function -Wno-unused-variable -Wno-misleading-indentation -I $(P2C_DIR)/include -I userland/programs/py2c -o $@ $(PY2C_APP_SRC) $(IME_UI_SRCS) $(P2C_LIB)
 $(BUILD_DIR)/cos_py2c_elf.h: $(BUILD_DIR)/py2c/Py2C.c-os tools/gen_cos_program.py
 	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_py2c_elf
+
+# The Py2C command line (python-code-to-c, run, c2py, --self-test ...) as a C-OS program: the whole Beta0.1 tool set built hosted on libcos.
+# /bin/python-code-to-c.c-os (and the short name /bin/py2c.c-os); `run` finds the installed source tree and the prebuilt runtime library (see docs/py2c_cos_port.md).
+P2CCLI_DIRS = $(P2C_DIR)/src
+P2CCLI_SRCS := $(addprefix $(P2C_DIR)/src/,codegen/python_code_to_c_codegen.c common/python_code_to_c_common.c common/python_code_to_c_unicode_tables.c core/python_code_to_c.c lexer/python_code_to_c_lexer.c modules/python_code_to_c_pygame.c parser/python_code_to_c_ast.c parser/python_code_to_c_astdump.c parser/python_code_to_c_parser.c platform/python_code_to_c_embed.c platform/python_code_to_c_gui.c platform/python_code_to_c_platform.c platform/python_code_to_c_platform_hosted.c runtime/python_code_to_c_runtime.c semantic/python_code_to_c_semantic.c tools/c2py.c tools/main.c tools/python_code_to_c_runtime_locate.c)
+$(BUILD_DIR)/p2ccli/python-code-to-c.c-os: $(P2CCLI_SRCS) $(wildcard $(P2C_DIR)/include/*/*.h) tools/cos-cc $(BUILD_DIR)/userland/libcos.a $(BUILD_DIR)/userland/cos_crt0.o | $(BUILD_DIR)
+	mkdir -p $(dir $@)
+	tools/cos-cc -O2 -w -U__linux__ -DP2C_COS_PORT -I $(P2C_DIR)/include -o $@ $(P2CCLI_SRCS)
+$(BUILD_DIR)/cos_p2ccli_elf.h: $(BUILD_DIR)/p2ccli/python-code-to-c.c-os tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_p2ccli_elf
+
+# The full Py2C source tree, installed at /apps/Py2C so the File Manager shows it and C-OS Studio can build it with tcc (overlay: tools/p2c_overlay)
+$(BUILD_DIR)/p2csrc_overlay/.staged: tools/p2c_overlay/Makefile tools/p2c_overlay/cosproj.txt tools/p2c_overlay/README.cos.md $(wildcard tools/p2c_overlay/cos/*) $(P2C_DIR)/Makefile
+	rm -rf $(BUILD_DIR)/p2csrc_overlay && mkdir -p $(BUILD_DIR)/p2csrc_overlay
+	cp $(P2C_DIR)/Makefile $(BUILD_DIR)/p2csrc_overlay/Makefile.gnu
+	cp tools/p2c_overlay/Makefile tools/p2c_overlay/cosproj.txt tools/p2c_overlay/README.cos.md $(BUILD_DIR)/p2csrc_overlay/
+	mkdir -p $(BUILD_DIR)/p2csrc_overlay/cos && cp tools/p2c_overlay/cos/* $(BUILD_DIR)/p2csrc_overlay/cos/
+	touch $@
+P2CSRC_FILES := $(shell find $(P2C_DIR) -type f -not -path '$(P2C_DIR)/build/*' -not -path '$(P2C_DIR)/obj/*' -not -path '$(P2C_DIR)/bin/*' 2>/dev/null)
+$(BUILD_DIR)/cos_p2csrc_pack.h: $(P2CSRC_FILES) $(BUILD_DIR)/p2csrc_overlay/.staged tools/gen_sdk_pack.py
+	python3 tools/gen_sdk_pack.py --root $(P2C_DIR) --exclude build --exclude obj --exclude bin --overlay $(BUILD_DIR)/p2csrc_overlay --name p2csrc --out $@
 
 # The music player is a ring-3 program built with tools/cos-cc from
 # userland/programs/music and embedded into the kernel (cos_music.c).
@@ -987,12 +1064,179 @@ $(BUILD_DIR)/cos_music.c-os: $(MUSIC_APP_SRC) userland/include/cos.h userland/in
 	tools/cos-cc -O2 -o $@ $(MUSIC_APP_SRC)
 $(BUILD_DIR)/cos_music_elf.h: $(BUILD_DIR)/cos_music.c-os tools/gen_cos_program.py
 	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_music_elf
+MEDIA_APP_SRC := userland/programs/media/main.c
+MEDIA_FAAD_SRC := $(wildcard userland/third_party/faad2/libfaad/*.c)
+# VP9 is FFmpeg's own vp9.c (n7.1, pre-CBS-refactor) ported to this
+# freestanding userland the same way edge264/dav1d/faad2 were: real
+# upstream decoder source, built against a hand-written shim layer
+# (avcodec.h/codec_internal.h/refstruct.h/... in this directory) that
+# implements exactly the subset of libavcodec/libavutil the decoder
+# actually calls - modelled closely on src/third_party/ffmpeg_webp's
+# existing kernel-side VP8/WebP port of the same idea. Replaces the
+# earlier libvpx-based VP9 decoder (userland/third_party/libvpx_vp9,
+# still present but unused): libvpx's high-bit-depth path needs
+# vpx_dsp_rtcd.h/vp9_rtcd.h declarations this vendored copy's generated
+# headers don't have (see the commit that added 10-bit AV1 for the
+# investigation), while FFmpeg's vp9.c is plain, ungenerated C that
+# supports 8/10/12-bit natively - BIT_DEPTH-templated the same way
+# dav1d's *_tmpl.c files are (vp9dsp_8bpp.c/10bpp.c/12bpp.c each
+# #include vp9dsp_template.c with a different BIT_DEPTH), so unlike
+# dav1d this needs no special dual-object-set build step - each already
+# produces its own distinctly-named object directly.
+MEDIA_FFVP9_DIR := userland/third_party/ffmpeg_vp9
+MEDIA_FFVP9_SRC := $(addprefix $(MEDIA_FFVP9_DIR)/,\
+	vp9.c vp9block.c vp9data.c vp9dsp.c vp9dsp_8bpp.c vp9dsp_10bpp.c vp9dsp_12bpp.c \
+	vp9lpf.c vp9mvs.c vp9prob.c vp9recon.c \
+	videodsp.c vlc.c vpx_rac.c mathtables.c libavutil/reverse.c \
+	cos_ffmpeg_shim.c cos_ffmpeg_tables.c cos_vp9_entry.c)
+MEDIA_FFVP9_INC := -I$(MEDIA_FFVP9_DIR) -I$(MEDIA_FFVP9_DIR)/libavutil
+# FFmpeg n7.0 HEVC decoder (libavcodec/hevc*.c, h2645_*.c, cabac, golomb). It reuses the compat layer in
+# ffmpeg_vp9/ (listed first on the include path so there is exactly one definition of each shared header).
+MEDIA_FFHEVC_DIR := userland/third_party/ffmpeg_hevc
+MEDIA_FFHEVC_SRC := $(addprefix $(MEDIA_FFHEVC_DIR)/,\
+	hevcdec.c hevc_cabac.c hevc_data.c hevc_filter.c hevc_mvs.c hevc_parse.c hevc_ps.c hevc_refs.c hevc_sei.c \
+	hevcdsp.c hevcpred.c h2645_parse.c h2645_sei.c h2645_vui.c h2645data.c cabac.c golomb.c bswapdsp.c log2_tab.c \
+	cos_hevc_shim.c cos_hevc_entry.c)
+MEDIA_FFHEVC_INC := -I$(MEDIA_FFHEVC_DIR)
+# FFmpeg's x86 SIMD (SSE-class asm only, see ffmpeg_x86/cos_x86_cpu.c) for the HEVC and VP9 decoders. The DSP files that
+# dispatch to it are built with -DCOS_FF_X86 (ffmpeg_vp9/config.h); the asm is assembled with nasm.
+MEDIA_FFX86_DIR := userland/third_party/ffmpeg_x86
+MEDIA_FFX86_SRC := $(addprefix $(MEDIA_FFX86_DIR)/,cos_x86_cpu.c libavcodec/x86/hevcdsp_init.c libavcodec/x86/vp9dsp_init.c \
+	libavcodec/x86/vp9dsp_init_10bpp.c libavcodec/x86/vp9dsp_init_12bpp.c libavcodec/x86/vp9dsp_init_16bpp.c libavcodec/x86/constants.c libavcodec/x86/videodsp_init.c libavcodec/x86/h26x/h2656dsp.c)
+MEDIA_FFX86_ASM := $(filter-out %/vp9itxfm_template.asm,$(sort $(wildcard $(MEDIA_FFX86_DIR)/libavcodec/x86/*.asm $(MEDIA_FFX86_DIR)/libavcodec/x86/h26x/*.asm)))
+MEDIA_FFX86_ASM_OBJ := $(patsubst $(MEDIA_FFX86_DIR)/%.asm,$(BUILD_DIR)/ffx86_asm/%.o,$(MEDIA_FFX86_ASM))
+$(BUILD_DIR)/ffx86_asm/%.o: $(MEDIA_FFX86_DIR)/%.asm $(MEDIA_FFX86_DIR)/config.asm $(wildcard $(MEDIA_FFX86_DIR)/libavutil/x86/*.asm $(MEDIA_FFX86_DIR)/libavcodec/x86/*_template.asm) | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	nasm -f elf64 -Pconfig.asm -I$(MEDIA_FFX86_DIR)/ -I$(dir $<) -o $@ $<
+MEDIA_CODEC_RUNTIME := userland/third_party/codec_runtime/cos_codec_runtime.c
+MEDIA_CODEC_INC := -Iuserland/third_party/codec_runtime
+MEDIA_DAV1D_DIR := userland/third_party/dav1d_src
+# dav1d's *_tmpl.c sources are compiled TWICE, once per pixel bit depth
+# (see common/bitdepth.h: BITDEPTH=8 vs 16 selects `pixel`'s width and
+# suffixes every function foo() as foo_8bpc()/foo_16bpc()), exactly like
+# upstream dav1d's own 8bd/16bd object split - decode.c's dispatch table
+# (assign_bitdepth_case in decode.c) calls through to whichever suffixed
+# symbol matches the stream's actual bpc at runtime, so both must exist
+# in the final link for 10-bit AV1 (profile 2 HDR clips) to decode.
+# Non-tmpl sources (decode.c, obu.c, ...) never include bitdepth.h, so
+# they are compiled exactly once, same as before.
+MEDIA_DAV1D_NONTMPL_SRC := $(shell find $(MEDIA_DAV1D_DIR)/src -maxdepth 1 -name '*.c' ! -name '*_tmpl.c' -print | sort)
+MEDIA_DAV1D_TMPL_SRC := $(shell find $(MEDIA_DAV1D_DIR)/src -maxdepth 1 -name '*_tmpl.c' -print | sort)
+MEDIA_DAV1D_SRC := $(MEDIA_DAV1D_NONTMPL_SRC) $(MEDIA_DAV1D_TMPL_SRC)
+MEDIA_DAV1D_INC := -I$(MEDIA_DAV1D_DIR) -I$(MEDIA_DAV1D_DIR)/include
+MEDIA_DAV1D_RUNTIME := userland/third_party/codec_runtime/cos_pthread_compat.c
+MEDIA_DAV1D_TMPL_CC := clang -ffreestanding -nostdlib -fno-stack-protector -fno-builtin \
+	-fno-asynchronous-unwind-tables -nostdinc -isystem $(shell clang -print-file-name=include) \
+	-isystem userland/include/libc -Iuserland/include -fPIE -fPIC -O2 -DNDEBUG -DSIMD=CLANG \
+	-DCOS_COS -DCOS_CODEC_RUNTIME -DHAVE_CONFIG_H -include userland/include/libc/stdlib.h \
+	-include userland/third_party/codec_runtime/cos_codec_runtime.h -iquote src/include \
+	$(MEDIA_CODEC_INC) $(MEDIA_DAV1D_INC)
+# The non-template dav1d sources (decode.c, obu.c, lib.c, ...) must also be
+# compiled by themselves, with dav1d's own include path first: in the combined
+# media.c-os command below, -Iuserland/third_party/faad2 precedes the dav1d
+# include dirs, so `#include "config.h"` resolved to faad2's config.h. That
+# silently left CONFIG_8BPC/CONFIG_16BPC/CONFIG_LOG undefined (=0) in those
+# files, so dav1d_submit_frame() hit "Compiled without support for N-bit
+# decoding" (ENOPROTOOPT) for every AV1 stream, 8-bit included.
+MEDIA_DAV1D_NONTMPL_OBJ := $(patsubst $(MEDIA_DAV1D_DIR)/src/%.c,$(BUILD_DIR)/dav1d_nontmpl/%.o,$(MEDIA_DAV1D_NONTMPL_SRC))
+$(BUILD_DIR)/dav1d_nontmpl/%.o: $(MEDIA_DAV1D_DIR)/src/%.c $(BUILD_DIR)/media_opt.stamp $(MEDIA_DAV1D_DIR)/config.h $(MEDIA_DAV1D_DIR)/include/vcs_version.h userland/third_party/codec_runtime/cos_codec_runtime.h | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(MEDIA_DAV1D_TMPL_CC) $(MEDIA_OPT_FLAGS) -c $< -o $@
+MEDIA_DAV1D_8BPC_OBJ := $(patsubst $(MEDIA_DAV1D_DIR)/src/%.c,$(BUILD_DIR)/dav1d_bpc/8/%.o,$(MEDIA_DAV1D_TMPL_SRC))
+MEDIA_DAV1D_16BPC_OBJ := $(patsubst $(MEDIA_DAV1D_DIR)/src/%.c,$(BUILD_DIR)/dav1d_bpc/16/%.o,$(MEDIA_DAV1D_TMPL_SRC))
+$(BUILD_DIR)/dav1d_bpc/8/%.o: $(MEDIA_DAV1D_DIR)/src/%.c $(BUILD_DIR)/media_opt.stamp $(MEDIA_DAV1D_DIR)/config.h $(MEDIA_DAV1D_DIR)/include/vcs_version.h userland/third_party/codec_runtime/cos_codec_runtime.h | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(MEDIA_DAV1D_TMPL_CC) $(MEDIA_OPT_FLAGS) -DBITDEPTH=8 -c $< -o $@
+$(BUILD_DIR)/dav1d_bpc/16/%.o: $(MEDIA_DAV1D_DIR)/src/%.c $(BUILD_DIR)/media_opt.stamp $(MEDIA_DAV1D_DIR)/config.h $(MEDIA_DAV1D_DIR)/include/vcs_version.h userland/third_party/codec_runtime/cos_codec_runtime.h | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(MEDIA_DAV1D_TMPL_CC) $(MEDIA_OPT_FLAGS) -DBITDEPTH=16 -c $< -o $@
+# dav1d's x86 SIMD assembly (SSE2..AVX2/AVX-512, picked at run time from CPUID like upstream) and its CPU probe.
+MEDIA_DAV1D_ASM_SRC := $(filter-out %/filmgrain_common.asm,$(sort $(wildcard $(MEDIA_DAV1D_DIR)/src/x86/*.asm)))
+MEDIA_DAV1D_ASM_OBJ := $(patsubst $(MEDIA_DAV1D_DIR)/src/x86/%.asm,$(BUILD_DIR)/dav1d_asm/%.o,$(MEDIA_DAV1D_ASM_SRC))
+MEDIA_DAV1D_NONTMPL_OBJ += $(BUILD_DIR)/dav1d_nontmpl/x86/cpu.o
+$(BUILD_DIR)/dav1d_asm/%.o: $(MEDIA_DAV1D_DIR)/src/x86/%.asm $(MEDIA_DAV1D_DIR)/config.asm $(MEDIA_DAV1D_DIR)/src/ext/x86/x86inc.asm | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	nasm -f elf64 -I$(MEDIA_DAV1D_DIR)/ -I$(MEDIA_DAV1D_DIR)/src/ -o $@ $<
+# ---- media.c-os: one object per source, with automatic header dependencies --------------------
+# Previously every codec (edge264, faad2, FFmpeg VP9 + HEVC, the shims, the app) was compiled in a single
+# clang invocation, so touching any one file recompiled all of them. Each source now builds to its own
+# object under build/media_obj/ (dav1d keeps its separate objects above), tracked with -MMD so a header
+# change rebuilds exactly the objects that include it. All of them use the same flags and include order
+# the combined command used.
+MEDIA_OBJ_DIR := $(BUILD_DIR)/media_obj
+MEDIA_CC := clang -ffreestanding -nostdlib -fno-stack-protector -fno-builtin \
+	-fno-asynchronous-unwind-tables -nostdinc -isystem $(shell clang -print-file-name=include) \
+	-isystem userland/include/libc -Iuserland/include -fPIE -O2 -DNDEBUG -DSIMD=CLANG \
+	-DCOS_COS -DCOS_CODEC_RUNTIME -DHAVE_CONFIG_H -include userland/include/libc/stdlib.h \
+	-include userland/third_party/codec_runtime/cos_codec_runtime.h -iquote src/include \
+	-Iuserland/third_party/edge264 -Iuserland/third_party/edge264/src \
+	-Iuserland/third_party/faad2 -Iuserland/third_party/faad2/include -Iuserland/third_party/faad2/libfaad \
+	$(MEDIA_FFVP9_INC) $(MEDIA_FFHEVC_INC) -I$(MEDIA_FFX86_DIR) $(MEDIA_CODEC_INC) $(MEDIA_DAV1D_INC) $(MEDIA_OPT_FLAGS)
+# Extra optimisation flags for every media object; tracked, so changing them rebuilds the objects.
+#
+# Default: no auto-vectorisation. Under QEMU's software emulation (TCG) each SSE instruction is executed by a
+# helper call, so the compiler's SSE2 loop vectorisation of the C decoders' filters costs more than the scalar
+# loops it replaces. Measured on QEMU/TCG: HEVC 720p 230 -> 180 ms/frame (-22%), VP9 640x360 38 -> 30 ms (-21%);
+# -O3 on top changed nothing measurable. (Explicitly vectorised code such as edge264's vector-extension kernels
+# is unaffected by these flags.) On real hardware SSE vectorisation pays off, so build with
+#     make MEDIA_OPT_FLAGS=
+# there to get it back.
+MEDIA_OPT_FLAGS ?= -fno-vectorize -fno-slp-vectorize
+$(call track_flags,$(BUILD_DIR)/media_opt.stamp,$(MEDIA_OPT_FLAGS))
+MEDIA_SRCS := $(MEDIA_APP_SRC) $(MEDIA_CODEC_RUNTIME) $(MEDIA_DAV1D_RUNTIME) \
+	userland/third_party/edge264/src/edge264.c $(MEDIA_FAAD_SRC) $(MEDIA_FFVP9_SRC) $(MEDIA_FFHEVC_SRC) $(MEDIA_FFX86_SRC)
+MEDIA_OBJS := $(patsubst %.c,$(MEDIA_OBJ_DIR)/%.o,$(MEDIA_SRCS))
+# edge264's kernels are written for SSSE3/SSE4.1 shuffles; built for baseline SSE2 alone, every byte shuffle turns
+# into scalar byte moves. The whole decoder is built a second time for x86-64-v2 (functions suffixed _v2) and
+# edge264_alloc() picks it at run time when the CPU has SSSE3/SSE4. (No x86-64-v3/AVX2 variant: the scheduler
+# saves FPU state with fxsave, which does not preserve the upper YMM halves.)
+MEDIA_EDGE264_V2_OBJ := $(MEDIA_OBJ_DIR)/edge264_v2.o
+MEDIA_OBJS += $(MEDIA_EDGE264_V2_OBJ)
+$(call track_flags,$(BUILD_DIR)/edge264_variants.stamp,v2)
+$(MEDIA_OBJ_DIR)/userland/third_party/edge264/src/edge264.o: MEDIA_EXTRA_FLAGS := -DHAS_X86_64_V2
+$(MEDIA_OBJ_DIR)/userland/third_party/edge264/src/edge264.o: $(BUILD_DIR)/edge264_variants.stamp
+$(MEDIA_EDGE264_V2_OBJ): userland/third_party/edge264/src/edge264_headers.c $(BUILD_DIR)/edge264_variants.stamp $(BUILD_DIR)/media_opt.stamp userland/include/cos.h userland/third_party/codec_runtime/cos_codec_runtime.h | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(MEDIA_CC) -march=x86-64-v2 '-DADD_VARIANT(f)=f##_v2' -MMD -MP -c $< -o $@
+# Flags that only the app itself reads are tracked through a stamp so that changing them rebuilds just main.o.
+MEDIA_FLAGS_STAMP := $(BUILD_DIR)/media_flags.stamp
+$(call track_flags,$(MEDIA_FLAGS_STAMP),FRAME_CRC=$(VALIDATION_FRAME_CRC) FRAME_TIMES=$(VALIDATION_FRAME_TIMES))
+$(MEDIA_OBJ_DIR)/$(MEDIA_APP_SRC:.c=.o): $(MEDIA_FLAGS_STAMP)
+$(MEDIA_OBJ_DIR)/$(MEDIA_APP_SRC:.c=.o): MEDIA_EXTRA_FLAGS := -DCOS_VALIDATION_FRAME_CRC=$(if $(VALIDATION_FRAME_CRC),$(VALIDATION_FRAME_CRC),0) -DCOS_VALIDATION_FRAME_TIMES=$(if $(VALIDATION_FRAME_TIMES),$(VALIDATION_FRAME_TIMES),0)
+# The HEVC objects are built for frame threading across cores (cos_hevc_entry.c).
+$(patsubst %.c,$(MEDIA_OBJ_DIR)/%.o,$(MEDIA_FFHEVC_SRC)): MEDIA_EXTRA_FLAGS := -DHAVE_THREADS=1 -DCOS_HEVC_MT=1
+# ...and so are the VP9 ones (cos_vp9_entry.c).
+$(patsubst %.c,$(MEDIA_OBJ_DIR)/%.o,$(MEDIA_FFVP9_SRC)): MEDIA_EXTRA_FLAGS := -DHAVE_THREADS=1 -DCOS_HEVC_MT=1
+# faad2/ precedes the FFmpeg directories on the include path and has a config.h of its own: put FFmpeg's first for the objects that read it
+$(patsubst %.c,$(MEDIA_OBJ_DIR)/%.o,$(MEDIA_FFX86_SRC)): MEDIA_EXTRA_FLAGS := -iquote $(MEDIA_FFVP9_DIR) -DHAVE_THREADS=1 -DCOS_HEVC_MT=1 -DCOS_FF_X86
+$(MEDIA_OBJ_DIR)/$(MEDIA_FFHEVC_DIR)/hevcdsp.o $(MEDIA_OBJ_DIR)/$(MEDIA_FFVP9_DIR)/vp9dsp.o $(MEDIA_OBJ_DIR)/$(MEDIA_FFVP9_DIR)/videodsp.o: MEDIA_EXTRA_FLAGS := -iquote $(MEDIA_FFVP9_DIR) -DHAVE_THREADS=1 -DCOS_HEVC_MT=1 -DCOS_FF_X86
+$(MEDIA_OBJ_DIR)/%.o: %.c $(BUILD_DIR)/media_opt.stamp userland/include/cos.h userland/include/cos_ui.h userland/third_party/codec_runtime/cos_codec_runtime.h $(MEDIA_DAV1D_DIR)/config.h $(MEDIA_DAV1D_DIR)/include/vcs_version.h | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(MEDIA_CC) $(MEDIA_EXTRA_FLAGS) -MMD -MP -c $< -o $@
+-include $(MEDIA_OBJS:.o=.d)
+$(BUILD_DIR)/media.c-os: $(MEDIA_OBJS) $(MEDIA_DAV1D_NONTMPL_OBJ) $(MEDIA_DAV1D_8BPC_OBJ) $(MEDIA_DAV1D_16BPC_OBJ) $(MEDIA_DAV1D_ASM_OBJ) $(MEDIA_FFX86_ASM_OBJ) $(BUILD_DIR)/userland/libcos.a $(BUILD_DIR)/userland/cos_crt0.o tools/cos-cc | $(BUILD_DIR)
+	CC=clang tools/cos-cc -o $@ $(MEDIA_OBJS) $(MEDIA_DAV1D_NONTMPL_OBJ) $(MEDIA_DAV1D_8BPC_OBJ) $(MEDIA_DAV1D_16BPC_OBJ) $(MEDIA_DAV1D_ASM_OBJ) $(MEDIA_FFX86_ASM_OBJ)
+$(BUILD_DIR)/cos_media_elf.h: $(BUILD_DIR)/media.c-os tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_media_elf
+PHOTO_APP_SRC := userland/programs/photo/main.c
+$(BUILD_DIR)/photo.c-os: $(PHOTO_APP_SRC) userland/include/cos.h userland/include/cos_ui.h userland/third_party/stb_image.h $(BUILD_DIR)/userland/libcos.a $(BUILD_DIR)/userland/cos_crt0.o tools/cos-cc | $(BUILD_DIR)
+	tools/cos-cc -O2 -o $@ $(PHOTO_APP_SRC)
+$(BUILD_DIR)/cos_photo_elf.h: $(BUILD_DIR)/photo.c-os tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_photo_elf
 # Sample programs shipped in /apps/samples (see cos_system_layout.c).
-SAMPLE_DEPS := userland/include/cos.h userland/include/cos_ui.h $(BUILD_DIR)/userland/libcos.a $(BUILD_DIR)/userland/cos_crt0.o tools/cos-cc
+SAMPLE_DEPS := userland/include/cos.h userland/include/cos_ui.h userland/include/cos_widget.h $(BUILD_DIR)/userland/libcos.a $(BUILD_DIR)/userland/cos_crt0.o tools/cos-cc
 $(BUILD_DIR)/sample_ui_gallery.c-os: userland/programs/samples/ui_gallery.c $(SAMPLE_DEPS) | $(BUILD_DIR)
 	tools/cos-cc -O2 -o $@ $<
 $(BUILD_DIR)/sample_tone.c-os: userland/programs/samples/tone.c $(SAMPLE_DEPS) | $(BUILD_DIR)
 	tools/cos-cc -O2 -o $@ $<
+$(BUILD_DIR)/sample_widgets.c-os: userland/programs/samples/widgets.c $(SAMPLE_DEPS) | $(BUILD_DIR)
+	tools/cos-cc -O2 -o $@ $<
+$(BUILD_DIR)/cos_sample_widgets_elf.h: $(BUILD_DIR)/sample_widgets.c-os tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_sample_widgets_elf
+$(BUILD_DIR)/sample_sandbox.c-os: userland/programs/samples/sandbox_test.c $(SAMPLE_DEPS) | $(BUILD_DIR)
+	tools/cos-cc -O2 -o $@ $<
+$(BUILD_DIR)/cos_sample_sandbox_elf.h: $(BUILD_DIR)/sample_sandbox.c-os tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_sample_sandbox_elf
 $(BUILD_DIR)/bootsplash.c-os: userland/programs/bootsplash/main.c $(SAMPLE_DEPS) | $(BUILD_DIR)
 	tools/cos-cc -O2 -o $@ $<
 $(BUILD_DIR)/cos_bootsplash_elf.h: $(BUILD_DIR)/bootsplash.c-os tools/gen_cos_program.py
@@ -1001,28 +1245,195 @@ $(BUILD_DIR)/clock.c-os: userland/programs/clock/main.c $(SAMPLE_DEPS) | $(BUILD
 	tools/cos-cc -O2 -o $@ $<
 $(BUILD_DIR)/cos_clock_elf.h: $(BUILD_DIR)/clock.c-os tools/gen_cos_program.py
 	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_clock_elf
+$(BUILD_DIR)/editor.c-os: userland/programs/editor/main.c $(IME_UI_SRCS) $(IME_UI_DEPS) $(SAMPLE_DEPS) | $(BUILD_DIR)
+	tools/cos-cc -O2 -o $@ userland/programs/editor/main.c $(IME_UI_SRCS)
+$(BUILD_DIR)/cos_editor_elf.h: $(BUILD_DIR)/editor.c-os tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_editor_elf
+$(BUILD_DIR)/sheet.c-os: userland/programs/sheet/main.c $(IME_UI_SRCS) $(IME_UI_DEPS) $(SAMPLE_DEPS) | $(BUILD_DIR)
+	tools/cos-cc -O2 -o $@ userland/programs/sheet/main.c $(IME_UI_SRCS)
+$(BUILD_DIR)/cos_sheet_elf.h: $(BUILD_DIR)/sheet.c-os tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_sheet_elf
+$(BUILD_DIR)/calc.c-os: userland/programs/calc/main.c userland/programs/calc/topics.inc src/gui/apps/tools/calc_school_math.c src/gui/apps/tools/calc_school_math.h $(SAMPLE_DEPS) | $(BUILD_DIR)
+	tools/cos-cc -O2 -Isrc/gui/apps/tools -o $@ userland/programs/calc/main.c src/gui/apps/tools/calc_school_math.c
+$(BUILD_DIR)/cos_calc_elf.h: $(BUILD_DIR)/calc.c-os tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_calc_elf
+$(BUILD_DIR)/httpdl.c-os: userland/programs/httpdl/main.c $(SAMPLE_DEPS) | $(BUILD_DIR)
+	tools/cos-cc -O2 -o $@ $<
+$(BUILD_DIR)/cos_httpdl_elf.h: $(BUILD_DIR)/httpdl.c-os tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_httpdl_elf
+$(BUILD_DIR)/games2d.c-os: userland/programs/games2d/main.c $(SAMPLE_DEPS) | $(BUILD_DIR)
+	tools/cos-cc -O2 -o $@ $<
+$(BUILD_DIR)/cos_games2d_elf.h: $(BUILD_DIR)/games2d.c-os tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_games2d_elf
+# Craft (fogleman/Craft, MIT) ported to C-OS with a software renderer: userland/programs/craft (see docs/craft.md).
+CRAFT_DIR = userland/programs/craft
+CRAFT_SRCS = $(addprefix $(CRAFT_DIR)/,craft.c cube.c item.c map.c matrix.c sign.c util.c world.c noise.c db.c r3d.c glfw_cos.c cplat.c cmem.c client.c)
+CRAFT_ASSETS = texture font sky sign
+CRAFT_ASSET_C = $(foreach a,$(CRAFT_ASSETS),$(BUILD_DIR)/craft/asset_$(a).c)
+$(BUILD_DIR)/craft/asset_%.c: $(CRAFT_DIR)/assets/%.png tools/bin_to_c_asset.py | $(BUILD_DIR)
+	@mkdir -p $(BUILD_DIR)/craft
+	python3 tools/bin_to_c_asset.py $< $@ craft_$*_png
+$(BUILD_DIR)/craft.c-os: $(CRAFT_SRCS) $(wildcard $(CRAFT_DIR)/*.h) $(CRAFT_ASSET_C) userland/lib/stbi_all.c $(SAMPLE_DEPS) | $(BUILD_DIR)
+	tools/cos-cc -O2 -w -I $(CRAFT_DIR) -Dmalloc=cm_malloc -Dfree=cm_free -Dcalloc=cm_calloc -Drealloc=cm_realloc -o $@ $(CRAFT_SRCS) $(CRAFT_ASSET_C) userland/lib/stbi_all.c
+$(BUILD_DIR)/cos_craft_elf.h: $(BUILD_DIR)/craft.c-os tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_craft_elf
+# The Launcher (the former Craft icon): tabs Craft / mc-classic-c, userland/programs/launcher. The games it starts are files in /apps/minecraft
+# (cos_system_layout.c): Craft.c-os above, and one program per version of mc-classic-c (github.com/degradka/mc-classic-c, GPL-3.0) built from
+# userland/third_party/mc-classic-c by tools/mc_build.sh on top of the CPU renderer userland/programs/mcclassic (see docs/MC_CLASSIC.md).
+# Linux GUI viewer (the Launcher's Linux tab): an RFB client for the X server the Linux layer runs (docs/LINUX_COMPAT.md)
+$(BUILD_DIR)/linuxgui.c-os: userland/programs/linuxgui/main.c $(SAMPLE_DEPS) | $(BUILD_DIR)
+	tools/cos-cc -O2 -o $@ $<
+$(BUILD_DIR)/cos_linuxgui_elf.h: $(BUILD_DIR)/linuxgui.c-os tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_linuxgui_elf
+# Linux app pack installer (docs/LINUX_COMPAT.md, "App packs"): downloads, verifies (the update key) and installs Firefox & co into /linux. LINUXPACK_URL is where the pack lives
+LINUXPACK_URL ?= https://kawanakatomoya374-pixel.github.io/C-OS-APPS/firefox/
+$(BUILD_DIR)/linuxpack_url.h: FORCE | $(BUILD_DIR)
+	printf '/* generated by the Makefile (LINUXPACK_URL) */\n#define COS_LINUXPACK_URL "%s"\n' '$(LINUXPACK_URL)' > $@.tmp; cmp -s $@.tmp $@ && rm -f $@.tmp || mv $@.tmp $@
+$(BUILD_DIR)/linuxpack.c-os: userland/programs/linuxpack/main.c userland/programs/linuxpack/inflate.h $(BUILD_DIR)/update/update_pubkey.h $(BUILD_DIR)/linuxpack_url.h $(BUILD_DIR)/libbearssl_user.a $(SAMPLE_DEPS) | $(BUILD_DIR)
+	tools/cos-cc -O2 -I$(BEARSSL_DIR)/inc -I$(BUILD_DIR)/update -I$(BUILD_DIR) -Iuserland/programs/linuxpack -o $@ userland/programs/linuxpack/main.c $(BUILD_DIR)/libbearssl_user.a
+$(BUILD_DIR)/cos_linuxpack_elf.h: $(BUILD_DIR)/linuxpack.c-os tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_linuxpack_elf
+$(BUILD_DIR)/launcher.c-os: userland/programs/launcher/main.c $(SAMPLE_DEPS) | $(BUILD_DIR)
+	tools/cos-cc -O2 -o $@ $<
+$(BUILD_DIR)/cos_launcher_elf.h: $(BUILD_DIR)/launcher.c-os tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_launcher_elf
+MC_ROOT = userland/third_party/mc-classic-c
+MC_VERSIONS = c0.0.11a c0.0.13a c0.0.13a_03 c0.0.14a_08 c0.0.16a_02 c0.0.17a c0.0.18a_02 c0.0.19a_04 c0.0.20a_02 c0.0.23a_01 c0.24_st_03 c0.25_05_st c0.27_st c0.28_01 c0.29_02 c0.30
+MC_COMMON = $(wildcard userland/programs/mcclassic/*.c userland/programs/mcclassic/*.h userland/programs/mcclassic/compat/*.h userland/programs/mcclassic/compat/*/*.h) tools/mc_build.sh tools/mc_pack.py
+define MC_RULE
+$$(BUILD_DIR)/mc-$(1).c-os: $$(shell find $$(MC_ROOT)/$(1) -type f) $$(MC_COMMON) $$(SAMPLE_DEPS) | $$(BUILD_DIR)
+	MC_WORK=$(CURDIR)/$$(BUILD_DIR)/mc tools/mc_build.sh $$(MC_ROOT) $(1) $$@
+$$(BUILD_DIR)/cos_mc_$(subst .,_,$(1))_elf.h: $$(BUILD_DIR)/mc-$(1).c-os tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $$< --out $$@ --symbol cos_mc_$(subst .,_,$(1))_elf
+endef
+$(foreach v,$(MC_VERSIONS),$(eval $(call MC_RULE,$(v))))
+# c0.30 is two games from one source: the creative one above and the survival one (-DSURVIVAL)
+$(BUILD_DIR)/mc-c0.30-survival.c-os: $(shell find $(MC_ROOT)/c0.30 -type f) $(MC_COMMON) $(SAMPLE_DEPS) | $(BUILD_DIR)
+	MC_TAG=-survival MC_DEFS=-DSURVIVAL MC_WORK=$(CURDIR)/$(BUILD_DIR)/mc tools/mc_build.sh $(MC_ROOT) c0.30 $@
+$(BUILD_DIR)/cos_mc_c0_30_survival_elf.h: $(BUILD_DIR)/mc-c0.30-survival.c-os tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_mc_c0_30_survival_elf
+MC_ELF_HEADERS = $(foreach v,$(MC_VERSIONS),$(BUILD_DIR)/cos_mc_$(subst .,_,$(v))_elf.h) $(BUILD_DIR)/cos_mc_c0_30_survival_elf.h
+# the sound and music files (identical in every version) are installed once, in /apps/minecraft/audio
+$(BUILD_DIR)/cos_mc_audio.h $(BUILD_DIR)/cos_mc_audio.inc: $(shell find $(MC_ROOT)/audio -type f) tools/mc_audio_pack.py | $(BUILD_DIR)
+	python3 tools/mc_audio_pack.py $(MC_ROOT)/audio $(BUILD_DIR)/cos_mc_audio.h $(BUILD_DIR)/cos_mc_audio.inc
+# cos_mc_games.h / .inc: what cos_system_layout.c includes and runs to install the games into /apps/minecraft
+$(BUILD_DIR)/cos_mc_games.h: $(MC_ELF_HEADERS) Makefile | $(BUILD_DIR)
+	{ echo '/* generated by the Makefile */'; $(foreach v,$(MC_VERSIONS),echo '#include "cos_mc_$(subst .,_,$(v))_elf.h"';) echo '#include "cos_mc_c0_30_survival_elf.h"'; } > $@
+$(BUILD_DIR)/cos_mc_games.inc: Makefile | $(BUILD_DIR)
+	{ echo '/* generated by the Makefile */'; $(foreach v,$(MC_VERSIONS),echo '    ensure_file("/apps/minecraft", "mc-$(v).c-os", cos_mc_$(subst .,_,$(v))_elf, cos_mc_$(subst .,_,$(v))_elf_len);';) echo '    ensure_file("/apps/minecraft", "mc-c0.30-survival.c-os", cos_mc_c0_30_survival_elf, cos_mc_c0_30_survival_elf_len);'; } > $@
+# TinyGL is compiled into the program itself; the kernel's allocator (memory.c) and libm replacement (tinygl_math.c) are
+# swapped for the C-OS user libc and userland/programs/tinygl/gl_mem.c.
+TINYGL_USER_SRCS = $(filter-out $(TINYGL_SRC_DIR)/memory.c $(TINYGL_SRC_DIR)/tinygl_math.c $(TINYGL_SRC_DIR)/tinygl_os.c $(TINYGL_SRC_DIR)/tinygl_stdio_stub.c,$(TINYGL_SRCS))
+$(BUILD_DIR)/tinygl.c-os: userland/programs/tinygl/main.c userland/programs/tinygl/gl_mem.c $(TINYGL_USER_SRCS) $(wildcard $(TINYGL_SRC_DIR)/*.h) $(SAMPLE_DEPS) | $(BUILD_DIR)
+	tools/cos-cc -O2 -DM_PI=3.14159265358979323846 -include stdio.h -I$(TINYGL_DIR)/include -I$(TINYGL_SRC_DIR) -o $@ userland/programs/tinygl/main.c userland/programs/tinygl/gl_mem.c $(TINYGL_USER_SRCS)
+$(BUILD_DIR)/cos_tinygl_elf.h: $(BUILD_DIR)/tinygl.c-os tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_tinygl_elf
+$(BUILD_DIR)/netsock_test.c-os: userland/programs/netsock_test/main.c $(SAMPLE_DEPS) | $(BUILD_DIR)
+	tools/cos-cc -O2 -o $@ $<
+$(BUILD_DIR)/cos_netsock_test_elf.h: $(BUILD_DIR)/netsock_test.c-os tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_netsock_test_elf
+COSMSGD_SRCS = userland/programs/cosmsgd/main.c userland/programs/cosmsgd/core.c userland/programs/cosmsgd/cert.c
+$(BUILD_DIR)/cosmsgd.c-os: $(COSMSGD_SRCS) userland/programs/cosmsgd/core.h userland/programs/cosmsgd/cert.h $(BUILD_DIR)/libbearssl_user.a $(SAMPLE_DEPS) | $(BUILD_DIR)
+	tools/cos-cc -O2 -I$(BEARSSL_DIR)/inc -o $@ $(COSMSGD_SRCS) $(BUILD_DIR)/libbearssl_user.a
+$(BUILD_DIR)/cos_cosmsgd_elf.h: $(BUILD_DIR)/cosmsgd.c-os tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_cosmsgd_elf
+# The key app updates are checked with: the release key (release/update_public.pem, the public half; the private half is kept by the publisher and never on a build
+# machine). Validation images (tests) trust the development key of the build tree instead (build/update/update_key.pem); `make UPDATE_PUBKEY=` does the same for any build. UPDATE_URL is where a fresh system looks for updates
+# (GitHub Pages; docs/app_update.md); a user changes it in Settings > Update.
+UPDATE_PUBKEY ?= release/update_public.pem
+UPDATE_URL ?= https://kawanakatomoya374-pixel.github.io/C-OS-UPDATE/updates/
+# Kernel updates (stage 2, docs/app_update.md): the kernel checks a kernel's signature itself, with its own key (KERNEL_PUBKEY, the public half of a release key kept offline;
+# validation images use a development key of the build tree). KERNEL_SERIAL is this kernel's build number: a kernel update must carry a higher one (make iso KERNEL_SERIAL=$(date +%s)).
+KERNEL_PUBKEY ?= release/kernel_update_public.pem
+KERNEL_SERIAL ?= 0
+# the validation images (tests) never look for updates on their own: a test that waits on timing must not meet a network request it did not ask for
+ifneq ($(strip $(VALIDATION_SYSMON)$(VALIDATION_TESTPROGS)),)
+UPDATE_URL :=
+UPDATE_PUBKEY :=          # and they trust the development key of the build tree: the tests sign their own packages
+KERNEL_PUBKEY :=
+endif
+$(BUILD_DIR)/update/update_pubkey.h: tools/gen_update_keys.py $(UPDATE_PUBKEY) FORCE | $(BUILD_DIR)
+	python3 tools/gen_update_keys.py $(BUILD_DIR) $(if $(UPDATE_PUBKEY),--public $(UPDATE_PUBKEY))
+$(BUILD_DIR)/update_url.h: FORCE | $(BUILD_DIR)
+	printf '/* generated by the Makefile (UPDATE_URL) */\n#define COS_UPDATE_URL "%s"\n' '$(UPDATE_URL)' > $@.tmp; cmp -s $@.tmp $@ && rm -f $@.tmp || mv $@.tmp $@
+$(BUILD_DIR)/kernel_pubkey.h: tools/gen_kernel_update_keys.py $(KERNEL_PUBKEY) FORCE | $(BUILD_DIR)
+	python3 tools/gen_kernel_update_keys.py $(BUILD_DIR) $(if $(KERNEL_PUBKEY),--public $(KERNEL_PUBKEY))
+$(BUILD_DIR)/kernel_serial.h: FORCE | $(BUILD_DIR)
+	printf '/* generated by the Makefile (KERNEL_SERIAL) */\n#define COS_KERNEL_SERIAL %su\n' '$(KERNEL_SERIAL)' > $@.tmp; cmp -s $@.tmp $@ && rm -f $@.tmp || mv $@.tmp $@
+$(BUILD_DIR)/cosupdate.c-os: userland/programs/update/main.c $(BUILD_DIR)/update/update_pubkey.h $(BUILD_DIR)/libbearssl_user.a $(SAMPLE_DEPS) | $(BUILD_DIR)
+	tools/cos-cc -O2 -I$(BEARSSL_DIR)/inc -I$(BUILD_DIR)/update -o $@ userland/programs/update/main.c $(BUILD_DIR)/libbearssl_user.a
+$(BUILD_DIR)/cos_cosupdate_elf.h: $(BUILD_DIR)/cosupdate.c-os tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_cosupdate_elf
+$(OBJ_DIR)/kernel/cos_msgsrv.o: $(SRCROOT)/kernel/cos_msgsrv.c $(BUILD_DIR)/cos_cosmsgd_elf.h | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -I$(BUILD_DIR) -c $< -o $@
+$(BUILD_DIR)/sysmon.c-os: userland/programs/sysmon/main.c $(SAMPLE_DEPS) | $(BUILD_DIR)
+	tools/cos-cc -O2 -o $@ $<
+$(BUILD_DIR)/cos_sysmon_elf.h: $(BUILD_DIR)/sysmon.c-os tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_sysmon_elf
+# BearSSL for ring-3 programs (C-OS Message's TLS): the same sources as the kernel's copy, built with cos-cc's freestanding flags.
+BEARSSL_USER_SRCS := $(filter-out %/sysrng.c,$(BEARSSL_SRCS))
+BEARSSL_USER_OBJS := $(patsubst $(BEARSSL_SRC_DIR)/%.c,$(BUILD_DIR)/bearssl_user/%.o,$(BEARSSL_USER_SRCS))
+$(BUILD_DIR)/bearssl_user/%.o: $(BEARSSL_SRC_DIR)/%.c | $(BUILD_DIR)
+	mkdir -p $(dir $@)
+	gcc -O2 -fPIE -ffreestanding -fno-stack-protector -fno-builtin -fno-asynchronous-unwind-tables -nostdinc \
+		-isystem $$(gcc -print-file-name=include) -isystem userland/include/libc -Iuserland/include \
+		-I$(BEARSSL_DIR)/inc -I$(BEARSSL_SRC_DIR) -c $< -o $@
+$(BUILD_DIR)/libbearssl_user.a: $(BEARSSL_USER_OBJS)
+	rm -f $@ && ar rcs $@ $^
+# The WebP decoder (FFmpeg's VP8/VP8L port, also used by the browser and image viewer) for ring-3 programs.
+WEBP_DIR = src/third_party/ffmpeg_webp
+WEBP_USER_SRCS = cos_webp_entry cos_ffmpeg_shim cos_ffmpeg_tables webp vp8 vp8dsp vp8data vpx_rac vlc videodsp h264pred libavutil/reverse
+WEBP_USER_OBJS = $(patsubst %,$(BUILD_DIR)/webp_user/%.o,$(WEBP_USER_SRCS))
+$(BUILD_DIR)/webp_user/%.o: $(WEBP_DIR)/%.c | $(BUILD_DIR)
+	mkdir -p $(dir $@)
+	gcc -O2 -w -fPIE -ffreestanding -fno-stack-protector -fno-builtin -fno-asynchronous-unwind-tables -nostdinc \
+		-isystem $$(gcc -print-file-name=include) -isystem userland/include/libc -Iuserland/include \
+		-I$(WEBP_DIR) -I$(WEBP_DIR)/.. -c $< -o $@
+$(BUILD_DIR)/libwebp_user.a: $(WEBP_USER_OBJS)
+	rm -f $@ && ar rcs $@ $^
+MESSENGER_SRCS = userland/programs/messenger/main.c userland/lib/cosime.c userland/lib/stbi_all.c userland/lib/cosaudiodec.c userland/lib/cosaudiodec_vorbis.c
+$(BUILD_DIR)/messenger.c-os: $(MESSENGER_SRCS) userland/programs/messenger/attach.inc userland/programs/messenger/profile.inc userland/programs/messenger/google.inc userland/programs/messenger/vault.inc userland/programs/messenger/vault_crypto.inc userland/programs/messenger/gui.inc userland/programs/messenger/e2e.inc userland/programs/messenger/e2ec.inc userland/programs/messenger/i18n.inc userland/lib/cosime_romaji.inc userland/include/cosime.h userland/include/cos_popup.h userland/include/cosaudiodec.h $(BUILD_DIR)/libbearssl_user.a $(BUILD_DIR)/libwebp_user.a $(SAMPLE_DEPS) | $(BUILD_DIR)
+	tools/cos-cc -O2 -I$(BEARSSL_DIR)/inc -o $@ $(MESSENGER_SRCS) $(BUILD_DIR)/libbearssl_user.a $(BUILD_DIR)/libwebp_user.a
+$(BUILD_DIR)/cos_messenger_elf.h: $(BUILD_DIR)/messenger.c-os tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_messenger_elf
 $(BUILD_DIR)/paint.c-os: userland/programs/paint/main.c $(SAMPLE_DEPS) | $(BUILD_DIR)
 	tools/cos-cc -O2 -o $@ $<
 $(BUILD_DIR)/cos_paint_elf.h: $(BUILD_DIR)/paint.c-os tools/gen_cos_program.py
 	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_paint_elf
-$(BUILD_DIR)/settings.c-os: userland/programs/settings/main.c $(SAMPLE_DEPS) | $(BUILD_DIR)
+$(BUILD_DIR)/settings.c-os: userland/programs/settings/main.c userland/programs/settings/plugins.inc $(SAMPLE_DEPS) | $(BUILD_DIR)
 	tools/cos-cc -O2 -o $@ $<
 $(BUILD_DIR)/cos_settings_elf.h: $(BUILD_DIR)/settings.c-os tools/gen_cos_program.py
 	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_settings_elf
+# The Terminal's `make` reuses C-OS Studio's Makefile engine (studio/make.c) and runs the plan itself (terminal/tmake.c).
+TERMINAL_SRCS := userland/programs/terminal/main.c userland/programs/terminal/tmake.c userland/programs/studio/make.c
+$(BUILD_DIR)/terminal.c-os: $(TERMINAL_SRCS) userland/programs/terminal/plugins.inc userland/programs/terminal/tmake.h userland/programs/studio/cosmake.h $(IME_UI_SRCS) $(IME_UI_DEPS) $(SAMPLE_DEPS) | $(BUILD_DIR)
+	tools/cos-cc -O2 -I userland/programs/studio -I userland/programs/terminal -o $@ $(TERMINAL_SRCS) $(IME_UI_SRCS)
+$(BUILD_DIR)/cos_terminal_elf.h: $(BUILD_DIR)/terminal.c-os tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_terminal_elf
 $(BUILD_DIR)/cos_sample_gallery_elf.h: $(BUILD_DIR)/sample_ui_gallery.c-os tools/gen_cos_program.py
 	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_sample_gallery_elf
 $(BUILD_DIR)/cos_sample_tone_elf.h: $(BUILD_DIR)/sample_tone.c-os tools/gen_cos_program.py
 	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_sample_tone_elf
-$(OBJ_DIR)/kernel/cos_system_layout.o: $(SRCROOT)/kernel/cos_system_layout.c $(BUILD_DIR)/cos_sample_gallery_elf.h $(BUILD_DIR)/cos_sample_tone_elf.h $(BUILD_DIR)/cos_tcc_elf.h $(BUILD_DIR)/cos_py2c_elf.h $(BUILD_DIR)/cos_sdk_pack.h $(BUILD_DIR)/cos_jpfont.h $(BUILD_DIR)/cos_files_elf.h | $(OBJ_DIR)
+$(OBJ_DIR)/kernel/cos_system_layout.o: $(SRCROOT)/kernel/cos_system_layout.c $(BUILD_DIR)/cos_linuxgui_elf.h $(BUILD_DIR)/cos_linuxpack_elf.h $(BUILD_DIR)/update_url.h $(BUILD_DIR)/cos_cosupdate_elf.h $(BUILD_DIR)/cos_sample_widgets_elf.h $(BUILD_DIR)/cos_sample_sandbox_elf.h $(BUILD_DIR)/cos_photo_elf.h $(BUILD_DIR)/cos_sample_gallery_elf.h $(BUILD_DIR)/cos_sample_tone_elf.h $(BUILD_DIR)/cos_tcc_elf.h $(BUILD_DIR)/cos_py2c_elf.h $(BUILD_DIR)/cos_p2ccli_elf.h $(BUILD_DIR)/cos_p2csrc_pack.h $(BUILD_DIR)/cos_terminal_elf.h $(BUILD_DIR)/cos_cosmsgd_elf.h $(BUILD_DIR)/cos_media_elf.h $(BUILD_DIR)/cos_sdk_pack.h $(BUILD_DIR)/cos_jpfont.h $(BUILD_DIR)/cos_langja_so.h $(BUILD_DIR)/cos_kmod_hello.h $(BUILD_DIR)/cos_kmod_fixtures.h $(BUILD_DIR)/cos_ssptest.h $(BUILD_DIR)/cos_posixtest.h $(BUILD_DIR)/cos_dltest.h $(if $(VALIDATION_TESTPROGS),$(BUILD_DIR)/cos_imgdev.h $(BUILD_DIR)/cos_linuxtest.h $(BUILD_DIR)/cos_linuxroot.h $(BUILD_DIR)/cos_linuxroot.inc) $(BUILD_DIR)/cos_plugins.h $(BUILD_DIR)/cos_files_elf.h $(BUILD_DIR)/cos_craft_elf.h $(BUILD_DIR)/cos_mc_games.h $(BUILD_DIR)/cos_mc_games.inc $(BUILD_DIR)/cos_mc_audio.h $(BUILD_DIR)/cos_mc_audio.inc | $(OBJ_DIR)
 	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+	$(CC) $(CFLAGS) -g0 $(INCLUDES) -c $< -o $@        # -g0: the file is ~25 MB of embedded programs; DWARF for them made the compile take half an hour
 
 
 # C-OS Studio (the IDE), tcc.c-os (TinyCC 0.9.28rc) and the on-device SDK are built by
 # tools/build_studio.sh as real C-OS ELF programs, then embedded into the kernel image.
 # The IDE has a 10 MB size budget (the script enforces it).
+# The Py2C runtime as a static library for programs made by Py2C Studio on the device: built here by the host compiler (fast, optimised),
+# shipped in the SDK as /system/sdk/lib/libp2crt.a with its headers in /system/sdk/include/py2c/ - tcc.c-os only compiles the generated file.
+P2CRT_SRCS = $(P2C_DIR)/src/common/python_code_to_c_unicode_tables.c $(P2C_DIR)/src/runtime/python_code_to_c_runtime.c $(P2C_DIR)/src/common/python_code_to_c_common.c $(P2C_DIR)/src/platform/python_code_to_c_platform.c $(P2C_DIR)/src/platform/python_code_to_c_platform_hosted.c $(P2C_DIR)/src/modules/python_code_to_c_pygame.c
+P2CRT_OBJS = $(patsubst $(P2C_DIR)/src/%.c,$(BUILD_DIR)/p2crt/%.o,$(P2CRT_SRCS))
+$(BUILD_DIR)/p2crt/%.o: $(P2C_DIR)/src/%.c $(wildcard $(P2C_DIR)/include/*/*.h)
+	mkdir -p $(dir $@)
+	$(USERLAND_CC) -c -O2 -DPYTHON_CODE_TO_C_NO_TLS -DP2C_COS_WINDOW -U__linux__ -ffreestanding -fno-builtin -fno-asynchronous-unwind-tables -fPIC -fstack-protector-strong -mstack-protector-guard=global -w -nostdinc -isystem $(USERLAND_GCC_INC) -isystem $(USERLAND_DIR)/include/libc -I$(USERLAND_DIR)/include -I$(P2C_DIR)/include -o $@ $<
+$(BUILD_DIR)/p2crt/libp2crt.a: $(P2CRT_OBJS)
+	rm -f $@ && $(USERLAND_AR) rcs $@ $^
 STUDIO_SRCS := $(wildcard userland/programs/studio/*.c userland/programs/studio/*.h userland/programs/tcc/*.c userland/programs/tcc/*.h userland/programs/tcc/compat/*.h userland/programs/tcc/compat/sys/*.h userland/sdk/include-extra/*.h) userland/lib/cos_ui.c
-$(BUILD_DIR)/studio/.built: $(STUDIO_SRCS) userland/include/cos.h userland/include/cos_ui.h tools/build_studio.sh tools/cos-cc $(BUILD_DIR)/userland/libcos.a $(BUILD_DIR)/userland/cos_crt0.o | $(BUILD_DIR)
+$(BUILD_DIR)/studio/.built: $(BUILD_DIR)/p2crt/libp2crt.a $(wildcard $(P2C_DIR)/examples/*.py) $(wildcard userland/sdk/examples/singleheader/*) userland/third_party/stb_image.h userland/third_party/stb_truetype.h userland/third_party/minimp3.h $(STUDIO_SRCS) userland/include/cos.h userland/include/cos_ui.h userland/include/cos_popup.h tools/build_studio.sh tools/cos-cc $(BUILD_DIR)/userland/libcos.a $(BUILD_DIR)/userland/cos_crt0.o | $(BUILD_DIR)
 	sh tools/build_studio.sh
 	touch $@
 $(BUILD_DIR)/cos_studio_elf.h: $(BUILD_DIR)/studio/.built tools/gen_cos_program.py
@@ -1036,13 +1447,48 @@ $(OBJ_DIR)/kernel/cos_studio.o: $(SRCROOT)/kernel/cos_studio.c $(BUILD_DIR)/cos_
 	$(CC) $(CFLAGS) $(INCLUDES) -I$(BUILD_DIR) -c $< -o $@
 
 # ---- File Manager: a ring-3 .c-os program (userland/programs/files), embedded like the music player ----
-FILES_APP_SRC := userland/programs/files/main.c userland/programs/files/core.c userland/programs/files/ui.c userland/programs/files/input.c userland/programs/files/stbi_impl.c
+FILES_APP_SRC := userland/programs/files/main.c userland/programs/files/core.c userland/programs/files/ui.c userland/programs/files/input.c userland/programs/files/plugins.c userland/programs/files/stbi_impl.c
 FILES_APP_DEPS := $(wildcard userland/programs/files/*.h) userland/include/cos.h userland/include/cos_ui.h userland/third_party/stb_image.h $(BUILD_DIR)/userland/libcos.a
-$(BUILD_DIR)/cos_files.c-os: $(FILES_APP_SRC) $(FILES_APP_DEPS) tools/cos-cc
-	tools/cos-cc -O2 -o $@ $(FILES_APP_SRC)
+$(BUILD_DIR)/cos_files.c-os: $(FILES_APP_SRC) $(IME_UI_SRCS) $(IME_UI_DEPS) $(FILES_APP_DEPS) tools/cos-cc
+	tools/cos-cc -O2 -o $@ $(FILES_APP_SRC) userland/lib/cosime.c userland/lib/cosime_ui.c      # (stbi_impl.c already carries the zlib code the dictionary needs)
 $(BUILD_DIR)/cos_files_elf.h: $(BUILD_DIR)/cos_files.c-os tools/gen_cos_program.py
 	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_files_elf
 # Noto Sans JP (subset: kana, punctuation, JIS X 0208 kanji), installed to /system/fonts by the layout code
+# The extension daemon (userland/programs/extd): runs the plugins of /system/plugins/system at boot
+$(BUILD_DIR)/extd.c-os: userland/programs/extd/main.c userland/include/cos_plugin_system.h $(SAMPLE_DEPS) | $(BUILD_DIR)
+	tools/cos-cc -O2 -o $@ $<
+$(BUILD_DIR)/cos_extd_elf.h: $(BUILD_DIR)/extd.c-os tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_extd_elf
+# Plugins (userland/plugins/<app>/<name>.c, see docs/plugins.md): .c-osll libraries the running Messenger / File Manager load, unload and reload on the fly.
+# They ship in /system/plugins/available/<app>/; copying one into /system/plugins/<app>/ switches it on.
+PLUGINS_messenger := dice textfx stats
+PLUGINS_files     := checksum backup hexview wordcount
+PLUGINS_terminal  := textutils hexdump calc alias sysinfo
+PLUGINS_studio    := texttools todo snippets docstats cformat
+PLUGINS_py2c      := header snippets tidy stats
+PLUGINS_settings  := desktopcolor autodark layout palette
+PLUGINS_system    := settings/desktopcolor settings/autodark
+PLUGIN_APPS := messenger files terminal studio py2c settings system
+# an entry "other/name" in PLUGINS_<app> is the library userland/plugins/other/name.c installed for <app> too (one library, several programs)
+plugin_lib = $(BUILD_DIR)/plugins/$(if $(findstring /,$(2)),$(2),$(1)/$(2)).c-osll
+PLUGIN_LIBS := $(sort $(foreach a,$(PLUGIN_APPS),$(foreach p,$(PLUGINS_$(a)),$(call plugin_lib,$(a),$(p)))))
+$(BUILD_DIR)/plugins/%.c-osll: userland/plugins/%.c userland/include/cos_plugin.h userland/include/cos_plugin_base.h userland/include/cos_plugin_util.h $(wildcard userland/include/cos_plugin_*.h) tools/cos-cc | $(BUILD_DIR)
+	mkdir -p $(dir $@)
+	tools/cos-cc --lib -O2 -o $@ $<
+# cos_plugins.h: the libraries as byte arrays; cos_plugins.inc: the lines cos_system_layout.c runs to install them
+$(BUILD_DIR)/cos_plugins.h: $(PLUGIN_LIBS) tools/gen_cos_program.py
+	rm -f $@.tmp $(BUILD_DIR)/cos_plugins.inc $(BUILD_DIR)/cos_plugins.inc.files
+	for a in $(PLUGIN_APPS); do echo '    ensure_dir("/system/plugins", "'$$a'"); ensure_dir("/system/plugins/available", "'$$a'");' >> $(BUILD_DIR)/cos_plugins.inc; done
+	$(foreach a,$(PLUGIN_APPS),$(foreach p,$(PLUGINS_$(a)),python3 tools/gen_cos_program.py --in $(call plugin_lib,$(a),$(p)) --out $@.1 --symbol cos_plg_$(a)_$(notdir $(p)) && cat $@.1 >> $@.tmp && echo '    ensure_file("/system/plugins/available/$(a)", "$(notdir $(p)).c-osll", cos_plg_$(a)_$(notdir $(p)), cos_plg_$(a)_$(notdir $(p))_len);' >> $(BUILD_DIR)/cos_plugins.inc.files;))
+	touch $@.tmp $(BUILD_DIR)/cos_plugins.inc.files; cat $(BUILD_DIR)/cos_plugins.inc.files >> $(BUILD_DIR)/cos_plugins.inc; rm -f $(BUILD_DIR)/cos_plugins.inc.files $@.1
+	mv $@.tmp $@
+
+# Language packs of C-OS Message: shared libraries (.c-osll) loaded with cos_dlopen() from /system/lang
+$(BUILD_DIR)/langpacks/ja.c-osll: userland/langpacks/ja.c userland/langpacks/ja_table.inc tools/cos-cc | $(BUILD_DIR)
+	mkdir -p $(dir $@)
+	tools/cos-cc --lib -O2 -o $@ $<
+$(BUILD_DIR)/cos_langja_so.h: $(BUILD_DIR)/langpacks/ja.c-osll tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_langja_so
 $(BUILD_DIR)/cos_jpfont.h: userland/third_party/NotoSansJP-subset.ttf tools/gen_cos_program.py
 	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_jpfont
 $(OBJ_DIR)/kernel/cos_files.o: $(SRCROOT)/kernel/cos_files.c $(BUILD_DIR)/cos_files_elf.h | $(OBJ_DIR)
@@ -1051,13 +1497,31 @@ $(OBJ_DIR)/kernel/cos_files.o: $(SRCROOT)/kernel/cos_files.c $(BUILD_DIR)/cos_fi
 $(OBJ_DIR)/kernel/cos_bootsplash.o: $(SRCROOT)/kernel/cos_bootsplash.c $(BUILD_DIR)/cos_bootsplash_elf.h | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -I$(BUILD_DIR) -c $< -o $@
+$(OBJ_DIR)/kernel/cos_editor.o: $(SRCROOT)/kernel/cos_editor.c $(BUILD_DIR)/cos_editor_elf.h $(BUILD_DIR)/cos_sheet_elf.h | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -I$(BUILD_DIR) -c $< -o $@
+$(OBJ_DIR)/kernel/cos_calc.o: $(SRCROOT)/kernel/cos_calc.c $(BUILD_DIR)/cos_calc_elf.h $(BUILD_DIR)/cos_httpdl_elf.h | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -I$(BUILD_DIR) -c $< -o $@
+$(OBJ_DIR)/kernel/cos_sysapps.o: $(SRCROOT)/kernel/cos_sysapps.c $(BUILD_DIR)/cos_sysmon_elf.h | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -I$(BUILD_DIR) -c $< -o $@
 $(OBJ_DIR)/kernel/cos_clock.o: $(SRCROOT)/kernel/cos_clock.c $(BUILD_DIR)/cos_clock_elf.h | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -I$(BUILD_DIR) -c $< -o $@
 $(OBJ_DIR)/kernel/cos_paint.o: $(SRCROOT)/kernel/cos_paint.c $(BUILD_DIR)/cos_paint_elf.h | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -I$(BUILD_DIR) -c $< -o $@
+$(OBJ_DIR)/kernel/cos_ime_data.o: $(SRCROOT)/kernel/cos_ime_data.c userland/third_party/mozc_dict/cosime.dic | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -DCOS_IME_DIC_PATH='"$(abspath userland/third_party/mozc_dict/cosime.dic)"' -c $< -o $@
+$(OBJ_DIR)/kernel/cos_messenger.o: $(SRCROOT)/kernel/cos_messenger.c $(BUILD_DIR)/cos_messenger_elf.h | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -I$(BUILD_DIR) -c $< -o $@
 $(OBJ_DIR)/kernel/cos_settings.o: $(SRCROOT)/kernel/cos_settings.c $(BUILD_DIR)/cos_settings_elf.h | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -I$(BUILD_DIR) -c $< -o $@
+$(OBJ_DIR)/kernel/cos_terminal.o: $(SRCROOT)/kernel/cos_terminal.c $(BUILD_DIR)/cos_terminal_elf.h | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -I$(BUILD_DIR) -c $< -o $@
 $(OBJ_DIR)/kernel/cos_fm_support.o: $(SRCROOT)/kernel/cos_fm_support.c | $(OBJ_DIR)
@@ -1067,7 +1531,153 @@ $(OBJ_DIR)/kernel/cos_fm_support.o: $(SRCROOT)/kernel/cos_fm_support.c | $(OBJ_D
 $(OBJ_DIR)/kernel/cos_music.o: $(SRCROOT)/kernel/cos_music.c $(BUILD_DIR)/cos_music_elf.h | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+$(OBJ_DIR)/kernel/cos_media.o: $(SRCROOT)/kernel/cos_media.c $(BUILD_DIR)/cos_media_elf.h | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
+# Test programs that the validation build installs in /bin (VALIDATION_TESTPROGS=1): ssptest overflows a buffer to check the stack protector
+$(BUILD_DIR)/ssptest.c-os: tools/ssp_test.c tools/cos-cc $(BUILD_DIR)/userland/libcos.a | $(BUILD_DIR)
+	tools/cos-cc -O1 -o $@ $<
+$(BUILD_DIR)/cos_ssptest.h: $(BUILD_DIR)/ssptest.c-os tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_ssptest
+# POSIX layer checks (tools/posixtest, run by tools/run_posix_test.sh)
+$(BUILD_DIR)/posixtest.c-os: tools/posixtest/posix_test.c tools/cos-cc $(BUILD_DIR)/userland/libcos.a | $(BUILD_DIR)
+	tools/cos-cc -O1 -o $@ $<
+$(BUILD_DIR)/cos_posixtest.h: $(BUILD_DIR)/posixtest.c-os tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_posixtest
+# On-device image decoder test (tools/run_imgdev_test.sh): the test images and the program that decodes them, installed by the VALIDATION_TESTPROGS build
+$(BUILD_DIR)/imgdev.c-os: tools/imgdev/imgdev.c tools/cos-cc $(BUILD_DIR)/userland/libcos.a | $(BUILD_DIR)
+	tools/cos-cc -O1 -o $@ $<
+$(BUILD_DIR)/cos_imgdev.h: $(BUILD_DIR)/imgdev.c-os tools/imgdev/gen.py tools/imgdev/pack.py tools/gen_cos_program.py
+	python3 -W ignore tools/imgdev/gen.py $(BUILD_DIR)/imgdev_assets
+	python3 tools/imgdev/pack.py $(BUILD_DIR)/imgdev_assets $(BUILD_DIR)/cos_imgdev_files.h
+	python3 tools/gen_cos_program.py --in $(BUILD_DIR)/imgdev.c-os --out $(BUILD_DIR)/cos_imgdev_prog.h --symbol cos_imgdev
+	cat $(BUILD_DIR)/cos_imgdev_prog.h $(BUILD_DIR)/cos_imgdev_files.h > $@
+# Linux compatibility test programs (tools/linuxtest, run by tools/run_linux_test.sh): ordinary Linux binaries built with the host compiler (static-pie), installed in /linux-test by the VALIDATION_TESTPROGS build
+$(BUILD_DIR)/linuxtest/hello: tools/linuxtest/hello.c | $(BUILD_DIR)
+	mkdir -p $(dir $@)
+	gcc -O2 -static-pie -o $@ $< 2>/dev/null
+# LINUX_ROOTFS="/host/path:/linux/guest/path ..." adds files to the Linux root file system of the validation build (a busybox, libraries: see docs/LINUX_COMPAT.md)
+# LINUX_ROOTFS_FILE=list.txt: the same "host:guest" entries, one per line (a long list does not fit on a command line)
+ifneq ($(LINUX_ROOTFS_FILE),)
+LINUX_ROOTFS := $(strip $(LINUX_ROOTFS) $(file < $(LINUX_ROOTFS_FILE)))
+endif
+# the file list itself is a dependency too: a changed list regenerates the headers
+$(BUILD_DIR)/linuxroot.spec: FORCE | $(BUILD_DIR)
+ifneq ($(LINUX_ROOTFS_FILE),)
+	@cmp -s $(LINUX_ROOTFS_FILE) $@ || cp $(LINUX_ROOTFS_FILE) $@
+else
+	@echo '$(LINUX_ROOTFS)' | cmp -s - $@ || echo '$(LINUX_ROOTFS)' > $@
+endif
+$(BUILD_DIR)/cos_linuxroot.h $(BUILD_DIR)/cos_linuxroot.inc: $(BUILD_DIR)/linuxroot.spec $(foreach f,$(LINUX_ROOTFS),$(firstword $(subst :, ,$(f)))) tools/linux_rootfs_pack.py Makefile | $(BUILD_DIR)
+	python3 tools/linux_rootfs_pack.py $(BUILD_DIR)/cos_linuxroot.h $(BUILD_DIR)/cos_linuxroot.inc $(if $(LINUX_ROOTFS_FILE),@$(LINUX_ROOTFS_FILE),$(LINUX_ROOTFS))
+# the same program linked dynamically, with the host's dynamic loader and C library as its /linux root file system
+$(BUILD_DIR)/linuxtest/hello_dyn: tools/linuxtest/hello.c | $(BUILD_DIR)
+	mkdir -p $(dir $@)
+	gcc -O2 -pie -o $@ $< 2>/dev/null
+$(BUILD_DIR)/linuxtest/threads: tools/linuxtest/threads.c | $(BUILD_DIR)
+	mkdir -p $(dir $@)
+	gcc -O2 -pie -pthread -o $@ $< 2>/dev/null
+$(BUILD_DIR)/linuxtest/fds: tools/linuxtest/fds.c | $(BUILD_DIR)
+	mkdir -p $(dir $@)
+	gcc -O2 -pie -pthread -o $@ $< 2>/dev/null
+$(BUILD_DIR)/linuxtest/procs: tools/linuxtest/procs.c | $(BUILD_DIR)
+	mkdir -p $(dir $@)
+	gcc -O2 -pie -pthread -o $@ $< 2>/dev/null
+$(BUILD_DIR)/linuxtest/ld.so: | $(BUILD_DIR)
+	mkdir -p $(dir $@)
+	cp -L /lib64/ld-linux-x86-64.so.2 $@
+$(BUILD_DIR)/linuxtest/libc.so.6: | $(BUILD_DIR)
+	mkdir -p $(dir $@)
+	cp -L /lib/x86_64-linux-gnu/libc.so.6 $@
+$(BUILD_DIR)/cos_linuxtest.h: $(BUILD_DIR)/linuxtest/hello $(BUILD_DIR)/linuxtest/hello_dyn $(BUILD_DIR)/linuxtest/threads $(BUILD_DIR)/linuxtest/fds $(BUILD_DIR)/linuxtest/procs $(BUILD_DIR)/linuxtest/ld.so $(BUILD_DIR)/linuxtest/libc.so.6 tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $(BUILD_DIR)/linuxtest/hello --out $(BUILD_DIR)/cos_linuxtest_1.h --symbol cos_linuxtest_hello
+	python3 tools/gen_cos_program.py --in $(BUILD_DIR)/linuxtest/hello_dyn --out $(BUILD_DIR)/cos_linuxtest_2.h --symbol cos_linuxtest_hello_dyn
+	python3 tools/gen_cos_program.py --in $(BUILD_DIR)/linuxtest/ld.so --out $(BUILD_DIR)/cos_linuxtest_3.h --symbol cos_linuxtest_ld
+	python3 tools/gen_cos_program.py --in $(BUILD_DIR)/linuxtest/libc.so.6 --out $(BUILD_DIR)/cos_linuxtest_4.h --symbol cos_linuxtest_libc
+	python3 tools/gen_cos_program.py --in $(BUILD_DIR)/linuxtest/threads --out $(BUILD_DIR)/cos_linuxtest_5.h --symbol cos_linuxtest_threads
+	python3 tools/gen_cos_program.py --in $(BUILD_DIR)/linuxtest/fds --out $(BUILD_DIR)/cos_linuxtest_6.h --symbol cos_linuxtest_fds
+	python3 tools/gen_cos_program.py --in $(BUILD_DIR)/linuxtest/procs --out $(BUILD_DIR)/cos_linuxtest_7.h --symbol cos_linuxtest_procs
+	cat $(BUILD_DIR)/cos_linuxtest_[1-7].h > $@
+# Loader test programs (tools/dltest, run by tools/run_dl_test.sh): installed in /bin and /lib by the VALIDATION_TESTPROGS build
+DLTEST_LIBS = $(BUILD_DIR)/dltest/dla.c-osll $(BUILD_DIR)/dltest/dlb.c-osll $(BUILD_DIR)/dltest/dlbad.c-osll $(BUILD_DIR)/dltest/dlp.c-osll
+$(BUILD_DIR)/dltest/dla.c-osll: tools/dltest/dl_a.c tools/cos-cc | $(BUILD_DIR)
+	mkdir -p $(dir $@)
+	tools/cos-cc --lib -O1 -o $@ $<
+$(BUILD_DIR)/dltest/dlb.c-osll: tools/dltest/dl_b.c $(BUILD_DIR)/dltest/dla.c-osll tools/cos-cc | $(BUILD_DIR)
+	tools/cos-cc --lib -O1 -o $@ tools/dltest/dl_b.c $(BUILD_DIR)/dltest/dla.c-osll
+$(BUILD_DIR)/dltest/dlbad.c-osll: tools/dltest/dl_bad.c tools/cos-cc | $(BUILD_DIR)
+	mkdir -p $(dir $@)
+	tools/cos-cc --lib -O1 -o $@ $<
+$(BUILD_DIR)/dltest/dlp.c-osll: tools/dltest/dl_p.c tools/cos-cc | $(BUILD_DIR)
+	mkdir -p $(dir $@)
+	tools/cos-cc --lib -O1 -o $@ $<
+$(BUILD_DIR)/dltest.c-os: tools/dltest/dl_main.c tools/cos-cc $(BUILD_DIR)/userland/libcos.a | $(BUILD_DIR)
+	tools/cos-cc -O1 -o $@ $<
+$(BUILD_DIR)/dlchild.c-os: tools/dltest/dl_child.c tools/cos-cc $(BUILD_DIR)/userland/libcos.a | $(BUILD_DIR)
+	tools/cos-cc -O1 -o $@ $<
+$(BUILD_DIR)/dluse.c-os: tools/dltest/dl_use.c $(BUILD_DIR)/dltest/dla.c-osll tools/cos-cc $(BUILD_DIR)/userland/libcos.a | $(BUILD_DIR)
+	tools/cos-cc -O1 -o $@ tools/dltest/dl_use.c $(BUILD_DIR)/dltest/dla.c-osll
+$(BUILD_DIR)/cos_dltest.h: $(BUILD_DIR)/dltest.c-os $(BUILD_DIR)/dlchild.c-os $(BUILD_DIR)/dluse.c-os $(DLTEST_LIBS) tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $(BUILD_DIR)/dltest.c-os --out $(BUILD_DIR)/cos_dltest_1.h --symbol cos_dltest
+	python3 tools/gen_cos_program.py --in $(BUILD_DIR)/dlchild.c-os --out $(BUILD_DIR)/cos_dltest_2.h --symbol cos_dlchild
+	python3 tools/gen_cos_program.py --in $(BUILD_DIR)/dluse.c-os --out $(BUILD_DIR)/cos_dltest_3.h --symbol cos_dluse
+	python3 tools/gen_cos_program.py --in $(BUILD_DIR)/dltest/dla.c-osll --out $(BUILD_DIR)/cos_dltest_4.h --symbol cos_dla_so
+	python3 tools/gen_cos_program.py --in $(BUILD_DIR)/dltest/dlb.c-osll --out $(BUILD_DIR)/cos_dltest_5.h --symbol cos_dlb_so
+	python3 tools/gen_cos_program.py --in $(BUILD_DIR)/dltest/dlbad.c-osll --out $(BUILD_DIR)/cos_dltest_6.h --symbol cos_dlbad_so
+	python3 tools/gen_cos_program.py --in $(BUILD_DIR)/dltest/dlp.c-osll --out $(BUILD_DIR)/cos_dltest_7.h --symbol cos_dlp_so
+	cat $(BUILD_DIR)/cos_dltest_[1-7].h > $@
+# Kernel modules (.c-osys): the signing key of this build tree, the example module, and the files the validation build adds to test the loader
+# KMOD_TRUSTED_LEVEL (default 3): the highest signing-key level this kernel trusts. make KMOD_TRUSTED_LEVEL=2 builds a kernel that has no key for SYSTEM-level modules.
+KMOD_TRUSTED_LEVEL ?= 3
+$(BUILD_DIR)/kmod_pubkey.h: tools/gen_kmod_keys.py FORCE | $(BUILD_DIR)
+	python3 tools/gen_kmod_keys.py $(BUILD_DIR) $(KMOD_TRUSTED_LEVEL)
+# one rule per module: $(1) name, $(2) source, $(3) extra prerequisites, $(4) extra cos-sys flags
+define KMOD_RULE
+$$(BUILD_DIR)/drivers/$(1).c-osys: $(2) src/include/cosys.h tools/cos-sys tools/kmod_sign.py $$(BUILD_DIR)/kmod_pubkey.h $(3)
+	mkdir -p $$(dir $$@)
+	tools/cos-sys $(4) -o $$@ $$<
+endef
+$(eval $(call KMOD_RULE,hello,userland/drivers/hello/hello.c,,))
+$(eval $(call KMOD_RULE,kbase,userland/drivers/kbase/kbase.c,,))
+$(eval $(call KMOD_RULE,kuser,userland/drivers/kuser/kuser.c,$(BUILD_DIR)/drivers/kbase.c-osys,-l $(BUILD_DIR)/drivers/kbase.so))
+$(eval $(call KMOD_RULE,rt,userland/drivers/rt/rt.c,,))
+$(eval $(call KMOD_RULE,audit,userland/drivers/audit/audit.c,,))
+$(eval $(call KMOD_RULE,pci,userland/drivers/pci/pci.c,,))
+$(eval $(call KMOD_RULE,virtiorng,userland/drivers/virtiorng/virtiorng.c,,))
+$(eval $(call KMOD_RULE,wprotect,userland/drivers/wprotect/wprotect.c,,))
+$(eval $(call KMOD_RULE,netfw,userland/drivers/netfw/netfw.c,,))
+$(eval $(call KMOD_RULE,edu,userland/drivers/edu/edu.c,,))
+$(eval $(call KMOD_RULE,needs_kernel,userland/drivers/fixtures/needs_kernel.c,,))
+$(eval $(call KMOD_RULE,too_privileged,userland/drivers/fixtures/too_privileged.c,,))
+$(BUILD_DIR)/cos_kmod_hello.h: $(BUILD_DIR)/drivers/hello.c-osys $(BUILD_DIR)/drivers/kbase.c-osys $(BUILD_DIR)/drivers/kuser.c-osys $(BUILD_DIR)/drivers/audit.c-osys $(BUILD_DIR)/drivers/pci.c-osys $(BUILD_DIR)/drivers/virtiorng.c-osys $(BUILD_DIR)/drivers/wprotect.c-osys $(BUILD_DIR)/drivers/netfw.c-osys $(BUILD_DIR)/drivers/edu.c-osys tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $(BUILD_DIR)/drivers/hello.c-osys --out $(BUILD_DIR)/cos_kmod_b1.h --symbol cos_kmod_hello
+	python3 tools/gen_cos_program.py --in $(BUILD_DIR)/drivers/kbase.c-osys --out $(BUILD_DIR)/cos_kmod_b2.h --symbol cos_kmod_kbase
+	python3 tools/gen_cos_program.py --in $(BUILD_DIR)/drivers/kuser.c-osys --out $(BUILD_DIR)/cos_kmod_b3.h --symbol cos_kmod_kuser
+	python3 tools/gen_cos_program.py --in $(BUILD_DIR)/drivers/audit.c-osys --out $(BUILD_DIR)/cos_kmod_b4.h --symbol cos_kmod_audit
+	python3 tools/gen_cos_program.py --in $(BUILD_DIR)/drivers/pci.c-osys --out $(BUILD_DIR)/cos_kmod_b5.h --symbol cos_kmod_pci
+	python3 tools/gen_cos_program.py --in $(BUILD_DIR)/drivers/virtiorng.c-osys --out $(BUILD_DIR)/cos_kmod_b6.h --symbol cos_kmod_virtiorng
+	python3 tools/gen_cos_program.py --in $(BUILD_DIR)/drivers/wprotect.c-osys --out $(BUILD_DIR)/cos_kmod_b7.h --symbol cos_kmod_wprotect
+	python3 tools/gen_cos_program.py --in $(BUILD_DIR)/drivers/netfw.c-osys --out $(BUILD_DIR)/cos_kmod_b8.h --symbol cos_kmod_netfw
+	python3 tools/gen_cos_program.py --in $(BUILD_DIR)/drivers/edu.c-osys --out $(BUILD_DIR)/cos_kmod_b9.h --symbol cos_kmod_edu
+	cat $(BUILD_DIR)/cos_kmod_b1.h $(BUILD_DIR)/cos_kmod_b2.h $(BUILD_DIR)/cos_kmod_b3.h $(BUILD_DIR)/cos_kmod_b4.h $(BUILD_DIR)/cos_kmod_b5.h $(BUILD_DIR)/cos_kmod_b6.h $(BUILD_DIR)/cos_kmod_b7.h $(BUILD_DIR)/cos_kmod_b8.h $(BUILD_DIR)/cos_kmod_b9.h > $@
+$(BUILD_DIR)/drivers/tampered.c-osys: $(BUILD_DIR)/drivers/hello.c-osys $(BUILD_DIR)/drivers/netfw.c-osys tools/kmod_fixtures.py
+	python3 tools/kmod_fixtures.py $< $(BUILD_DIR)/drivers $(BUILD_DIR)/drivers/netfw.so $(BUILD_DIR)/kmod
+$(BUILD_DIR)/cos_kmod_fixtures.h: $(BUILD_DIR)/drivers/needs_kernel.c-osys $(BUILD_DIR)/drivers/too_privileged.c-osys $(BUILD_DIR)/drivers/rt.c-osys $(BUILD_DIR)/drivers/tampered.c-osys tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $(BUILD_DIR)/drivers/needs_kernel.c-osys --out $(BUILD_DIR)/cos_kmod_fx1.h --symbol cos_kmod_fx_needs_kernel
+	python3 tools/gen_cos_program.py --in $(BUILD_DIR)/drivers/tampered.c-osys --out $(BUILD_DIR)/cos_kmod_fx2.h --symbol cos_kmod_fx_tampered
+	python3 tools/gen_cos_program.py --in $(BUILD_DIR)/drivers/unsigned.c-osys --out $(BUILD_DIR)/cos_kmod_fx3.h --symbol cos_kmod_fx_unsigned
+	python3 tools/gen_cos_program.py --in $(BUILD_DIR)/drivers/wrongkey.c-osys --out $(BUILD_DIR)/cos_kmod_fx4.h --symbol cos_kmod_fx_wrongkey
+	python3 tools/gen_cos_program.py --in $(BUILD_DIR)/drivers/too_privileged.c-osys --out $(BUILD_DIR)/cos_kmod_fx5.h --symbol cos_kmod_fx_too_privileged
+	python3 tools/gen_cos_program.py --in $(BUILD_DIR)/drivers/rt.c-osys --out $(BUILD_DIR)/cos_kmod_fx6.h --symbol cos_kmod_fx_rt
+	python3 tools/gen_cos_program.py --in $(BUILD_DIR)/drivers/lowkey_system.c-osys --out $(BUILD_DIR)/cos_kmod_fx7.h --symbol cos_kmod_fx_lowkey_system
+	cat $(BUILD_DIR)/cos_kmod_fx1.h $(BUILD_DIR)/cos_kmod_fx2.h $(BUILD_DIR)/cos_kmod_fx3.h $(BUILD_DIR)/cos_kmod_fx4.h $(BUILD_DIR)/cos_kmod_fx5.h $(BUILD_DIR)/cos_kmod_fx6.h $(BUILD_DIR)/cos_kmod_fx7.h > $@
+$(OBJ_DIR)/kernel/cos_kmod.o: $(SRCROOT)/kernel/cos_kmod.c src/include/cosys.h $(SRCROOT)/kernel/cos_elf.h $(BUILD_DIR)/kmod_pubkey.h | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -I$(BEARSSL_DIR)/inc -c $< -o $@
+$(OBJ_DIR)/kernel/cos_bootupd.o: $(SRCROOT)/kernel/cos_bootupd.c $(SRCROOT)/kernel/cos_bootupd.h $(BUILD_DIR)/kernel_pubkey.h $(BUILD_DIR)/kernel_serial.h | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -I$(BEARSSL_DIR)/inc -I$(SRCROOT)/third_party/fatfs $(if $(KUPD_NOCONFIRM),-DCOS_KUPD_NOCONFIRM) -c $< -o $@
 $(OBJ_DIR)/kernel/cos_audio.o: $(SRCROOT)/kernel/cos_audio.c | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
@@ -1085,10 +1695,25 @@ $(OBJ_DIR)/kernel/cos_elf.o: $(SRCROOT)/kernel/cos_elf.c | $(OBJ_DIR)
 $(OBJ_DIR)/kernel/cos_elf_link.o: $(SRCROOT)/kernel/cos_elf_link.c | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+$(OBJ_DIR)/kernel/cos_pcache.o: $(SRCROOT)/kernel/cos_pcache.c | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
 # The futex: the wait/wake primitive every userland lock is built on.
 # Before this, .c-os programs had threads and nothing to synchronise them
 # with - not a mutex, not a semaphore, not even a documented atomic.
+$(OBJ_DIR)/kernel/cos_httpjob.o: $(SRCROOT)/kernel/cos_httpjob.c | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+$(OBJ_DIR)/kernel/cos_games.o: $(SRCROOT)/kernel/cos_games.c $(BUILD_DIR)/cos_games2d_elf.h $(BUILD_DIR)/cos_launcher_elf.h $(BUILD_DIR)/cos_tinygl_elf.h | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -I$(BUILD_DIR) -c $< -o $@
+$(OBJ_DIR)/kernel/cos_socket.o: $(SRCROOT)/kernel/cos_socket.c | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+$(OBJ_DIR)/kernel/cos_nettest.o: $(SRCROOT)/kernel/cos_nettest.c $(BUILD_DIR)/cos_netsock_test_elf.h | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -I$(BUILD_DIR) -c $< -o $@
 $(OBJ_DIR)/kernel/cos_futex.o: $(SRCROOT)/kernel/cos_futex.c | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
@@ -1140,10 +1765,6 @@ $(OBJ_DIR)/bios/bios.o: $(SRCROOT)/bios/bios.c | $(OBJ_DIR)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
 $(OBJ_DIR)/kernel/settings_manager.o: $(SRCROOT)/kernel/settings_manager.c | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-$(OBJ_DIR)/drivers/disk/ide.o: $(SRCROOT)/drivers/disk/ide.c | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
@@ -1217,6 +1838,34 @@ $(OBJ_DIR)/gui/core/output/gui_desktop_render.o: $(SRCROOT)/gui/core/output/gui_
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
+$(OBJ_DIR)/gui/core/gui_shell_api.o: $(SRCROOT)/gui/core/gui_shell_api.c $(SRCROOT)/gui/core/gui_internal.h $(SRCROOT)/include/cos_shell.h | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+$(BUILD_DIR)/taskbar.c-os: userland/programs/taskbar/main.c $(SAMPLE_DEPS) | $(BUILD_DIR)
+	tools/cos-cc -O2 -o $@ $<
+$(BUILD_DIR)/cos_taskbar_elf.h: $(BUILD_DIR)/taskbar.c-os tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_taskbar_elf
+$(BUILD_DIR)/startmenu.c-os: userland/programs/startmenu/main.c $(SAMPLE_DEPS) | $(BUILD_DIR)
+	tools/cos-cc -O2 -o $@ $<
+$(BUILD_DIR)/cos_startmenu_elf.h: $(BUILD_DIR)/startmenu.c-os tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_startmenu_elf
+$(BUILD_DIR)/desktop.c-os: userland/programs/desktop/main.c $(SAMPLE_DEPS) | $(BUILD_DIR)
+	tools/cos-cc -O2 -o $@ $<
+$(BUILD_DIR)/cos_desktop_elf.h: $(BUILD_DIR)/desktop.c-os tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_desktop_elf
+$(BUILD_DIR)/notify.c-os: userland/programs/notify/main.c $(SAMPLE_DEPS) | $(BUILD_DIR)
+	tools/cos-cc -O2 -o $@ $<
+$(BUILD_DIR)/cos_notify_elf.h: $(BUILD_DIR)/notify.c-os tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_notify_elf
+$(BUILD_DIR)/ctxmenu.c-os: userland/programs/ctxmenu/main.c $(SAMPLE_DEPS) | $(BUILD_DIR)
+	tools/cos-cc -O2 -o $@ $<
+$(BUILD_DIR)/cos_ctxmenu_elf.h: $(BUILD_DIR)/ctxmenu.c-os tools/gen_cos_program.py
+	python3 tools/gen_cos_program.py --in $< --out $@ --symbol cos_ctxmenu_elf
+$(OBJ_DIR)/kernel/cos_shell.o: $(SRCROOT)/kernel/cos_shell.c $(BUILD_DIR)/cos_ctxmenu_elf.h $(BUILD_DIR)/cos_taskbar_elf.h $(BUILD_DIR)/cos_startmenu_elf.h $(BUILD_DIR)/cos_desktop_elf.h $(BUILD_DIR)/cos_notify_elf.h $(BUILD_DIR)/cos_extd_elf.h | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -I$(BUILD_DIR) -c $< -o $@
+
 $(OBJ_DIR)/gui/core/output/gui_taskbar_frame.o: $(SRCROOT)/gui/core/output/gui_taskbar_frame.c $(SRCROOT)/gui/core/gui_internal.h | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
@@ -1232,13 +1881,12 @@ $(OBJ_DIR)/gui/core/input/gui_input.o: $(SRCROOT)/gui/core/input/gui_input.c $(S
 $(OBJ_DIR)/gui/core/gui_render_loop.o: $(SRCROOT)/gui/core/gui_render_loop.c $(SRCROOT)/gui/core/gui_internal.h | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-
-$(OBJ_DIR)/gui/components/boot_animation.o: $(SRCROOT)/gui/components/boot_animation.c | $(OBJ_DIR)
+$(OBJ_DIR)/gui/core/screenshot.o: $(SRCROOT)/gui/core/screenshot.c $(SRCROOT)/gui/core/screenshot.h | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
-$(OBJ_DIR)/gui/apps/ui/modern_ui.o: $(SRCROOT)/gui/apps/ui/modern_ui.c | $(OBJ_DIR)
+
+$(OBJ_DIR)/gui/components/boot_animation.o: $(SRCROOT)/gui/components/boot_animation.c | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
@@ -1254,10 +1902,6 @@ $(OBJ_DIR)/gui/apps/core/gui_app_folder.o: $(SRCROOT)/gui/apps/core/gui_app_fold
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
-$(OBJ_DIR)/gui/apps/terminal/gui_apps_terminal.o: $(SRCROOT)/gui/apps/terminal/gui_apps_terminal.c $(SRCROOT)/gui/apps/common/gui_apps_common.h $(COSNET_STATE) | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -I$(SRCROOT)/third_party/tinyc -c $< -o $@
 
@@ -1266,63 +1910,11 @@ $(OBJ_DIR)/gui/apps/terminal/gui_apps_terminal.o: $(SRCROOT)/gui/apps/terminal/g
 
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -I$(SRCROOT)/third_party/tinyc -c $< -o $@
-
-$(OBJ_DIR)/gui/apps/calculator/gui_apps_calculator.o: $(SRCROOT)/gui/apps/calculator/gui_apps_calculator.c $(SRCROOT)/gui/apps/common/gui_apps_common.h $(COSNET_STATE) | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-$(OBJ_DIR)/gui/apps/settings/gui_apps_settings.o: $(SRCROOT)/gui/apps/settings/gui_apps_settings.c $(SRCROOT)/gui/apps/common/gui_apps_common.h $(COSNET_STATE) | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-$(OBJ_DIR)/gui/apps/about/gui_apps_about.o: $(SRCROOT)/gui/apps/about/gui_apps_about.c $(SRCROOT)/gui/apps/common/gui_apps_common.h $(COSNET_STATE) | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
 $(OBJ_DIR)/gui/apps/browser/gui_apps_browser.o: $(SRCROOT)/gui/apps/browser/gui_apps_browser.c $(SRCROOT)/gui/apps/common/gui_apps_common.h $(COSNET_STATE) | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
-$(OBJ_DIR)/gui/apps/taskmanager/gui_apps_taskmanager.o: $(SRCROOT)/gui/apps/taskmanager/gui_apps_taskmanager.c $(SRCROOT)/gui/apps/common/gui_apps_common.h $(COSNET_STATE) | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-$(OBJ_DIR)/gui/apps/paint/gui_apps_paint.o: $(SRCROOT)/gui/apps/paint/gui_apps_paint.c $(SRCROOT)/gui/apps/common/gui_apps_common.h $(COSNET_STATE) | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-$(OBJ_DIR)/gui/apps/clock/gui_apps_clock.o: $(SRCROOT)/gui/apps/clock/gui_apps_clock.c $(SRCROOT)/gui/apps/common/gui_apps_common.h $(COSNET_STATE) | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-$(OBJ_DIR)/gui/apps/storage/gui_apps_storage.o: $(SRCROOT)/gui/apps/storage/gui_apps_storage.c $(SRCROOT)/gui/apps/common/gui_apps_common.h $(COSNET_STATE) | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-$(OBJ_DIR)/gui/apps/memory/gui_apps_memory.o: $(SRCROOT)/gui/apps/memory/gui_apps_memory.c $(SRCROOT)/gui/apps/common/gui_apps_common.h $(COSNET_STATE) | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-$(OBJ_DIR)/gui/apps/birthday/gui_apps_birthday.o: $(SRCROOT)/gui/apps/birthday/gui_apps_birthday.c $(SRCROOT)/gui/apps/common/gui_apps_common.h $(COSNET_STATE) | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-$(OBJ_DIR)/gui/apps/music/gui_apps_music.o: $(SRCROOT)/gui/apps/music/gui_apps_music.c $(SRCROOT)/gui/apps/common/gui_apps_common.h $(COSNET_STATE) | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-
-$(OBJ_DIR)/gui/apps/games/voxel_games_advanced.o: $(SRCROOT)/gui/apps/games/voxel_games_advanced.c | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-$(OBJ_DIR)/gui/apps/games/tinygl_viewer.o: $(SRCROOT)/gui/apps/games/tinygl_viewer.c | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-$(OBJ_DIR)/gui/apps/games/games2d.o: $(SRCROOT)/gui/apps/games/games2d.c | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
 $(OBJ_DIR)/gui/apps/tools/calc_school_math.o: $(SRCROOT)/gui/apps/tools/calc_school_math.c | $(OBJ_DIR)
 	mkdir -p $(dir $@)
@@ -1336,71 +1928,11 @@ $(OBJ_DIR)/gui/core/window/gui_create_window.o: $(SRCROOT)/gui/core/window/gui_c
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
-$(OBJ_DIR)/gui/apps/tools/http_downloader_gui.o: $(SRCROOT)/gui/apps/tools/http_downloader_gui.c | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
 $(OBJ_DIR)/gui/apps/system/password_screen.o: $(SRCROOT)/gui/apps/system/password_screen.c | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
-$(OBJ_DIR)/gui/browser/modern_browser.o: $(SRCROOT)/gui/browser/modern_browser.c | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-$(OBJ_DIR)/gui/browser/cos_browser.o: $(SRCROOT)/gui/browser/cos_browser.c | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
 # Additional GUI build rules for new folder structure
-$(OBJ_DIR)/gui/components/enhanced_context_menu.o: $(SRCROOT)/gui/components/enhanced_context_menu.c | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-$(OBJ_DIR)/gui/file_manager/efm_util.o: $(SRCROOT)/gui/file_manager/efm_util.c $(SRCROOT)/gui/file_manager/efm_internal.h | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-$(OBJ_DIR)/gui/file_manager/efm_core.o: $(SRCROOT)/gui/file_manager/efm_core.c $(SRCROOT)/gui/file_manager/efm_internal.h | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-$(OBJ_DIR)/gui/file_manager/efm_fileops.o: $(SRCROOT)/gui/file_manager/efm_fileops.c $(SRCROOT)/gui/file_manager/efm_internal.h | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-$(OBJ_DIR)/gui/file_manager/efm_search_bookmark.o: $(SRCROOT)/gui/file_manager/efm_search_bookmark.c $(SRCROOT)/gui/file_manager/efm_internal.h | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-$(OBJ_DIR)/gui/file_manager/efm_thumbnail_preview.o: $(SRCROOT)/gui/file_manager/efm_thumbnail_preview.c $(SRCROOT)/gui/file_manager/efm_internal.h | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-$(OBJ_DIR)/gui/file_manager/efm_render.o: $(SRCROOT)/gui/file_manager/efm_render.c $(SRCROOT)/gui/file_manager/efm_internal.h | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-$(OBJ_DIR)/gui/file_manager/efm_input.o: $(SRCROOT)/gui/file_manager/efm_input.c $(SRCROOT)/gui/file_manager/efm_internal.h | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-
-$(OBJ_DIR)/gui/core/input/input_manager.o: $(SRCROOT)/gui/core/input/input_manager.c | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-$(OBJ_DIR)/gui/core/output/gui_renderer.o: $(SRCROOT)/gui/core/output/gui_renderer.c | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-$(OBJ_DIR)/gui/file_manager/file_manager_explorer.o: $(SRCROOT)/gui/file_manager/file_manager_explorer.c | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-$(OBJ_DIR)/gui/core/gui_file_manager_enhanced_bridge.o: $(SRCROOT)/gui/core/gui_file_manager_enhanced_bridge.c | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
 $(OBJ_DIR)/gui/apps/system/password_screen_enhanced.o: $(SRCROOT)/gui/apps/system/password_screen_enhanced.c | $(OBJ_DIR)
 	mkdir -p $(dir $@)
@@ -1420,6 +1952,20 @@ $(OBJ_DIR)/apps/jpeg_viewer.o: $(SRCROOT)/apps/jpeg_viewer.c | $(OBJ_DIR)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
 $(OBJ_DIR)/apps/png_decoder.o: $(SRCROOT)/apps/png_decoder.c | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+# Image decoders split out of jpeg_viewer.c / png_decoder.c (docs/image_decoders.md);
+# host-tested by tools/imgtest/run.sh.
+$(OBJ_DIR)/apps/jpeg_codec.o: $(SRCROOT)/apps/jpeg_codec.c | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+$(OBJ_DIR)/apps/bmp_codec.o: $(SRCROOT)/apps/bmp_codec.c | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+$(OBJ_DIR)/apps/image_scale.o: $(SRCROOT)/apps/image_scale.c | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
@@ -1499,6 +2045,48 @@ $(OBJ_DIR)/assets/sample_test_webp.o: $(SRCROOT)/assets/sample_test_webp.c | $(O
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
+$(OBJ_DIR)/assets/sample_test_mp4.o: $(SRCROOT)/assets/sample_test_mp4.c | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(filter-out -O2,$(CFLAGS)) -O0 $(INCLUDES) -c $< -o $@
+$(OBJ_DIR)/assets/sample_test_vp9_mp4.o: $(SRCROOT)/assets/sample_test_vp9_mp4.c | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(filter-out -O2,$(CFLAGS)) -O0 $(INCLUDES) -c $< -o $@
+$(OBJ_DIR)/assets/sample_test_vp9_10bit_mp4.o: $(SRCROOT)/assets/sample_test_vp9_10bit_mp4.c | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(filter-out -O2,$(CFLAGS)) -O0 $(INCLUDES) -c $< -o $@
+$(OBJ_DIR)/assets/sample_test_av1_10bit_mp4.o: $(SRCROOT)/assets/sample_test_av1_10bit_mp4.c | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(filter-out -O2,$(CFLAGS)) -O0 $(INCLUDES) -c $< -o $@
+$(OBJ_DIR)/assets/sample_test_av1_mp4.o: $(SRCROOT)/assets/sample_test_av1_mp4.c | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(filter-out -O2,$(CFLAGS)) -O0 $(INCLUDES) -c $< -o $@
+$(OBJ_DIR)/assets/sample_test_h264_high_mp4.o: $(SRCROOT)/assets/sample_test_h264_high_mp4.c | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(filter-out -O2,$(CFLAGS)) -O0 $(INCLUDES) -c $< -o $@
+$(OBJ_DIR)/assets/sample_test_hevc_mp4.o: $(SRCROOT)/assets/sample_test_hevc_mp4.c | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(filter-out -O2,$(CFLAGS)) -O0 $(INCLUDES) -c $< -o $@
+$(OBJ_DIR)/assets/sample_test_hevc10_mp4.o: $(SRCROOT)/assets/sample_test_hevc10_mp4.c | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(filter-out -O2,$(CFLAGS)) -O0 $(INCLUDES) -c $< -o $@
+$(OBJ_DIR)/assets/sample_test_hevc_12bit_mp4.o: $(SRCROOT)/assets/sample_test_hevc_12bit_mp4.c | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(filter-out -O2,$(CFLAGS)) -O0 $(INCLUDES) -c $< -o $@
+$(OBJ_DIR)/assets/sample_test_vp9_12bit_mp4.o: $(SRCROOT)/assets/sample_test_vp9_12bit_mp4.c | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(filter-out -O2,$(CFLAGS)) -O0 $(INCLUDES) -c $< -o $@
+$(OBJ_DIR)/assets/sample_test_av1_12bit_mp4.o: $(SRCROOT)/assets/sample_test_av1_12bit_mp4.c | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(filter-out -O2,$(CFLAGS)) -O0 $(INCLUDES) -c $< -o $@
+$(OBJ_DIR)/assets/sample_test_hevc_frag_mp4.o: $(SRCROOT)/assets/sample_test_hevc_frag_mp4.c | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(filter-out -O2,$(CFLAGS)) -O0 $(INCLUDES) -c $< -o $@
+$(OBJ_DIR)/assets/sample_test_hevc_hev1_mp4.o: $(SRCROOT)/assets/sample_test_hevc_hev1_mp4.c | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(filter-out -O2,$(CFLAGS)) -O0 $(INCLUDES) -c $< -o $@
+$(OBJ_DIR)/assets/sample_test_hevc_hev1_frag_mp4.o: $(SRCROOT)/assets/sample_test_hevc_hev1_frag_mp4.c | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(filter-out -O2,$(CFLAGS)) -O0 $(INCLUDES) -c $< -o $@
 $(OBJ_DIR)/assets/netsurf_icon_png.o: $(SRCROOT)/assets/netsurf_icon_png.c | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
@@ -1558,23 +2146,39 @@ $(OBJ_DIR)/third_party/fatfs/ffsystem.o: $(SRCROOT)/third_party/fatfs/ffsystem.c
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
+$(OBJ_DIR)/fs/fat_fsck.o: $(SRCROOT)/fs/fat_fsck.c $(SRCROOT)/fs/fat_fsck.h | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -I$(SRCROOT)/third_party/fatfs -c $< -o $@
+
 $(OBJ_DIR)/fs/fs_unified.o: $(SRCROOT)/fs/fs_unified.c | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
-$(OBJ_DIR)/fs/text_editor.o: $(SRCROOT)/fs/text_editor.c | $(OBJ_DIR)
+$(OBJ_DIR)/drivers/disk/fs_selftest.o: $(SRCROOT)/drivers/disk/fs_selftest.c $(SRCROOT)/drivers/disk/storage.h | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -I$(SRCROOT)/third_party/fatfs -c $< -o $@
+
+$(OBJ_DIR)/drivers/disk/disk_bench.o: $(SRCROOT)/drivers/disk/disk_bench.c $(SRCROOT)/drivers/disk/blk.h | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
-$(OBJ_DIR)/drivers/disk/storage.o: $(SRCROOT)/drivers/disk/storage.c | $(OBJ_DIR)
+$(OBJ_DIR)/drivers/disk/ide_blk.o: $(SRCROOT)/drivers/disk/ide_blk.c $(SRCROOT)/drivers/disk/blk.h | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+$(OBJ_DIR)/drivers/disk/ahci.o: $(SRCROOT)/drivers/disk/ahci.c $(SRCROOT)/drivers/disk/blk.h | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+$(OBJ_DIR)/drivers/disk/nvme.o: $(SRCROOT)/drivers/disk/nvme.c $(SRCROOT)/drivers/disk/blk.h | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+$(OBJ_DIR)/drivers/disk/storage.o: $(SRCROOT)/drivers/disk/storage.c $(SRCROOT)/drivers/disk/blk.h | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
 $(OBJ_DIR)/drivers/disk/crc32_common.o: $(SRCROOT)/drivers/disk/crc32_common.c | $(OBJ_DIR)
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-$(OBJ_DIR)/kernel/filemanager/mk_advanced_filemanager.o: $(SRCROOT)/kernel/filemanager/mk_advanced_filemanager.c | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
@@ -1634,7 +2238,19 @@ $(OBJ_DIR)/kernel/drivers/udp.o: $(SRCROOT)/kernel/drivers/udp.c | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
-$(OBJ_DIR)/kernel/drivers/tcp.o: $(SRCROOT)/kernel/drivers/tcp.c | $(OBJ_DIR)
+$(OBJ_DIR)/kernel/drivers/net_fw.o: $(SRCROOT)/kernel/drivers/net_fw.c $(SRCROOT)/kernel/drivers/net_fw.h $(SRCROOT)/kernel/drivers/net.h | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+$(OBJ_DIR)/kernel/drivers/ip6.o: $(SRCROOT)/kernel/drivers/ip6.c $(SRCROOT)/kernel/drivers/ip6.h $(SRCROOT)/kernel/drivers/tcp.h $(SRCROOT)/kernel/drivers/net.h | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+$(OBJ_DIR)/kernel/drivers/icmp.o: $(SRCROOT)/kernel/drivers/icmp.c $(SRCROOT)/kernel/drivers/net.h | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+$(OBJ_DIR)/kernel/drivers/net_selftest.o: $(SRCROOT)/kernel/drivers/net_selftest.c $(SRCROOT)/kernel/drivers/net.h | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+$(OBJ_DIR)/kernel/drivers/tcp.o: $(SRCROOT)/kernel/drivers/tcp.c $(SRCROOT)/kernel/drivers/tcp.h $(SRCROOT)/kernel/drivers/ip6.h | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
@@ -1891,8 +2507,9 @@ LDFLAGS = -m64 -nostdlib -nodefaultlibs -no-pie -T $(SRCROOT)/boot/linker.ld \
 # to keep re-scanning the whole group until nothing new resolves,
 # which is the standard fix for this and doesn't require reasoning
 # about the exact dependency graph by hand.
-$(P2C_LIB):
-	$(MAKE) -C $(P2C_DIR) freestanding WARN_CFLAGS='-Wall -Wextra -Wno-unused-parameter' EXTRA_CFLAGS='-DPYTHON_CODE_TO_C_NO_LIBC_STUBS'
+P2C_SRCFILES := $(shell find $(P2C_DIR)/src $(P2C_DIR)/include -name "*.c" -o -name "*.h" 2>/dev/null)
+$(P2C_LIB): $(P2C_SRCFILES)
+	$(MAKE) -C $(P2C_DIR) freestanding WARN_CFLAGS='-Wall -Wextra -Wno-unused-parameter' FREESTANDING_EXTRA_CFLAGS='-DPYTHON_CODE_TO_C_NO_LIBC_STUBS -DPYTHON_CODE_TO_C_NO_TLS -DPYTHON_CODE_TO_C_NO_PYGAME'
 
 $(KERNEL): $(OBJS) $(P2C_LIB) $(BEARSSL_LIB) $(NGHTTP2_LIB) $(ACPICA_LIB) $(COMPAT_LIB) $(QUICKJS_LIB) $(LWAPCAPLET_LIB) $(LPARSERUTILS_LIB) $(LUTF8PROC_LIB) $(LHUBBUB_LIB) $(LCSS_LIB) $(LDOM_LIB) $(LNSUTILS_LIB) $(NS_UTILS_LIB) $(NSBMP_LIB) $(SVGTINY_LIB) $(NS_CONTENT_LIB) $(NSJS_QUICKJS_LIB) $(TINYC_LIB)
 	@echo "[BUILD] Linking kernel..."
@@ -1904,6 +2521,17 @@ $(KERNEL): $(OBJS) $(P2C_LIB) $(BEARSSL_LIB) $(NGHTTP2_LIB) $(ACPICA_LIB) $(COMP
 	cp $(BUILD_DIR)/kernel.elf $@
 	@echo "[BUILD] Kernel linked (ELF): $(BUILD_DIR)/kernel.elf"
 	@ls -la $(BUILD_DIR)/kernel.elf
+
+# What the boot loader reads. GRUB loads every section of a multiboot2 ELF, symbol tables and debug information included (30 MB of
+# the 70 MB file), and on a BIOS or USB boot every sector costs a firmware call - so the boot copies are stripped, and the one on the
+# ISO / disk is also gzip'ed (GRUB's gzio unpacks it while loading; that halves again what has to be read). build/kernel.elf stays
+# whole for debugging.
+KERNEL_BOOT_ELF = $(BUILD_DIR)/kernel.boot.elf
+KERNEL_BOOT_GZ  = $(BUILD_DIR)/kernel.boot.gz
+$(KERNEL_BOOT_ELF): $(KERNEL)
+	strip -o $@ $(BUILD_DIR)/kernel.elf
+$(KERNEL_BOOT_GZ): $(KERNEL_BOOT_ELF)
+	gzip -9 -n -c $< > $@
 
 $(PACK_STORAGE): tools/pack_storage.go | $(BUILD_DIR)
 	@echo "[BUILD] Building pack_storage with Go..."
@@ -1939,9 +2567,10 @@ $(STORAGE_IMG): $(PACK_STORAGE) | $(BUILD_DIR)
 	fi
 
 # ---- Create bootable ISO ----
-iso: check-tools $(KERNEL) $(STORAGE_IMG)
+iso: check-tools $(KERNEL) $(KERNEL_BOOT_GZ) $(STORAGE_IMG)
 	mkdir -p iso/boot
-	cp $(BUILD_DIR)/kernel.elf iso/boot/kernel.elf
+	rm -f iso/boot/kernel.elf
+	cp $(KERNEL_BOOT_GZ) iso/boot/kernel.elf.gz
 	mkdir -p iso/boot/desktop
 	cp $(SRCROOT)/assets/desktop_featured.png iso/boot/desktop/featured.png
 	mkdir -p $(GRUB_DIR)
@@ -1966,6 +2595,14 @@ iso: check-tools $(KERNEL) $(STORAGE_IMG)
 		fi; \
 	fi
 
+# ---- Bootable hard-disk / SSD image (GPT; BIOS + UEFI) ----
+# Raw image to dd onto a drive (or to boot in QEMU with COS_BOOT_DISK=build/c-os-disk.img). The kernel keeps all of its
+# persistent data in the image's last partition. Override the size with HDD_SIZE_MIB (data partition needs >= 1300 MiB).
+HDD_IMG ?= $(BUILD_DIR)/c-os-disk.img
+HDD_SIZE_MIB ?= 2560
+hdd: iso
+	python3 tools/make_hdd_image.py --kernel $(KERNEL_BOOT_GZ) --boot-tree iso/boot --out $(HDD_IMG) --size-mib $(HDD_SIZE_MIB)
+
 # ---- UEFI Secure Boot artifacts ----
 # The signed standalone GRUB embeds both this immutable configuration and the
 # exact kernel ELF. Firmware verification of BOOTX64.EFI therefore covers the
@@ -1974,11 +2611,11 @@ secureboot-dev-keys:
 	chmod 700 tools/generate_secureboot_dev_keys.sh
 	./tools/generate_secureboot_dev_keys.sh
 
-secureboot-esp: $(KERNEL)
+secureboot-esp: $(KERNEL_BOOT_GZ)
 	@test -n "$(SECUREBOOT_KEY)" || { echo "Set SECUREBOOT_KEY to an external PEM private key."; exit 2; }
 	@test -n "$(SECUREBOOT_CERT)" || { echo "Set SECUREBOOT_CERT to its external PEM certificate."; exit 2; }
 	chmod 700 tools/build_secureboot_uefi.sh
-	./tools/build_secureboot_uefi.sh --key "$(SECUREBOOT_KEY)" --cert "$(SECUREBOOT_CERT)" --kernel "$(BUILD_DIR)/kernel.elf" --config "$(SRCROOT)/boot/grub_secure.cfg" --out-dir "$(SECUREBOOT_DIR)"
+	./tools/build_secureboot_uefi.sh --key "$(SECUREBOOT_KEY)" --cert "$(SECUREBOOT_CERT)" --kernel "$(KERNEL_BOOT_GZ)" --config "$(SRCROOT)/boot/grub_secure.cfg" --out-dir "$(SECUREBOOT_DIR)"
 
 # Alias retained for CI/manual workflows: the build script emits both the FAT
 # ESP and the UEFI-first El Torito ISO from one signed BOOTX64.EFI.
@@ -1991,7 +2628,7 @@ secureboot-iso: secureboot-esp
 # ---- Clean ----
 # `clean` (defined further down) runs this and then removes the whole build dir.
 clean-cos:
-	rm -rf $(OBJ_DIR) $(BUILD_DIR)/kernel.elf $(BUILD_DIR)/compat_stubs.a $(BUILD_DIR)/libbearssl.a $(BUILD_DIR)/isofiles $(ISO) iso/boot/kernel.elf $(GRUB_DIR)
+	rm -rf $(OBJ_DIR) $(BUILD_DIR)/kernel.elf $(BUILD_DIR)/compat_stubs.a $(BUILD_DIR)/libbearssl.a $(BUILD_DIR)/isofiles $(ISO) iso/boot/kernel.elf iso/boot/kernel.elf.gz $(BUILD_DIR)/kernel.boot.elf $(BUILD_DIR)/kernel.boot.gz $(GRUB_DIR)
 	@echo "[CLEAN] Done"
 
 run: iso $(STORAGE_IMG)
@@ -2045,6 +2682,10 @@ $(OBJ_DIR)/third_party/tinyusb/hub.o: $(TINYUSB_DIR)/host/hub.c | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(TINYUSB_INCLUDES) -c $< -o $@
 
+$(OBJ_DIR)/kernel/drivers/usb_audio.o: $(SRCROOT)/kernel/drivers/usb_audio.c | $(OBJ_DIR)
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) $(TINYUSB_INCLUDES) -c $< -o $@
+
 $(OBJ_DIR)/kernel/drivers/tusb_msc_bridge.o: $(SRCROOT)/kernel/drivers/tusb_msc_bridge.c | $(OBJ_DIR)
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) $(TINYUSB_INCLUDES) -c $< -o $@
@@ -2057,9 +2698,26 @@ $(OBJ_DIR)/third_party/tinyusb/msc_host.o: $(TINYUSB_DIR)/class/msc/msc_host.c |
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(TINYUSB_INCLUDES) -c $< -o $@
 
+# TinyUSB's EHCI driver defines the hcd_* entry points itself; they are renamed here so tusb_hcd_dispatch.c can own the
+# real ones and route to EHCI or xHCI per root port.
+EHCI_RENAME := -Dhcd_frame_number=ehci_hcd_frame_number -Dhcd_port_reset=ehci_hcd_port_reset \
+	-Dhcd_port_reset_end=ehci_hcd_port_reset_end -Dhcd_port_connect_status=ehci_hcd_port_connect_status \
+	-Dhcd_port_speed_get=ehci_hcd_port_speed_get -Dhcd_device_close=ehci_hcd_device_close \
+	-Dhcd_edpt_open=ehci_hcd_edpt_open -Dhcd_edpt_close=ehci_hcd_edpt_close -Dhcd_setup_send=ehci_hcd_setup_send \
+	-Dhcd_edpt_xfer=ehci_hcd_edpt_xfer -Dhcd_edpt_abort_xfer=ehci_hcd_edpt_abort_xfer \
+	-Dhcd_edpt_clear_stall=ehci_hcd_edpt_clear_stall -Dhcd_int_handler=ehci_hcd_int_handler
 $(OBJ_DIR)/third_party/tinyusb/ehci.o: $(TINYUSB_DIR)/portable/ehci/ehci.c | $(OBJ_DIR)
 	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(TINYUSB_INCLUDES) -c $< -o $@
+	$(CC) $(CFLAGS) $(TINYUSB_INCLUDES) $(EHCI_RENAME) -c $< -o $@
+$(OBJ_DIR)/kernel/drivers/tusb_hcd_dispatch.o: $(SRCROOT)/kernel/drivers/tusb_hcd_dispatch.c $(SRCROOT)/kernel/drivers/xhci_hcd.h | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) $(TINYUSB_INCLUDES) -c $< -o $@
+$(OBJ_DIR)/kernel/drivers/cos_devices.o: $(SRCROOT)/kernel/drivers/cos_devices.c $(SRCROOT)/include/cos_devices.h | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) $(TINYUSB_INCLUDES) -c $< -o $@
+$(OBJ_DIR)/kernel/drivers/xhci_hcd.o: $(SRCROOT)/kernel/drivers/xhci_hcd.c $(SRCROOT)/kernel/drivers/xhci_hcd.h | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) $(TINYUSB_INCLUDES) -c $< -o $@
 
 $(OBJ_DIR)/kernel/system/mk_storage_compat.o: $(SRCROOT)/kernel/system/mk_storage_compat.c | $(OBJ_DIR)
 	mkdir -p $(dir $@)
@@ -2075,6 +2733,10 @@ override ASFLAGS := -f elf64
 
 
 # ---- Additional Build Rules for C-OS 5.0.0 Features ----
+$(OBJ_DIR)/kernel/security/cos_security.o: $(SRCROOT)/kernel/security/cos_security.c $(SRCROOT)/kernel/security/cos_security.h | $(OBJ_DIR)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
 $(OBJ_DIR)/kernel/security/permission_manager.o: $(SRCROOT)/kernel/security/permission_manager.c | $(OBJ_DIR)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
@@ -2169,6 +2831,8 @@ obj_userland += tcc_app.o
 # exception-listing anyway. Explicit is no larger and cannot silently mismatch.
 VALIDATION_PROG_DIR := validation/cos_programs
 VALIDATION_HEADERS :=
+# userspace_demo.c includes the real paint application image.
+VALIDATION_HEADERS += $(BUILD_DIR)/cos_paint_elf.h
 
 VALIDATION_HEADERS += $(BUILD_DIR)/cos_argv_elf.h
 $(BUILD_DIR)/cos_argv_elf.h: $(VALIDATION_PROG_DIR)/argvtest.c-os tools/gen_cos_program.py | $(BUILD_DIR)
@@ -2289,11 +2953,6 @@ VALIDATION_HEADERS += $(BUILD_DIR)/cos_multiwaiter_elf.h
 $(BUILD_DIR)/cos_multiwaiter_elf.h: $(VALIDATION_PROG_DIR)/multiwaiter.c-os tools/gen_cos_program.py | $(BUILD_DIR)
 	@mkdir -p $(BUILD_DIR)
 	python3 tools/gen_cos_program.py --in $(VALIDATION_PROG_DIR)/multiwaiter.c-os --out $(BUILD_DIR)/cos_multiwaiter_elf.h --symbol cos_multiwaiter_elf
-
-VALIDATION_HEADERS += $(BUILD_DIR)/cos_paint_elf.h
-$(BUILD_DIR)/cos_paint_elf.h: $(VALIDATION_PROG_DIR)/paint.c-os tools/gen_cos_program.py | $(BUILD_DIR)
-	@mkdir -p $(BUILD_DIR)
-	python3 tools/gen_cos_program.py --in $(VALIDATION_PROG_DIR)/paint.c-os --out $(BUILD_DIR)/cos_paint_elf.h --symbol cos_paint_elf
 
 VALIDATION_HEADERS += $(BUILD_DIR)/cos_sigkilltest_elf.h
 $(BUILD_DIR)/cos_sigkilltest_elf.h: $(VALIDATION_PROG_DIR)/sigkilltest.c-os tools/gen_cos_program.py | $(BUILD_DIR)
@@ -2426,14 +3085,15 @@ USERLAND_DIR   := userland
 USERLAND_BUILD := $(BUILD_DIR)/userland
 USERLAND_CC    ?= gcc
 USERLAND_AR    ?= ar
-USERLAND_CFLAGS := -ffreestanding -nostdlib -fno-stack-protector -fno-builtin \
+USERLAND_CFLAGS := -ffreestanding -nostdlib -fstack-protector-strong -mstack-protector-guard=global -fno-builtin \
                    -fno-asynchronous-unwind-tables -fPIC -O2 \
                    -I$(USERLAND_DIR)/include
 
-USERLAND_OBJS := $(USERLAND_BUILD)/cos_lib.o  $(USERLAND_BUILD)/cos_rtld.o \
+USERLAND_OBJS := $(USERLAND_BUILD)/cos_lib.o  $(USERLAND_BUILD)/cos_posix.o $(USERLAND_BUILD)/cos_rtld.o $(USERLAND_BUILD)/cos_plugin.o $(USERLAND_BUILD)/cos_plugin_base.o \
                  $(USERLAND_BUILD)/cos_fmt.o  $(USERLAND_BUILD)/cos_math.o \
                  $(USERLAND_BUILD)/cos_sync.o $(USERLAND_BUILD)/cos_libc.o \
-                 $(USERLAND_BUILD)/cos_ui.o $(USERLAND_BUILD)/cos_ui_fonts.o
+                 $(USERLAND_BUILD)/cos_ui.o $(USERLAND_BUILD)/cos_ui_fonts.o \
+                 $(USERLAND_BUILD)/cos_widget.o
 
 # The standard C library layer (<stdio.h>, <stdlib.h>, ... in
 # userland/include/libc). Built with -nostdinc so it can never pick up the
@@ -2442,11 +3102,17 @@ USERLAND_GCC_INC := $(shell $(USERLAND_CC) -print-file-name=include)
 # cos_ui: drawing + TrueType text for ring-3 apps (stb_truetype, embedded DejaVu subsets)
 $(USERLAND_BUILD)/cos_ui.o: $(USERLAND_DIR)/lib/cos_ui.c $(USERLAND_DIR)/include/cos_ui.h $(USERLAND_DIR)/third_party/stb_truetype.h | $(USERLAND_BUILD)
 	$(USERLAND_CC) $(USERLAND_CFLAGS) -Wno-unused-function -nostdinc -isystem $(USERLAND_GCC_INC) -isystem $(USERLAND_DIR)/include/libc -c $< -o $@
+$(USERLAND_BUILD)/cos_widget.o: $(USERLAND_DIR)/lib/cos_widget.c $(USERLAND_DIR)/include/cos_widget.h $(USERLAND_DIR)/include/cos_ui.h $(USERLAND_DIR)/include/cos.h | $(USERLAND_BUILD)
+	$(USERLAND_CC) $(USERLAND_CFLAGS) $(if $(CW_DEBUG),-DCW_DEBUG) -nostdinc -isystem $(USERLAND_GCC_INC) -isystem $(USERLAND_DIR)/include/libc -c $< -o $@
 $(USERLAND_BUILD)/cos_ui_fonts.o: $(USERLAND_DIR)/lib/cos_ui_fonts.c | $(USERLAND_BUILD)
 	$(USERLAND_CC) $(USERLAND_CFLAGS) -nostdinc -isystem $(USERLAND_GCC_INC) -c $< -o $@
 
 $(USERLAND_BUILD)/cos_libc.o: $(USERLAND_DIR)/lib/cos_libc.c $(wildcard $(USERLAND_DIR)/include/libc/*.h) | $(USERLAND_BUILD)
 	$(USERLAND_CC) $(USERLAND_CFLAGS) -nostdinc -isystem $(USERLAND_GCC_INC) -c $< -o $@
+
+$(USERLAND_BUILD)/cos_posix.o: $(USERLAND_DIR)/lib/cos_posix.c $(wildcard $(USERLAND_DIR)/include/libc/*.h $(USERLAND_DIR)/include/libc/*/*.h) | $(USERLAND_BUILD)
+	$(USERLAND_CC) $(USERLAND_CFLAGS) -nostdinc -isystem $(USERLAND_GCC_INC) -isystem $(USERLAND_DIR)/include/libc -c $< -o $@
+	nm --defined-only -g $@ | awk 'NF==3 {print $$3}' > $@.weak && objcopy --weaken-symbols=$@.weak $@ && rm -f $@.weak     # defined names only: weakening the undefined ones would leave them unresolved (null) instead of pulling libcos members. Programs with their own open/pthread_* (tcc_shim, the media decoders) keep theirs instead of clashing with this layer
 
 $(USERLAND_BUILD)/cos_fmt.o: $(USERLAND_DIR)/lib/cos_fmt.c | $(USERLAND_BUILD)
 	$(USERLAND_CC) $(USERLAND_CFLAGS) -c $< -o $@
@@ -2464,6 +3130,12 @@ $(USERLAND_BUILD)/cos_lib.o: $(USERLAND_DIR)/lib/cos_lib.c | $(USERLAND_BUILD)
 	$(USERLAND_CC) $(USERLAND_CFLAGS) -c $< -o $@
 
 $(USERLAND_BUILD)/cos_rtld.o: $(USERLAND_DIR)/lib/cos_rtld.c | $(USERLAND_BUILD)
+	$(USERLAND_CC) $(USERLAND_CFLAGS) -c $< -o $@
+
+$(USERLAND_BUILD)/cos_plugin.o: $(USERLAND_DIR)/lib/cos_plugin.c $(USERLAND_DIR)/include/cos_plugin.h | $(USERLAND_BUILD)
+	$(USERLAND_CC) $(USERLAND_CFLAGS) -c $< -o $@
+
+$(USERLAND_BUILD)/cos_plugin_base.o: $(USERLAND_DIR)/lib/cos_plugin_base.c $(USERLAND_DIR)/include/cos_plugin_base.h | $(USERLAND_BUILD)
 	$(USERLAND_CC) $(USERLAND_CFLAGS) -c $< -o $@
 
 $(USERLAND_BUILD)/cos_crt0.o: $(USERLAND_DIR)/lib/cos_crt0.S | $(USERLAND_BUILD)
@@ -2522,3 +3194,5 @@ check-nsfont:
 .PHONY: check-host
 check-host: check-elfloader check-userland check-nsfont
 	@echo "[check-host] loader, linker, formatter, math, locks and NetSurf font metrics all green"
+
+.PHONY: hdd

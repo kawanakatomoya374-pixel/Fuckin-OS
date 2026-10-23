@@ -79,14 +79,15 @@ rm -rf "$staging"
 
 # Build one PE/COFF image that contains GRUB, its immutable boot configuration
 # and the exact ELF kernel. Under Secure Boot there is no loose, unsigned
-# /boot/kernel.elf for this GRUB configuration to load.
+# /boot/kernel.elf.gz for this GRUB configuration to load. The kernel is the stripped, gzip'ed boot copy (build/kernel.boot.gz): GRUB unpacks it from
+# the memory disk, and the signed file the firmware has to read and hash is a third smaller.
 grub-mkstandalone \
     -O x86_64-efi \
     --compress=xz \
-    --modules="normal multiboot multiboot2 all_video gfxterm efi_gop efi_uga font terminal echo search search_fs_uuid part_gpt part_msdos fat iso9660 configfile" \
+    --modules="normal gzio multiboot multiboot2 all_video gfxterm efi_gop efi_uga font terminal echo search search_fs_uuid part_gpt part_msdos fat iso9660 configfile" \
     -o "$unsigned" \
     "/boot/grub/grub.cfg=$config" \
-    "/boot/kernel.elf=$kernel"
+    "/boot/kernel.elf.gz=$kernel"
 
 sbsign --key "$key" --cert "$cert" --output "$signed" "$unsigned"
 sbverify --cert "$cert" "$signed"

@@ -28,7 +28,7 @@ if [[ ! -f "$key" || ! -f "$cert" ]]; then
 fi
 openssl x509 -in "$cert" -outform DER -out "$cer"
 # A deterministic owner GUID distinguishes this development certificate in db.
-cert-to-efi-sig-list -g 3b8bfa61-9c08-4c8a-8a04-3bceca0f4088 "$cert" "$esl"
+if command -v cert-to-efi-sig-list >/dev/null 2>&1; then cert-to-efi-sig-list -g 3b8bfa61-9c08-4c8a-8a04-3bceca0f4088 "$cert" "$esl"; else : > "$esl"; echo "note: efitools not installed, .esl not written (make_secboot_vars.sh does not need it)"; fi
 chmod 600 "$key"
 chmod 644 "$cert" "$cer" "$esl"
 

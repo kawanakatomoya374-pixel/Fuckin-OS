@@ -1,2 +1,0 @@
-COSLIB_1.0 { global: ver_fn; local: *; };
-COSLIB_2.0 { global: ver_fn; } COSLIB_1.0;

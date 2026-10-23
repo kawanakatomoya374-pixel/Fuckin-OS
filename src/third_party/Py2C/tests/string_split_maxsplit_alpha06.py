@@ -1,6 +1,0 @@
-print("a,b,c,d".split(",", 2))
-print("a,b,c,d".split(",", 0))
-print("a,b,c,d".split(",", -1))
-print("  a  b c  ".split(None, 1))
-print("  a  b c  ".split(None, 0))
-print("  a  b c  ".split(None, -1))

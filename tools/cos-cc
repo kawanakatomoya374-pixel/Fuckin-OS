@@ -20,7 +20,10 @@
 # ----------------------
 #   -ffreestanding        no host libc is present; do not assume one
 #   -nostdlib             ditto at link time
-#   -fno-stack-protector  the guard needs a libc-provided __stack_chk_fail
+#   -fstack-protector-strong -mstack-protector-guard=global
+#                         programs (not libraries) keep a canary below the return address of every function with a
+#                         local buffer; libcos supplies __stack_chk_guard (random per process) and __stack_chk_fail.
+#                         A library is built without it: it would need the guard from the program that loads it.
 #   -fPIE / -fPIC         the loader places the image; it is not fixed
 #   --no-dynamic-linker   suppress PT_INTERP. A program carrying it is asking
 #                         to be started by an ld.so; C-OS links it in-kernel
@@ -82,7 +85,7 @@ fi
 # standard C library headers (userland/include/libc: stdio.h, stdlib.h,
 # string.h, ctype.h, math.h, time.h, ...). cos.h stays reachable as before.
 GCC_INC=$($CC -print-file-name=include)
-COMMON="-ffreestanding -nostdlib -fno-stack-protector -fno-builtin \
+COMMON="-ffreestanding -nostdlib -fno-builtin \
         -fno-asynchronous-unwind-tables -nostdinc -isystem $GCC_INC \
         -isystem $INC/libc -I$INC"
 # libgcc last, always. -nostdlib drops it, and the compiler emits calls
@@ -91,6 +94,7 @@ COMMON="-ffreestanding -nostdlib -fno-stack-protector -fno-builtin \
 # turn into link errors that name a symbol like __udivti3 and give no
 # hint where it came from - exactly the failure this project hit while
 # building the printf engine.
+SSP="-fstack-protector-strong -mstack-protector-guard=global"
 LIBGCC="-lgcc"
 LINK="-Wl,-z,now -Wl,-z,relro -Wl,-z,noexecstack"
 
@@ -106,7 +110,7 @@ lib)
     # twice with two divergent copies of its globals.
     SONAME=$(basename "$OUT")
     # shellcheck disable=SC2086
-    $CC $COMMON -fPIC -shared -Wl,-soname,"$SONAME" $LINK \
+    $CC $COMMON -fno-stack-protector -fPIC -shared -Wl,-soname,"$SONAME" $LINK \
         -o "$OUT" $ARGS $LIBGCC
     ;;
 static)
@@ -114,13 +118,13 @@ static)
     # right choice for a hand-written assembly test or anything that must
     # not depend on a library being present.
     # shellcheck disable=SC2086
-    $CC $COMMON -fno-pie -no-pie -Wl,-e,_start $LINK \
+    $CC $COMMON $SSP -fno-pie -no-pie -Wl,-e,_start $LINK \
         -o "$OUT" $ARGS ${CRT0:+"$CRT0"} ${RTLD:+"$RTLD"} \
         ${LIBCOS:+"$LIBCOS"} $LIBGCC
     ;;
 *)
     # shellcheck disable=SC2086
-    $CC $COMMON -fPIE -pie -Wl,--no-dynamic-linker -Wl,-e,_start $LINK \
+    $CC $COMMON $SSP -fPIE -pie -Wl,--no-dynamic-linker -Wl,-e,_start $LINK \
         -o "$OUT" $ARGS ${CRT0:+"$CRT0"} ${RTLD:+"$RTLD"} \
         ${LIBCOS:+"$LIBCOS"} $LIBGCC
     ;;

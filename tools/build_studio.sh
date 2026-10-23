@@ -48,6 +48,7 @@ CC="${CC:-gcc}" tools/cos-cc -O2 -w \
 
 # 4. SDK: the headers a program compiled ON the device can include
 cp userland/include/cos.h userland/include/cos_ui.h "$OUT/sdk/include/"
+cp userland/include/cos_plugin.h userland/include/cos_plugin_*.h "$OUT/sdk/include/"      # so a plugin can be written (and built as a .c-osll) on the device
 cp -r userland/include/libc/. "$OUT/sdk/include/"
 cp "$TINYC"/include/stdarg.h "$TINYC"/include/stddef.h "$TINYC"/include/stdbool.h "$TINYC"/include/float.h \
    "$TINYC"/include/stdalign.h "$TINYC"/include/stdnoreturn.h "$TINYC"/include/varargs.h "$OUT/sdk/include/"
@@ -55,6 +56,20 @@ cp userland/sdk/include-extra/*.h "$OUT/sdk/include/"
 cp "$TCCDIR"/compat/fcntl.h "$TCCDIR"/compat/signal.h "$TCCDIR"/compat/dlfcn.h "$OUT/sdk/include/"
 mkdir -p "$OUT/sdk/include/sys"; cp "$TCCDIR"/compat/sys/*.h "$OUT/sdk/include/sys/" 2>/dev/null || true
 cp build/userland/cos_crt0.o build/userland/libcos.a "$OUT/sdk/lib/"
+# the Py2C runtime (libp2crt.a + headers + examples): what a program converted by Py2C Studio links against
+P2C=src/third_party/Py2C
+[ -f build/p2crt/libp2crt.a ] || make -s build/p2crt/libp2crt.a >/dev/null
+cp build/p2crt/libp2crt.a "$OUT/sdk/lib/"
+# `-lm` (the command line of Py2C's run mode, and anything else written for a host) finds an empty libm: the math functions are in libcos
+rm -f "$OUT/sdk/lib/libm.a"; ar rcs "$OUT/sdk/lib/libm.a"
+rm -rf "$OUT/sdk/include/py2c"; mkdir -p "$OUT/sdk/include/py2c"
+cp -r $P2C/include/runtime $P2C/include/common $P2C/include/platform $P2C/include/modules "$OUT/sdk/include/py2c/"
+# programs started on C-OS have no thread pointer (FS base) set up by the launcher, so the runtime must not use __thread
+sed -i '1i #define PYTHON_CODE_TO_C_NO_TLS 1' "$OUT/sdk/include/py2c/common/python_code_to_c_common.h"
+mkdir -p "$OUT/sdk/examples/py2c"; cp $P2C/examples/*.py "$OUT/sdk/examples/py2c/"
+# single-header libraries built on the device (README.txt there): the demos plus the headers they include
+mkdir -p "$OUT/sdk/examples/singleheader"; cp userland/sdk/examples/singleheader/* "$OUT/sdk/examples/singleheader/"
+cp userland/third_party/stb_image.h userland/third_party/stb_truetype.h userland/third_party/minimp3.h "$OUT/sdk/examples/singleheader/"
 
 # 5. C-OS Studio itself
 CC="${CC:-gcc}" tools/cos-cc -O2 -Wall -Wno-unused-parameter -Wno-unused-function -Wno-misleading-indentation \
@@ -62,7 +77,7 @@ CC="${CC:-gcc}" tools/cos-cc -O2 -Wall -Wno-unused-parameter -Wno-unused-functio
     -o "$OUT/studio.c-os" \
     $STUDIO/main.c $STUDIO/ui.c $STUDIO/dialogs.c $STUDIO/edview.c $STUDIO/term.c $STUDIO/make.c \
     $STUDIO/build.c $STUDIO/project.c $STUDIO/search.c $STUDIO/complete.c $STUDIO/index.c $STUDIO/settings.c \
-    $STUDIO/editor.c $STUDIO/theme.c $STUDIO/buffer.c $STUDIO/highlight.c $STUDIO/studio_fonts.c \
+    $STUDIO/editor.c $STUDIO/theme.c $STUDIO/buffer.c $STUDIO/highlight.c $STUDIO/studio_fonts.c $STUDIO/plugins.c \
     userland/lib/cos_ui.c userland/lib/cos_ui_fonts.c
 
 sz=$(stat -c %s "$OUT/studio.c-os")

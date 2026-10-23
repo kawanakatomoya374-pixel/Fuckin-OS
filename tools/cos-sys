@@ -1,0 +1,38 @@
+#!/bin/sh
+# cos-sys - build a C-OS kernel module (.c-osys): cos-sys [-I dir]... [-l other.so]... -o out.c-osys source.c...
+# A .c-osys is a shared object like a .c-osll, compiled for ring 0 (position independent, no red zone, no SSE, symbols hidden unless marked COSYS_EXPORT),
+# linked with -shared (GNU hash, RELRO, bind-now, separate code) and signed with the key of the module's level: the level it declares in COSYS_MODULE (read from
+# the sources; -L N overrides) decides which of build/kmod/kmod_key_l1..l3.pem is used - the lowest key that may sign it. KMOD_KEY=file.pem uses that key instead (with -L as its id). It may use only what
+# src/include/cosys.h declares; the kernel resolves those names from its export table at load time and refuses any other undefined symbol.
+# -l links against another module (an unsigned .so that this tool leaves next to its output): the kernel then requires that module to be loaded first.
+# (-fno-optimize-sibling-calls: the kernel tells which module is calling an export from the return address, which a tail call would hide.)
+# The module's soname is the output file name without ".c-osys"; it is what a dependent module records and the kernel matches against a loaded module's name.
+set -eu
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+OUT=""; SRCS=""; LIBS=""; LEVEL=""; INC="-I$ROOT/src/include"
+while [ $# -gt 0 ]; do case "$1" in
+    -o) OUT=$2; shift 2 ;;
+    -I) INC="$INC -I$2"; shift 2 ;;
+    -l) LIBS="$LIBS $2"; shift 2 ;;
+    -L) LEVEL=$2; shift 2 ;;
+    *) SRCS="$SRCS $1"; shift ;;
+esac; done
+[ -n "$OUT" ] && [ -n "$SRCS" ] || { echo "usage: cos-sys [-I dir] [-l other.so] -o out.c-osys source.c..." >&2; exit 2; }
+if [ -z "$LEVEL" ]; then
+    DECL=$(cat $SRCS | grep -o 'COSYS_MODULE([^;]*' | grep -o 'COSYS_LEVEL_[A-Z]*' | head -1 || true)
+    case "$DECL" in COSYS_LEVEL_SYSTEM) LEVEL=3 ;; COSYS_LEVEL_DEVICE) LEVEL=2 ;; *) LEVEL=1 ;; esac      # BASIC and SERVICE: the lowest key
+fi
+KEY=${KMOD_KEY:-$ROOT/build/kmod/kmod_key_l$LEVEL.pem}
+[ -f "$KEY" ] || python3 "$ROOT/tools/gen_kmod_keys.py" "$ROOT/build"
+TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
+OBJS=""
+for s in $SRCS; do
+    o="$TMP/$(basename "$s" .c).o"
+    gcc -m64 -ffreestanding -fno-builtin -fPIC -fvisibility=hidden -fno-plt -fno-optimize-sibling-calls -mno-red-zone -mgeneral-regs-only -fno-stack-protector -fno-common \
+        -fno-asynchronous-unwind-tables -fno-unwind-tables -O2 -Wall -Werror $INC -c "$s" -o "$o"
+    OBJS="$OBJS $o"
+done
+NAME=$(basename "$OUT" .c-osys)
+SO="${OUT%.c-osys}.so"
+ld -shared -soname "$NAME" -z relro -z now -z noexecstack -z separate-code -z max-page-size=4096 --hash-style=gnu -Bsymbolic -o "$SO" $OBJS $LIBS
+python3 "$ROOT/tools/kmod_sign.py" "$SO" "$KEY" "$OUT" "$LEVEL"

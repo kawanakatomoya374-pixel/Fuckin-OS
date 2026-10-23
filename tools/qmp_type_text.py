@@ -5,7 +5,8 @@ import socket
 import sys
 import time
 
-QMP = "/tmp/cos_gui_qmp.sock"
+import os
+QMP = os.environ.get("COS_QMP", "/tmp/cos_gui_qmp.sock")
 TEXT = sys.argv[1] if len(sys.argv) > 1 else "C-OS NetSurf"
 PRESS_ENTER = "--no-enter" not in sys.argv[2:]
 PUNCT = {
@@ -16,6 +17,9 @@ PUNCT = {
     ')': ('0', True), "'": ('apostrophe', False), '"': ('apostrophe', True),
     '+': ('equal', True), '*': ('8', True), '!': ('1', True),
     '<': ('comma', True), '>': ('dot', True), ' ': ('spc', False),
+    '{': ('bracket_left', True), '}': ('bracket_right', True), '[': ('bracket_left', False), ']': ('bracket_right', False),
+    '|': ('backslash', True), '\\': ('backslash', False), '#': ('3', True), '$': ('4', True), '@': ('2', True), '^': ('6', True),
+    '~': ('grave_accent', True), '`': ('grave_accent', False),
 }
 
 def event(qcode, down):
@@ -23,13 +27,16 @@ def event(qcode, down):
 
 def send(sock, payload):
     sock.sendall((json.dumps(payload) + '\n').encode())
+    buf = b''
     while True:
-        line = b''
-        while not line.endswith(b'\n'):
+        while b'\n' not in buf:                       # QMP also sends asynchronous events: take the answer line by line
             chunk = sock.recv(4096)
             if not chunk:
                 raise RuntimeError('QMP disconnected')
-            line += chunk
+            buf += chunk
+        line, buf = buf.split(b'\n', 1)
+        if not line.strip():
+            continue
         response = json.loads(line.decode())
         if 'return' in response:
             return response
