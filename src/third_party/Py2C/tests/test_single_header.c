@@ -1,0 +1,80 @@
+#define P2C_SINGLE_HEADER_IMPLEMENTATION
+#include "python_code_to_c_single.h"
+
+int main(void) {
+    const char *source =
+        "items = [1, 2]\n"
+        "if (count := len(items)):\n"
+        "    pass\n"
+        "match count:\n"
+        "    case 1 | 2 if count > 1:\n"
+        "        merged = {'a': 1} | {'b': 2}\n"
+        "    case _:\n"
+        "        merged = {}\n"
+        "match {'kind': 'ok', 'value': 3, 'extra': 4}:\n"
+        "    case {'kind': 'ok', 'value': captured, **remaining} as record:\n"
+        "        pattern_value = [captured, remaining, record]\n"
+        "    case _:\n"
+        "        pattern_value = []\n"
+        "match [1, 2, 3]:\n"
+        "    case [first, *sequence_rest]:\n"
+        "        pattern_sequence = sequence_rest\n"
+        "class Unit:\n"
+        "    def __init__(self, value):\n"
+        "        self.value = value\n"
+        "match Unit(7):\n"
+        "    case Unit(value=class_value):\n"
+        "        pattern_class = class_value\n"
+        "for first, *middle, last in [(1, 2, 3)]:\n"
+        "    print(first, last, sep='|', end='!')\n"
+        "text = 'banana'\n"
+        "first = text.index('na')\n"
+        "last = text.rindex('na')\n"
+        "replaced = 'aaaa'.replace('a', 'b', 2)\n"
+        "position = [1, 2, 3, 2].index(2, 2)\n"
+        "ranged = text.rindex('na', 0, -1)\n"
+        "occurrences = text.count('na', 1, -1)\n"
+        "parts = 'a,b,c'.split(',', 1)\n"
+        "trimmed = 'xxalphaxx'.strip('x')\n"
+        "edge = 'alphabet'.startswith(('zz', 'al'), 0, 8)\n"
+        "tail = 'archive.tar.gz'.endswith(('.zip', '.gz'))\n"
+        "partitioned = 'key=value'.partition('=')\n"
+        "line_parts = 'a\\\\nb'.splitlines(True)\n"
+        "expanded = 'a\\\\tb'.expandtabs(4)\n"
+        "classified = 'Alpha1'.isalnum()\n"
+        "advanced_map = dict.fromkeys(['x', 'y'], 3)\n"
+        "advanced_map.update([('z', 4)])\n"
+        "advanced_set = {1, 2}\n"
+        "subset = advanced_set.issubset([1, 2, 3])\n"
+        "superset = advanced_set.issuperset((1,))\n"
+        "popped = advanced_set.pop()\n"
+        "code = ord('あ')\n"
+        "character = chr(code)\n"
+        "binary = bin(-5)\n"
+        "octal = oct(9)\n"
+        "hexadecimal = hex(255)\n"
+        "total = sum(range(4), 10)\n"
+        "type Scalar = int | float\n"
+        "def passthrough[T = int](value: T, /):\n"
+        "    return value\n"
+        "def emitted():\n"
+        "    yield from [1, 2]\n"
+        "try:\n"
+        "    raise RuntimeError('outer') from ValueError('inner')\n"
+        "except RuntimeError:\n"
+        "    pass\n"
+        "try:\n"
+        "    passthrough(value=1)\n"
+        "except TypeError:\n"
+        "    pass\n"
+        "checked = passthrough(1)\n";
+    char *generated = NULL;
+    P2C_Result result = python_to_c(source, NULL, &generated);
+    if (result != P2C_OK || !generated) return 1;
+    if (!strstr(generated, "_p2c_match_value_") || !strstr(generated, "p2c_match_mapping_rest") || !strstr(generated, "p2c_match_sequence_rest") || !strstr(generated, "p2c_isinstance_of_class") || !strstr(generated, "p2c_hasattr") || !strstr(generated, "p2c_getattr") || !strstr(generated, "p2c_obj_bitor") || !strstr(generated, "count =") || !strstr(generated, "_p2c_for_rest_i_") || !strstr(generated, "p2c_print_multi_opts") || !strstr(generated, "\"index\"") || !strstr(generated, "\"rindex\"") || !strstr(generated, "\"replace\"") || !strstr(generated, "\"count\"") || !strstr(generated, "\"split\"") || !strstr(generated, "\"strip\"") || !strstr(generated, "\"startswith\"") || !strstr(generated, "\"endswith\"") || !strstr(generated, "\"partition\"") || !strstr(generated, "\"splitlines\"") || !strstr(generated, "\"expandtabs\"") || !strstr(generated, "\"isalnum\"") || !strstr(generated, "p2c_dict_fromkeys") || !strstr(generated, "\"update\"") || !strstr(generated, "\"issubset\"") || !strstr(generated, "\"issuperset\"") || !strstr(generated, "\"pop\"") || !strstr(generated, "p2c_builtin_ord") || !strstr(generated, "p2c_builtin_chr") || !strstr(generated, "p2c_builtin_int_base") || !strstr(generated, "p2c_builtin_sum") || !strstr(generated, "p2c_posonly_keyword_error") || !strstr(generated, "p2c_yield_from_iter_") || !strstr(generated, "p2c_exception_with_cause")) {
+        free(generated);
+        return 2;
+    }
+    free(generated);
+    return 0;
+}

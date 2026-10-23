@@ -1,0 +1,7 @@
+print(dict())
+print(dict({"x": 4, "y": 5}))
+print(dict([("a", 1), ("b", 2)]))
+print(dict([(1, "first"), (1, "last"), (2, "two")]))
+print(dict(alpha=1, beta=2))
+print(dict({"alpha": 0, "gamma": 3}, alpha=1, beta=2))
+print(dict(**{"left": 7}, right=8))

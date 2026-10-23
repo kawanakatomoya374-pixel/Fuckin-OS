@@ -1,0 +1,12 @@
+# 幅・精度・大小変換をコードポイント単位で扱う（CPython 準拠）
+print(repr("%5s" % "e"), repr("%5s" % "\u00e9"))
+print(repr("%-5s|" % "\u00e9"), repr("%5.1s" % "\u00e9x"), repr("%.2s" % "\u00e9\u00e8z"))
+print(repr("%3s|%3d|%5.1f" % ("\u00e9", 7, 1.25)))
+print(repr("%c%c%c" % (65, 12354, 19968)), repr("[%3c]" % 12354))
+print(repr("\u00e9".rjust(3)), repr("\u00e9".rjust(4, ".")), repr("\u00e9".ljust(3)), repr("\u00e9".center(5)))
+print(repr("\u3042\u3044".center(6, "-")), repr("\u3042".center(4)))
+print(repr("12".zfill(5)), repr("-12".zfill(5)), repr("+12".zfill(5)), repr("\u00e9".zfill(3)))
+print(repr("\u00df".upper()), repr("\u00df".casefold()), repr("stra\u00dfe".upper()))
+print(repr("\ufb01".upper()), repr("\ufb03".casefold()), repr("\ufb00\ufb02".upper()))
+print(repr("\u00df".lower()), repr("STRASSE".lower()), repr("\u00c9\u00e8\u3042".lower()))
+print(repr("\u00c9".casefold()), repr("\u00e9".upper()), repr("\u3042\u30a2".upper()))

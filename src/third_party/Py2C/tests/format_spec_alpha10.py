@@ -1,0 +1,11 @@
+# format 仕様のアラインメント・幅・精度（コードポイント単位の幅寄せ）
+print("{:>5}|{:<5}|{:^5}|{:05d}|{:.2f}|{:+.1f}".format("a", "b", "c", 7, 3.14159, 2.0))
+print("{:5}|".format("ab") + "{:5}|".format(42))
+print("{:>8.3f}|{:<8.3f}|{:^9.3f}|".format(3.14159, 3.14159, 3.14159))
+print("{:8}|".format("x") + "{:>8}|".format("x") + "{:^8}|".format("x"))
+print("{:*^9}|".format("mid") + "{:-<6}|".format("a"))
+print("{:>4}|".format("\u00e9") + "{:^6}|".format("\u3042\u3044"))
+print("{:d}|{:x}|{:o}|{:b}".format(255, 255, 255, 255))
+print("{:.3f}|{:.0f}|{:.4s}|".format(2.0 / 3.0, 2.5, "abcdef"))
+print("{} {} {}".format(1, "a", 2.5), "{1}{0}".format("a", "b"))
+print("[{:^7}]".format("ab") + "[{:<2}]".format("ab") + "[{:>2}]".format("ab"))

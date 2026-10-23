@@ -1,0 +1,14 @@
+# C-OS Studio project: the Py2C command line tool built with the on-device TinyCC (F7 / Build).
+# The result is /C-OS Studio/deliverables/python-code-to-c.c-os ; `make install` in the terminal puts it into /bin.
+name=Py2C
+target=python-code-to-c
+type=exe
+cflags=-O1 -U__linux__
+defines=P2C_COS_PORT
+includes=include
+sources=src/codegen/python_code_to_c_codegen.c,src/common/python_code_to_c_common.c,src/common/python_code_to_c_unicode_tables.c
+sources=src/core/python_code_to_c.c,src/lexer/python_code_to_c_lexer.c,src/modules/python_code_to_c_pygame.c
+sources=src/parser/python_code_to_c_ast.c,src/parser/python_code_to_c_astdump.c,src/parser/python_code_to_c_parser.c
+sources=src/platform/python_code_to_c_embed.c,src/platform/python_code_to_c_gui.c,src/platform/python_code_to_c_platform.c
+sources=src/platform/python_code_to_c_platform_hosted.c,src/runtime/python_code_to_c_runtime.c,src/semantic/python_code_to_c_semantic.c
+sources=src/tools/c2py.c,src/tools/main.c,src/tools/python_code_to_c_runtime_locate.c

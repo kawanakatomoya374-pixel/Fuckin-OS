@@ -1,0 +1,5 @@
+print("aaaa".replace("a", "b", 2))
+print("aaaa".replace("a", "b", 0))
+print("aaaa".replace("a", "b", -1))
+print("abc".replace("", "-", 2))
+print("abc".replace("", "-"))

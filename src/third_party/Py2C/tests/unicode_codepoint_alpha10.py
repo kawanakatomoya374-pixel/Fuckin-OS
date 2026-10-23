@@ -1,0 +1,45 @@
+def probe(tag, fn):
+    try:
+        print(tag, fn())
+    except ValueError:
+        print(tag, "<ValueError>")
+    except IndexError:
+        print(tag, "<IndexError>")
+    except TypeError:
+        print(tag, "<TypeError>")
+    except KeyError:
+        print(tag, "<KeyError>")
+
+
+probe("U01", lambda: len("\u00e9"))
+probe("U02", lambda: len("\u3042\u3044\u3046"))
+probe("U03", lambda: "\u00e9"[0])
+probe("U04", lambda: ord("\u00e9"))
+probe("U05", lambda: ord("\u3042"))
+probe("U06", lambda: chr(233))
+probe("U07", lambda: "a\u00e9bc"[1:3])
+probe("U08", lambda: "\u3042\u3044\u3046\u3048\u304a"[1:4])
+probe("U09", lambda: "\u3042\u3044\u3046"[::-1])
+probe("U10", lambda: len("a\u00e9b"))
+probe("U11", lambda: "\u00e9" * 2)
+probe("U14", lambda: list("a\u00e9"))
+probe("U15", lambda: "\u00e9" in "caf\u00e9")
+probe("U18", lambda: "\u3042\u3042".count("\u3042"))
+probe("U20", lambda: len(""))
+probe("U21", lambda: "\u00e9"[1])
+probe("U22", lambda: "\u3042\u3044"[-1])
+probe("U23", lambda: "café".find("é"))
+probe("U24", lambda: "あいう".index("い"))
+probe("U25", lambda: "あいう".rfind("う"))
+probe("U26", lambda: "aé".find("é", 1))
+probe("U27", lambda: "あいう"[1:])
+probe("V01", lambda: sorted(["b", "\u00e9", "a", "z"]))
+probe("V02", lambda: "\u00e9" < "z")
+probe("V03", lambda: "z" < "\u00e9")
+probe("V04", lambda: max(["a", "\u00e9"]))
+probe("V05", lambda: "\u00e9".upper())
+probe("V06", lambda: "\u00c9".lower())
+probe("V07", lambda: "\u3042abc".upper())
+probe("V08", lambda: "\u041f\u0440\u0438\u0432\u0435\u0442".lower())
+probe("V09", lambda: "abc".capitalize())
+probe("V10", lambda: "hello world".title())

@@ -1,0 +1,1 @@
+This OS currently only supports UTF-8, so you cannot save Japanese characters. We plan to add support for photos, MP3s, and MP4s soon, so please don't burn out the developers!
