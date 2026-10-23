@@ -1,0 +1,6 @@
+COSLIB_1.0 {
+    global: ver_fn;
+};
+COSLIB_2.0 {
+    global: ver_fn;
+} COSLIB_1.0;

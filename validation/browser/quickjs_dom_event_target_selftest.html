@@ -1,0 +1,37 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>QuickJS DOM Event target/currentTarget self-test</title>
+<p id="result">RUNNING</p>
+<div id="outer"><button id="inner">test</button></div>
+<script>
+(function () {
+  'use strict';
+  var result = document.getElementById('result');
+  var outer = document.getElementById('outer');
+  var inner = document.getElementById('inner');
+  var checks = [];
+  function check(name, condition) {
+    if (!condition) throw new Error(name + ' failed');
+    checks.push(name);
+  }
+  try {
+    var seen = [];
+    outer.addEventListener('cos-event-target', function (event) {
+      seen.push(event.currentTarget === outer && event.target === inner);
+    });
+    inner.addEventListener('cos-event-target', function (event) {
+      seen.push(event.currentTarget === inner && event.target === inner);
+    });
+    inner.dispatchEvent(new Event('cos-event-target', { bubbles: true }));
+    check('target/currentTarget', seen.length === 2 && seen[0] && seen[1]);
+    result.textContent = 'PASS: ' + checks.join(', ');
+    if (typeof console !== 'undefined' && console.log) console.log('EVENT_TEST_PASS target/currentTarget');
+    document.title = 'PASS event-target-currentTarget';
+  } catch (error) {
+    result.textContent = 'FAIL: ' + error;
+    if (typeof console !== 'undefined' && console.log) console.log('EVENT_TEST_FAIL ' + error);
+    document.title = 'FAIL event-target-currentTarget';
+  }
+}());
+</script>
+.

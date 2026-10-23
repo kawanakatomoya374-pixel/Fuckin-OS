@@ -1,0 +1,115 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>QuickJS document/window EventTarget + generic CSS style self-test</title>
+<p id="result">RUNNING</p>
+<div id="outer"><button id="inner">test</button></div>
+<script>
+(function () {
+  'use strict';
+  var result = document.getElementById('result');
+  var outer = document.getElementById('outer');
+  var inner = document.getElementById('inner');
+  var checks = [];
+  function check(name, condition) {
+    if (!condition) throw new Error(name + ' failed');
+    checks.push(name);
+  }
+  try {
+    /* --- 1. document/window participate in the real capture/bubble path --- */
+    var order = [];
+    var docTargetOk = false;
+    var winTargetOk = false;
+
+    window.addEventListener('cos-et', function () { order.push('win-capture'); }, true);
+    document.addEventListener('cos-et', function () { order.push('doc-capture'); }, true);
+    outer.addEventListener('cos-et', function () { order.push('outer-capture'); }, true);
+    inner.addEventListener('cos-et', function () { order.push('target'); });
+    outer.addEventListener('cos-et', function () { order.push('outer-bubble'); });
+    document.addEventListener('cos-et', function (e) {
+      order.push('doc-bubble');
+      docTargetOk = (e.target === inner && e.currentTarget === document);
+    });
+    window.addEventListener('cos-et', function (e) {
+      order.push('win-bubble');
+      winTargetOk = (e.target === inner && e.currentTarget === window);
+    });
+
+    inner.dispatchEvent(new Event('cos-et', { bubbles: true }));
+
+    check('full propagation order',
+      order.join(',') === 'win-capture,doc-capture,outer-capture,target,outer-bubble,doc-bubble,win-bubble');
+    check('document sees real event.target', docTargetOk);
+    check('window sees real event.target', winTargetOk);
+
+    /* --- 2. event delegation from document (the common real-world pattern) --- */
+    var delegated = null;
+    document.addEventListener('cos-delegate', function (e) {
+      if (e.target && e.target.id === 'inner') delegated = e.target.id;
+    });
+    inner.dispatchEvent(new Event('cos-delegate', { bubbles: true }));
+    check('document-level delegation', delegated === 'inner');
+
+    /* --- 3. removeEventListener works on document/window --- */
+    var removedCount = 0;
+    function removable() { removedCount++; }
+    document.addEventListener('cos-remove', removable);
+    inner.dispatchEvent(new Event('cos-remove', { bubbles: true }));
+    document.removeEventListener('cos-remove', removable);
+    inner.dispatchEvent(new Event('cos-remove', { bubbles: true }));
+    check('document removeEventListener', removedCount === 1);
+
+    /* --- 4. stopPropagation at document halts the walk to window --- */
+    var reachedWindow = false;
+    document.addEventListener('cos-stop', function (e) { e.stopPropagation(); });
+    window.addEventListener('cos-stop', function () { reachedWindow = true; });
+    inner.dispatchEvent(new Event('cos-stop', { bubbles: true }));
+    check('stopPropagation at document', reachedWindow === false);
+
+    /* --- 5. arbitrary CSS properties, not just the old 22-name whitelist --- */
+    inner.style.transform = 'translateX(10px)';
+    check('style.transform roundtrip', inner.style.transform === 'translateX(10px)');
+
+    inner.style.gridTemplateColumns = '1fr 2fr';
+    check('camelCase -> hyphenated',
+      inner.style.gridTemplateColumns === '1fr 2fr' &&
+      inner.getAttribute('style').indexOf('grid-template-columns:1fr 2fr') >= 0);
+
+    /* previously-whitelisted properties must keep working */
+    inner.style.color = 'red';
+    check('legacy property still works', inner.style.color === 'red');
+
+    /* --- 6. repeated writes replace in place instead of appending duplicates --- */
+    inner.style.color = 'blue';
+    inner.style.color = 'green';
+    var styleText = inner.getAttribute('style');
+    var occurrences = styleText.split('color:').length - 1;
+    check('no duplicate declarations', occurrences === 1 && inner.style.color === 'green');
+
+    /* --- 7. CSSStyleDeclaration API surface over arbitrary properties --- */
+    check('getPropertyValue', inner.style.getPropertyValue('transform') === 'translateX(10px)');
+    inner.style.setProperty('padding-left', '4px');
+    check('setProperty', inner.style.paddingLeft === '4px');
+    var old = inner.style.removeProperty('padding-left');
+    check('removeProperty', old === '4px' && inner.style.paddingLeft === '');
+    check('style.length', inner.style.length >= 2);
+    check('ownKeys enumerates', Object.keys(inner.style).indexOf('transform') >= 0);
+
+    /* --- 8. cssText still reads/writes the whole declaration --- */
+    inner.style.cssText = 'color:purple;transform:none;';
+    check('cssText write', inner.style.color === 'purple' && inner.style.transform === 'none');
+    check('cssText read', inner.style.cssText.indexOf('purple') >= 0);
+
+    result.textContent = 'PASS: ' + checks.length + ' checks';
+    if (typeof console !== 'undefined' && console.log) {
+      console.log('EVENTTARGET_STYLE_TEST_PASS ' + checks.length + ' ' + checks.join('|'));
+    }
+    document.title = 'PASS eventtarget-style';
+  } catch (error) {
+    result.textContent = 'FAIL: ' + error;
+    if (typeof console !== 'undefined' && console.log) {
+      console.log('EVENTTARGET_STYLE_TEST_FAIL ' + error + ' after:' + checks.join('|'));
+    }
+    document.title = 'FAIL eventtarget-style';
+  }
+}());
+</script>

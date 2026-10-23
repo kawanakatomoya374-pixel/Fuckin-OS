@@ -1,0 +1,28 @@
+<!doctype html>
+<div id="root"><span id="child">x</span></div><pre id="result">pending</pre>
+<script>
+(function () {
+  var result = document.getElementById('result');
+  var step = 'start';
+  try {
+    step = 'get child';
+    var child = document.getElementById('child');
+    step = 'getRootNode';
+    var root = child.getRootNode();
+    console.log('NODE_ROOT_STEP root=' + root.nodeType);
+    step = 'create empty';
+    var empty = document.createElement('i');
+    step = 'child connected';
+    var connected = child.isConnected;
+    var documentRoot = document.getRootNode();
+    var documentConnected = document.isConnected;
+    step = 'root hasChildNodes';
+    var rootChildren = root.hasChildNodes();
+    step = 'empty hasChildNodes';
+    var emptyChildren = empty.hasChildNodes();
+    var ok = root === document && documentRoot === document && connected === true && documentConnected === true && root.nodeType === 9 && rootChildren === true && emptyChildren === false;
+    result.textContent = ok ? 'PASS: Node root APIs' : 'FAIL: root=' + root.nodeType + ' same=' + (root === document) + ' connected=' + connected + ' documentConnected=' + documentConnected;
+    console.log(ok ? 'NODE_ROOT_PASS' : 'NODE_ROOT_FAIL values');
+  } catch (e) { result.textContent = 'FAIL step=' + step + ': ' + e; console.log('NODE_ROOT_FAIL step=' + step + ' ' + e); }
+}());
+</script>

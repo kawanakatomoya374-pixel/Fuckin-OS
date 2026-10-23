@@ -1,0 +1,15 @@
+<!doctype html>
+<pre id="result">pending</pre>
+<script>
+(function () {
+  var result = document.getElementById('result');
+  try {
+    var mouse = new MouseEvent('click', {bubbles: true, clientX: 12, clientY: 34, button: 1});
+    var key = new KeyboardEvent('keydown', {key: 'A', code: 'KeyA', which: 65});
+    var input = new InputEvent('input', {data: 'x', inputType: 'insertText'});
+    var ok = mouse.bubbles === true && mouse.clientX === 12 && mouse.clientY === 34 && mouse.button === 1 && key.key === 'A' && key.code === 'KeyA' && key.which === 65 && input.data === 'x' && input.inputType === 'insertText';
+    result.textContent = ok ? 'PASS: specialized Event' : 'FAIL: specialized Event';
+    console.log(ok ? 'EVENT_SPECIALIZED_PASS' : 'EVENT_SPECIALIZED_FAIL');
+  } catch (e) { result.textContent = 'FAIL: ' + e; console.log('EVENT_SPECIALIZED_FAIL ' + e); }
+}());
+</script>

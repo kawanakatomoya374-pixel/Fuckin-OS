@@ -1,0 +1,69 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>C-OS QuickJS DOM/CSS performance self-test</title>
+<style>
+  body { font-family: sans-serif; margin: 12px; }
+  #result { padding: 8px; border-radius: 6px; font-weight: bold; }
+  #host { display: block; position: relative; overflow: hidden; }
+  .cell { display: inline; margin: 1px; padding: 1px; border: 1px solid #ccd; }
+  .hot { background-color: #d8f6df; color: #063; }
+</style>
+<h1>C-OS NetSurf + QuickJS performance self-test</h1>
+<p id="result">RUNNING</p>
+<div id="host"></div>
+<script>
+(function () {
+  'use strict';
+  var started = Date.now();
+  var result = document.getElementById('result');
+  var host = document.getElementById('host');
+  var checks = [];
+  function check(name, condition) {
+    if (!condition) throw new Error(name + ' failed');
+    checks.push(name);
+  }
+  try {
+    var fragment = document.createDocumentFragment();
+    for (var i = 0; i < 160; ++i) {
+      var node = document.createElement('span');
+      node.className = 'cell';
+      node.setAttribute('data-index', String(i));
+      node.textContent = 'N' + i + ' ';
+      node.style.position = 'relative';
+      node.style.borderRadius = '2px';
+      node.style.fontWeight = (i % 2) ? '700' : '400';
+      if ((i % 8) === 0) node.classList.add('hot');
+      fragment.appendChild(node);
+    }
+    check('DocumentFragment child count', fragment.childNodes.length === 160);
+    var builtMs = Date.now() - started;
+    host.appendChild(fragment);
+    var selected = document.querySelectorAll('span.cell[data-index]');
+    check('selector/CSSOM', selected.length >= 160);
+    var selectorMs = Date.now() - started - builtMs;
+    var events = 0;
+    selected[0].addEventListener('cos-perf', function () { events++; });
+    selected[0].dispatchEvent(new Event('cos-perf'));
+    check('Event dispatch', events === 1);
+    localStorage.setItem('cos-perf-self-test', 'ok');
+    check('Storage', localStorage.getItem('cos-perf-self-test') === 'ok');
+    localStorage.removeItem('cos-perf-self-test');
+    check('Web APIs', typeof fetch === 'function' && typeof XMLHttpRequest === 'function');
+    result.classList.add('hot');
+    result.style.border = '1px solid #287c42';
+    result.style.opacity = '1';
+    var syncMs = Date.now() - started;
+    result.textContent = 'PASS: ' + checks.join(', ') +
+      ' | build_ms=' + builtMs + ' selector_ms=' + selectorMs +
+      ' sync_ms=' + syncMs;
+    setTimeout(function () {
+      var totalMs = Date.now() - started;
+      result.textContent += ' timer=PASS total_ms=' + totalMs;
+      document.title = 'PASS local-dom-160 ' + totalMs + 'ms';
+    }, 0);
+  } catch (error) {
+    result.style.color = '#a00';
+    result.textContent = 'FAIL: ' + error;
+  }
+}());
+</script>

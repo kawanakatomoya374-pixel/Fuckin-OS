@@ -1,0 +1,28 @@
+<!doctype html>
+<meta charset="utf-8">
+<div id="root"></div><pre id="result">pending</pre>
+<script>
+(function () {
+  var root = document.getElementById('root');
+  var result = document.getElementById('result');
+  try {
+    var seen = 0;
+    var observer = new MutationObserver(function (records) {
+      if (records.length === 1 && records[0].type === 'attributes' && records[0].attributeName === 'data-ok') {
+        seen++;
+        result.textContent = 'PASS: MutationObserver attributes';
+        console.log('MUTATION_ATTRIBUTES_PASS');
+      } else {
+        result.textContent = 'FAIL: attribute record';
+        console.log('MUTATION_ATTRIBUTES_FAIL record');
+      }
+    });
+    observer.observe(root, { attributes: true, attributeFilter: ['data-ok'] });
+    root.setAttribute('data-no', '1');
+    root.setAttribute('data-ok', '2');
+    queueMicrotask(function () {
+      if (seen !== 1) { result.textContent = 'FAIL: filter/timing'; console.log('MUTATION_ATTRIBUTES_FAIL filter'); }
+    });
+  } catch (e) { result.textContent = 'FAIL: ' + e; console.log('MUTATION_ATTRIBUTES_FAIL ' + e); }
+}());
+</script>

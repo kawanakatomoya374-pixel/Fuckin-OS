@@ -1,0 +1,127 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>QuickJS document/window EventTarget + generic style self-test</title>
+<p id="result">RUNNING</p>
+<div id="outer"><button id="inner">test</button></div>
+<script>
+(function () {
+  'use strict';
+  var result = document.getElementById('result');
+  var outer = document.getElementById('outer');
+  var inner = document.getElementById('inner');
+  var checks = [];
+  function check(name, condition) {
+    if (!condition) throw new Error(name + ' failed');
+    checks.push(name);
+  }
+  try {
+    /* ---- 1. document/window take part in the real capture/bubble path ---- */
+    var order = [];
+    var docTarget = null, winTarget = null;
+
+    window.addEventListener('cos-doc-target', function (e) {
+      order.push('win-capture');
+    }, true);
+    document.addEventListener('cos-doc-target', function (e) {
+      order.push('doc-capture');
+    }, true);
+    outer.addEventListener('cos-doc-target', function (e) {
+      order.push('outer-capture');
+    }, true);
+    inner.addEventListener('cos-doc-target', function (e) {
+      order.push('target');
+    });
+    outer.addEventListener('cos-doc-target', function (e) {
+      order.push('outer-bubble');
+    });
+    document.addEventListener('cos-doc-target', function (e) {
+      order.push('doc-bubble');
+      docTarget = e.target;
+    });
+    window.addEventListener('cos-doc-target', function (e) {
+      order.push('win-bubble');
+      winTarget = e.target;
+    });
+
+    inner.dispatchEvent(new Event('cos-doc-target', { bubbles: true }));
+
+    check('document reached on bubble', order.indexOf('doc-bubble') >= 0);
+    check('window reached on bubble', order.indexOf('win-bubble') >= 0);
+    check('document reached on capture', order.indexOf('doc-capture') >= 0);
+    check('window reached on capture', order.indexOf('win-capture') >= 0);
+    check('event.target correct at document', docTarget === inner);
+    check('event.target correct at window', winTarget === inner);
+    check('propagation order', order.join(',') ===
+      'win-capture,doc-capture,outer-capture,target,outer-bubble,doc-bubble,win-bubble');
+
+    /* stopPropagation at the document level must prevent window from firing */
+    var afterStop = [];
+    function stopper(e) { e.stopPropagation(); }
+    function shouldNotRun() { afterStop.push('window'); }
+    document.addEventListener('cos-doc-stop', stopper);
+    window.addEventListener('cos-doc-stop', shouldNotRun);
+    inner.dispatchEvent(new Event('cos-doc-stop', { bubbles: true }));
+    check('stopPropagation at document', afterStop.length === 0);
+
+    /* removeEventListener must actually detach a document listener */
+    var removed = 0;
+    function counted() { removed++; }
+    document.addEventListener('cos-doc-remove', counted);
+    inner.dispatchEvent(new Event('cos-doc-remove', { bubbles: true }));
+    document.removeEventListener('cos-doc-remove', counted);
+    inner.dispatchEvent(new Event('cos-doc-remove', { bubbles: true }));
+    check('document removeEventListener', removed === 1);
+
+    /* ---- 2. element.style accepts arbitrary CSS properties ---- */
+    inner.style.color = 'red';
+    check('style basic property', inner.style.color === 'red');
+
+    /* These were outside the old 22-name whitelist and silently did nothing. */
+    inner.style.transform = 'rotate(45deg)';
+    check('style.transform', inner.style.transform === 'rotate(45deg)');
+    inner.style.gridTemplateColumns = '1fr 2fr';
+    check('style camelCase -> hyphen',
+      inner.style.gridTemplateColumns === '1fr 2fr' &&
+      inner.getAttribute('style').indexOf('grid-template-columns:1fr 2fr') >= 0);
+
+    /* Repeated writes must replace in place, not append duplicates. */
+    inner.style.color = 'blue';
+    inner.style.color = 'green';
+    check('style replaces in place', inner.style.color === 'green');
+    var occurrences = inner.getAttribute('style').split('color:').length - 1;
+    check('no duplicate declarations', occurrences === 1);
+
+    /* CSSOM methods over the same generic backing. */
+    inner.style.setProperty('font-style', 'italic');
+    check('setProperty', inner.style.getPropertyValue('font-style') === 'italic');
+    var old = inner.style.removeProperty('font-style');
+    check('removeProperty returns old', old === 'italic');
+    check('removeProperty clears', inner.style.getPropertyValue('font-style') === '');
+
+    /* Enumeration reflects real declarations, not a fixed-length list. */
+    var keys = Object.keys(inner.style);
+    check('ownKeys enumerates declared', keys.indexOf('transform') >= 0);
+    check('length matches declarations', inner.style.length === keys.length);
+
+    /* Unset properties read as empty string, as in the CSSOM. */
+    check('unset property empty', inner.style.borderCollapse === '');
+
+    /* cssText round-trips through the style attribute. */
+    inner.style.cssText = 'color:purple;';
+    check('cssText set', inner.style.color === 'purple');
+    check('cssText get', inner.style.cssText.indexOf('color:purple') >= 0);
+
+    result.textContent = 'PASS: ' + checks.length + ' checks';
+    if (typeof console !== 'undefined' && console.log) {
+      console.log('DOCTARGET_STYLE_PASS ' + checks.length + ' checks');
+    }
+    document.title = 'PASS document-target-style';
+  } catch (error) {
+    result.textContent = 'FAIL: ' + error;
+    if (typeof console !== 'undefined' && console.log) {
+      console.log('DOCTARGET_STYLE_FAIL ' + error + ' after: ' + checks.join(', '));
+    }
+    document.title = 'FAIL document-target-style';
+  }
+}());
+</script>

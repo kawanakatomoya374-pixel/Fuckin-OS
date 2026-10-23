@@ -1,0 +1,5 @@
+{"QMP": {"version": {"qemu": {"micro": 2, "minor": 2, "major": 8}, "package": "Debian 1:8.2.2+ds-0ubuntu1.18"}, "capabilities": ["oob"]}}
+{"return": {}}
+{"return": ""}
+{"return": [{"index": 2, "name": "QEMU PS/2 Mouse", "current": false, "absolute": false}, {"index": 4, "name": "QEMU HID Mouse", "current": true, "absolute": false}]}
+{"return": {}}

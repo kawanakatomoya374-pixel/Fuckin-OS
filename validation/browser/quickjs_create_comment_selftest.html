@@ -1,0 +1,19 @@
+<!doctype html>
+<div id="target"></div><pre id="result">pending</pre>
+<script>
+(function () {
+  var result = document.getElementById('result');
+  try {
+    var comment = document.createComment('hello');
+    var target = document.getElementById('target');
+    target.appendChild(comment);
+    var serialized = new XMLSerializer().serializeToString(target);
+    var basic = comment.nodeType === 8 && comment.nodeName === '#comment' && comment.data === 'hello' && comment.textContent === 'hello' && comment.parentNode === target && serialized.indexOf('<!--hello-->') >= 0 && typeof comment.splitText === 'undefined';
+    var chars = comment.length === 5 && comment.substringData(1, 3) === 'ell';
+    comment.appendData('!'); comment.insertData(5, '?'); comment.deleteData(5, 1); comment.replaceData(0, 1, 'H');
+    var ok = basic && chars && comment.data === 'Hello!';
+    result.textContent = ok ? 'PASS: createComment' : 'FAIL: type=' + comment.nodeType + ' name=' + comment.nodeName + ' data=' + comment.data + ' text=' + comment.textContent + ' parent=' + (comment.parentNode === target) + ' html=' + serialized + ' split=' + typeof comment.splitText;
+    console.log(ok ? 'CREATE_COMMENT_PASS' : 'CREATE_COMMENT_FAIL type=' + comment.nodeType + ' name=' + comment.nodeName + ' data=' + comment.data + ' text=' + comment.textContent + ' parent=' + (comment.parentNode === target) + ' html=' + serialized + ' split=' + typeof comment.splitText);
+  } catch (e) { result.textContent = 'FAIL: ' + e; console.log('CREATE_COMMENT_FAIL ' + e); }
+}());
+</script>

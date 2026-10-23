@@ -1,0 +1,44 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>C-OS local HTML QuickJS pending</title>
+<style>
+  body { font-family: sans-serif; background: #f7fbff; color: #17324d; }
+  #result { padding: 10px; margin: 8px 0; border: 1px solid #287c42; }
+  .ok { color: #176b32; font-weight: 700; }
+</style>
+<h1>Local NetSurf + QuickJS self-test</h1>
+<p>This document must be loaded from <code>file:///browser/local_quickjs_file_selftest.html</code>.</p>
+<div id="result">PENDING</div>
+<script src="local_quickjs_file_module.js"></script>
+<script>
+(function () {
+  var result = document.getElementById('result');
+  var checks = [];
+  function check(name, ok) { checks.push(name + ': ' + (ok ? 'PASS' : 'FAIL')); return ok; }
+  try {
+    var fragment = document.createDocumentFragment();
+    var node = document.createElement('span');
+    node.classList.add('ok');
+    node.style.color = '#176b32';
+    node.textContent = 'local DOM node';
+    fragment.appendChild(node);
+    check('DocumentFragment', fragment.childNodes.length === 1);
+    result.appendChild(fragment);
+    localStorage.setItem('local-file-self-test', 'ok');
+    check('localStorage', localStorage.getItem('local-file-self-test') === 'ok');
+    var fired = false;
+    result.addEventListener('local-check', function () { fired = true; });
+    result.dispatchEvent(new Event('local-check'));
+    check('Event dispatch', fired);
+    check('External script', window.__cos_local_file_module === 'PASS');
+    var passed = checks.every(function (line) { return line.indexOf('FAIL') < 0; });
+    result.classList.add(passed ? 'ok' : 'fail');
+    result.textContent = (passed ? 'PASS: ' : 'FAIL: ') + checks.join(' | ');
+    document.title = passed ? 'C-OS local HTML QuickJS PASS' : 'C-OS local HTML QuickJS FAIL';
+  } catch (error) {
+    console.error('[local-file-selftest] ' + String(error));
+    result.textContent = 'FAIL: ' + error;
+    document.title = 'C-OS local HTML QuickJS ERROR';
+  }
+}());
+</script>

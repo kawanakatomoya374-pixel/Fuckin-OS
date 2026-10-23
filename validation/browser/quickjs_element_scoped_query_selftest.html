@@ -1,0 +1,96 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Element-scoped query and insertion self-test</title>
+<p id="result">RUNNING</p>
+<div id="outside"><span class="item" id="o1">outside</span></div>
+<div id="scope">
+  <span class="item" id="s1">one</span>
+  <span class="item" id="s2">two</span>
+  <p id="deep"><span class="item" id="s3">three</span></p>
+</div>
+<script>
+(function () {
+  'use strict';
+  var checks = [];
+  function check(name, cond) {
+    if (!cond) throw new Error(name + ' failed');
+    checks.push(name);
+  }
+  try {
+    var scope = document.getElementById('scope');
+    var outside = document.getElementById('outside');
+    var deep = document.getElementById('deep');
+
+    /* --- element.querySelectorAll must be scoped to descendants --- */
+    check('document sees all 4 .item', document.querySelectorAll('.item').length === 4);
+    var scoped = scope.querySelectorAll('.item');
+    check('scope sees only its 3', scoped.length === 3);
+    var ids = [];
+    for (var i = 0; i < scoped.length; ++i) ids.push(scoped[i].id);
+    check('scoped ids correct', ids.join(',') === 's1,s2,s3');
+    check('outside is excluded', ids.indexOf('o1') === -1);
+
+    /* deeper scoping: p#deep contains exactly one .item */
+    check('nested scope', deep.querySelectorAll('.item').length === 1);
+    check('nested scope id', deep.querySelectorAll('.item')[0].id === 's3');
+
+    /* --- querySelector returns first descendant or null --- */
+    check('querySelector first', scope.querySelector('.item').id === 's1');
+    check('querySelector null when no match', outside.querySelector('.nope') === null);
+    /* the receiver itself must never be returned (descendants only) */
+    check('self not matched', scope.querySelector('#scope') === null);
+
+    /* --- getElementsByTagName scoped --- */
+    check('scoped tag name', scope.getElementsByTagName('span').length === 3);
+    check('outside tag name', outside.getElementsByTagName('span').length === 1);
+
+    /* --- localName / childElementCount / hasAttributes --- */
+    check('localName lowercased', scope.localName === 'div');
+    check('childElementCount', scope.childElementCount === 3);
+    check('hasAttributes true', scope.hasAttributes() === true);
+    var bare = document.createElement('div');
+    check('hasAttributes false', bare.hasAttributes() === false);
+
+    /* --- insertAdjacentElement / Text / HTML --- */
+    var host = document.createElement('div');
+    host.id = 'host';
+    document.body.appendChild(host);
+
+    var made = document.createElement('b');
+    made.id = 'made';
+    var returned = host.insertAdjacentElement('beforeend', made);
+    check('insertAdjacentElement returns node', returned === made);
+    check('insertAdjacentElement beforeend', host.querySelector('#made') !== null);
+
+    host.insertAdjacentText('afterbegin', 'TXT');
+    check('insertAdjacentText afterbegin', host.textContent.indexOf('TXT') === 0);
+
+    host.insertAdjacentHTML('beforeend', '<i class="ins" id="i1">x</i><i class="ins">y</i>');
+    check('insertAdjacentHTML count', host.querySelectorAll('.ins').length === 2);
+    check('insertAdjacentHTML parsed element', host.querySelector('#i1').tagName.toLowerCase() === 'i');
+
+    host.insertAdjacentHTML('beforebegin', '<u id="before-host">b</u>');
+    var beforeHost = document.getElementById('before-host');
+    check('insertAdjacentHTML beforebegin', beforeHost !== null &&
+          beforeHost.nextElementSibling === host);
+
+    /* --- replaceChildren --- */
+    host.replaceChildren();
+    check('replaceChildren clears', host.childElementCount === 0 && host.textContent === '');
+    var fresh = document.createElement('em');
+    host.replaceChildren(fresh, 'tail');
+    check('replaceChildren appends', host.childElementCount === 1 &&
+          host.textContent.indexOf('tail') >= 0);
+
+    document.getElementById('result').textContent = 'PASS: ' + checks.length;
+    if (typeof console !== 'undefined' && console.log) {
+      console.log('SCOPED_QUERY_PASS ' + checks.length + ' ' + checks.join('|'));
+    }
+  } catch (error) {
+    document.getElementById('result').textContent = 'FAIL: ' + error;
+    if (typeof console !== 'undefined' && console.log) {
+      console.log('SCOPED_QUERY_FAIL ' + error + ' after:' + checks.join('|'));
+    }
+  }
+}());
+</script>

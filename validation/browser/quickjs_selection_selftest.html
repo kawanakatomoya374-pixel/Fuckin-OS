@@ -1,0 +1,40 @@
+<!doctype html>
+<meta charset="utf-8">
+<div id="root">selection text</div><pre id="result">pending</pre>
+<script>
+(function () {
+  var result = document.getElementById('result');
+  try {
+    var root = document.getElementById('root');
+    var range = document.createRange();
+    range.selectNodeContents(root);
+    var selection = document.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    var ok = selection.rangeCount === 1 && selection.getRangeAt(0) === range && selection.toString() === root.textContent && selection.anchorNode === root && selection.focusNode === root && selection.anchorOffset === 0 && selection.focusOffset === root.textContent.length && selection.direction === 'forward' && !selection.isCollapsed;
+    selection.setBaseAndExtent(root, 0, root, 5);
+    var baseOk = selection.anchorNode === root && selection.focusNode === root && selection.anchorOffset === 0 && selection.focusOffset === 5;
+    selection.extend(root, root.textContent.length);
+    var extendOk = selection.focusNode === root && selection.focusOffset === root.textContent.length;
+    selection.collapseToStart();
+    var collapseStartOk = selection.isCollapsed && selection.anchorNode === root && selection.focusNode === root && selection.anchorOffset === selection.focusOffset;
+    selection.setBaseAndExtent(root, 0, root, 5);
+    selection.collapseToEnd();
+    var collapseEndOk = selection.isCollapsed && selection.anchorNode === root && selection.focusNode === root && selection.anchorOffset === selection.focusOffset;
+    var containsOk = selection.containsNode(root, false) === true;
+    var removable = selection.getRangeAt(0);
+    selection.removeRange(removable);
+    var removeRangeOk = selection.rangeCount === 0 && selection.anchorNode === null && selection.focusNode === null;
+    var deleteNode = document.createElement('div');
+    deleteNode.textContent = 'delete me';
+    var deleteRange = document.createRange();
+    deleteRange.selectNodeContents(deleteNode);
+    selection.addRange(deleteRange);
+    selection.deleteFromDocument();
+    var deleteOk = deleteNode.textContent === '' && selection.isCollapsed;
+    ok = ok && baseOk && extendOk && collapseStartOk && collapseEndOk && containsOk && removeRangeOk && deleteOk;
+    result.textContent = ok ? 'PASS: Selection' : 'FAIL: Selection values';
+    console.log(ok ? 'SELECTION_PASS' : 'SELECTION_FAIL values');
+  } catch (e) { result.textContent = 'FAIL: ' + e; console.log('SELECTION_FAIL ' + e); }
+}());
+</script>

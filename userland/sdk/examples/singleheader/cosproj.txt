@@ -1,0 +1,6 @@
+# C-OS Studio project: the two-file single-header example (mini_vec.h: the implementation is compiled into vec_main.c). F7 / Build.
+name=vec_demo
+target=vec_demo
+type=exe
+cflags=-O1
+sources=vec_main.c,vec_util.c

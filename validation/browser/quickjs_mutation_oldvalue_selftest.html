@@ -1,0 +1,24 @@
+<!doctype html>
+<div id="target">old text</div><pre id="result">pending</pre>
+<script>
+(function () {
+  var target = document.getElementById('target');
+  var result = document.getElementById('result');
+  var seen = [];
+  try {
+    var observer = new MutationObserver(function (records) {
+      for (var i = 0; i < records.length; ++i) seen.push(records[i]);
+    });
+    observer.observe(target, {attributes: true, attributeOldValue: true, characterData: true, characterDataOldValue: true, subtree: true, childList: true});
+    target.setAttribute('data-old', 'new');
+    target.firstChild.textContent = 'new text';
+    queueMicrotask(function () {
+      var attr = null, chars = null;
+      for (var i = 0; i < seen.length; ++i) { if (seen[i].type === 'attributes') attr = seen[i]; if (seen[i].type === 'characterData') chars = seen[i]; }
+      var ok = attr && attr.attributeName === 'data-old' && attr.oldValue === null && chars && chars.oldValue === 'old text';
+      result.textContent = ok ? 'PASS: Mutation oldValue' : 'FAIL: records=' + seen.length;
+      console.log(ok ? 'MUTATION_OLDVALUE_PASS' : 'MUTATION_OLDVALUE_FAIL records=' + seen.length);
+    });
+  } catch (e) { result.textContent = 'FAIL: ' + e; console.log('MUTATION_OLDVALUE_FAIL ' + e); }
+}());
+</script>
