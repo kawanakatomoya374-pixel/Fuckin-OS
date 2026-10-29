@@ -1,6 +1,6 @@
 /**
  * storage_manager.h - ストレージ永続化管理
- * C-OS 4.0.8 alpha - VirtualBox Compatible
+ * C-OS 4.1.0 - VirtualBox Compatible
  */
 #ifndef STORAGE_MANAGER_H
 #define STORAGE_MANAGER_H

@@ -1,6 +1,6 @@
 /**
  * storage.c - Persistent filesystem storage backend
- * C-OS 4.0.8 alpha
+ * C-OS 4.1.0
  *
  * This backend keeps a RAM cache for fast access while persisting a compact
  * filesystem catalog and file payloads to a raw ATA disk image.
@@ -514,6 +514,8 @@ static bool ata_write_sectors(uint64_t lba, uint32_t count, const void *buffer);
 static bool ata_flush(void);
 void ata_report_cache_stats(void);
 static blk_dev_t *g_blk;
+static bool blk_read_retry(uint64_t lba, uint32_t count, void *buf);
+static bool blk_write_retry(uint64_t lba, uint32_t count, const void *buf);
 
 static bool storage_disk_io_read(uint64_t lba, uint8_t* buffer, size_t bytes) {
     if (!buffer || bytes == 0) return true;
@@ -1185,10 +1187,7 @@ static bool ata_read_sector(uint64_t lba, void *buffer) {
         ata_unlock();
         return true;
     }
-    bool ok = false;
-    for (int attempt = 0; attempt < ATA_IO_ATTEMPTS && !ok; ++attempt) {
-        ok = g_blk->read(g_blk, lba, 1, buffer);
-    }
+    bool ok = blk_read_retry(lba, 1, buffer);
     if (!ok) {
         /* Do not cache a failed read: the buffer contents are undefined,
          * and caching them would make a transient failure permanent. */
@@ -1210,10 +1209,7 @@ static bool ata_write_sector(uint64_t lba, const void *buffer) {
     /* Invalidate first. If the disk write fails partway, the cache must
      * not keep claiming the new contents are on disk. */
     line->valid = false;
-    bool ok = false;
-    for (int attempt = 0; attempt < ATA_IO_ATTEMPTS && !ok; ++attempt) {
-        ok = g_blk->write(g_blk, lba, 1, buffer);
-    }
+    bool ok = blk_write_retry(lba, 1, buffer);
     if (ok) {
         memcpy(line->data, buffer, 512);
         line->lba = lba;
@@ -1236,15 +1232,50 @@ static uint8_t g_ata_run_buf[RUN_BUF_SECTORS * 512u];
 static uint64_t g_ra_next;
 static uint32_t g_ra_len = ATA_READAHEAD_MIN;
 
-static bool blk_read_retry(uint64_t lba, uint32_t count, void *buf) {
+static bool blk_read_once(uint64_t lba, uint32_t count, void *buf) {
     bool ok = false;
     for (int attempt = 0; attempt < ATA_IO_ATTEMPTS && !ok; ++attempt) ok = g_blk->read(g_blk, lba, count, buf);
     return ok;
 }
-static bool blk_write_retry(uint64_t lba, uint32_t count, const void *buf) {
+static bool blk_write_once(uint64_t lba, uint32_t count, const void *buf) {
     bool ok = false;
     for (int attempt = 0; attempt < ATA_IO_ATTEMPTS && !ok; ++attempt) ok = g_blk->write(g_blk, lba, count, buf);
     return ok;
+}
+/* The drivers hand the buffer to a DMA engine (IDE bus master, AHCI, NVMe): its address has to be at least 2 bytes (IDE/AHCI) or 4 bytes (NVMe) aligned,
+ * and a transfer from an odd address is not what the engine writes to the disk. A file written at an odd offset (a zip header of 45 bytes, then the data) reaches
+ * here with such a buffer (FatFs passes the user's data on from the byte where it stands), so the sectors go through an aligned bounce buffer. The caller holds
+ * the ATA lock, which also protects the bounce buffer. */
+#define ALIGN_SECT 128u
+static uint8_t *g_align_bounce;
+static bool blk_buf_unaligned(const void *buf) { return ((uintptr_t)buf & 3u) != 0; }
+static bool align_bounce_ready(void) {
+    if (!g_align_bounce) g_align_bounce = (uint8_t *)kmalloc_aligned((size_t)ALIGN_SECT * 512u, 4096);
+    return g_align_bounce != NULL;
+}
+static bool blk_read_retry(uint64_t lba, uint32_t count, void *buf) {
+    if (!blk_buf_unaligned(buf)) return blk_read_once(lba, count, buf);
+    if (!align_bounce_ready()) return false;
+    uint8_t *out = (uint8_t *)buf;
+    while (count) {
+        uint32_t n = count < ALIGN_SECT ? count : ALIGN_SECT;
+        if (!blk_read_once(lba, n, g_align_bounce)) return false;
+        memcpy(out, g_align_bounce, (size_t)n * 512u);
+        lba += n; out += (size_t)n * 512u; count -= n;
+    }
+    return true;
+}
+static bool blk_write_retry(uint64_t lba, uint32_t count, const void *buf) {
+    if (!blk_buf_unaligned(buf)) return blk_write_once(lba, count, buf);
+    if (!align_bounce_ready()) return false;
+    const uint8_t *in = (const uint8_t *)buf;
+    while (count) {
+        uint32_t n = count < ALIGN_SECT ? count : ALIGN_SECT;
+        memcpy(g_align_bounce, in, (size_t)n * 512u);
+        if (!blk_write_once(lba, n, g_align_bounce)) return false;
+        lba += n; in += (size_t)n * 512u; count -= n;
+    }
+    return true;
 }
 
 static bool ata_read_sectors(uint64_t lba, uint32_t count, void *buffer) {

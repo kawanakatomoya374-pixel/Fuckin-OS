@@ -1,6 +1,6 @@
 /**
  * mk_desktop.h - Advanced Desktop System Header
- * C-OS 4.0.8 alpha Advanced Desktop Environment
+ * C-OS 4.1.0 Advanced Desktop Environment
  */
 #ifndef MK_DESKTOP_H
 #define MK_DESKTOP_H

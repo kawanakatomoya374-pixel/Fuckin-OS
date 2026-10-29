@@ -20,7 +20,7 @@
  * over a real network (only the data: scheme is registered so far -
  * see cos_fetch.c).
  *
- * C-OS 4.0.8 alpha additions:
+ * C-OS 4.1.0 additions:
  *   - cos_netsurf_load_url_sync_nowait(): fire-and-forget variant for
  *     GUI callers that want to trigger the pipeline without blocking
  *     the render loop.
@@ -266,9 +266,10 @@ nserror cos_netsurf_init(void)
     /* A browser document can now retain up to 10MiB of HTML input and page
      * resources commonly include CSS, scripts, and images.  Give NetSurf's
      * standard llcache a 128MiB shared resource budget; this is separate from
-     * the 24MiB per-QuickJS-runtime execution ceiling. */
-    params.llcache.limit = 128u * 1024u * 1024u;   /* 128MiB RAM cache */
-    params.llcache.hysteresis = 16u * 1024u * 1024u;
+     * the per-QuickJS-runtime execution ceiling. The cache only holds what no page is showing any more; 48MiB is plenty for that and leaves the rest of the machine's memory
+     * to the programs (the cache was 128MiB: on a 2-4 GiB machine running Firefox beside the browser that is real money). */
+    params.llcache.limit = 48u * 1024u * 1024u;   /* 48MiB RAM cache */
+    params.llcache.hysteresis = 8u * 1024u * 1024u;
     params.llcache.minimum_lifetime = 0;
     params.llcache.minimum_bandwidth = 0;
     params.llcache.maximum_bandwidth = 0;
@@ -289,7 +290,7 @@ nserror cos_netsurf_init(void)
     serial_puts("\n");
     serial_puts("[NetSurf] engine initialised (content core + html/css/png/jpeg/bmp "
                 "handlers + QuickJS backend + data:/file:/http:/https: "
-                "fetchers; llcache=128MiB, QuickJS runtime=24MiB)\n");
+                "fetchers; llcache=48MiB, QuickJS runtime=32MiB)\n");
 
     /* A tiny side-effect-free evaluation verifies that the QuickJS bridge is
      * usable when the browser first starts, rather than merely linked. */

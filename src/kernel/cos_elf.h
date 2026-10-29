@@ -519,6 +519,7 @@ typedef struct {
 #define COS_AT_RANDOM   25
 #define COS_AT_HWCAP2   26
 #define COS_AT_EXECFN   31
+#define COS_AT_SYSINFO_EHDR 33          /* the address of the vDSO (an ELF image the kernel maps) */
 #define COS_AT_MINSIGSTKSZ  51
 /* Private to C-OS. */
 #define COS_AT_COS_LINKMAP  0x434F5300u   /* 'C','O','S',0 */
@@ -545,6 +546,7 @@ typedef struct {
     uint64_t at_entry;            /* the program's real entry point      */
     uint64_t at_linkmap;          /* address of the cos_elf_linkmap_t    */
     uint64_t at_tp;               /* thread pointer, if TLS was set up   */
+    uint64_t at_sysinfo_ehdr;     /* AT_SYSINFO_EHDR: where the vDSO is mapped (0: none) */
     uint64_t at_random_seed[2];   /* 16 bytes of AT_RANDOM               */
     const char *execfn;           /* AT_EXECFN, usually argv[0]'s path   */
     bool     secure;              /* AT_SECURE                           */

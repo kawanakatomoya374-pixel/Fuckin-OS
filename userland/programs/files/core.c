@@ -84,13 +84,17 @@ static bool ext_is(const char *name, const char *list) {          /* list: " .pn
     key[n++] = ' '; key[n] = 0;
     return strstr(list, key) != NULL;
 }
+static bool name_ends_ci(const char *name, const char *suf) { size_t a = strlen(name), b = strlen(suf); return a >= b && !strcasecmp(name + a - b, suf); }
 int kind_of(const char *name, bool is_dir) {
     if (is_dir) return K_FOLDER;
     if (ext_is(name, " .png .jpg .jpeg .jpe .bmp .gif .webp .tga .psd ")) return K_IMAGE;
     if (ext_is(name, " .mp3 .wav .ogg .flac .m4a .aac ")) return K_AUDIO;
     if (ext_is(name, " .mp4 .mkv .avi .mov .webm ")) return K_VIDEO;
     if (ext_is(name, " .c .h .cpp .hpp .cc .py .js .java .rs .go .s .asm .sh .lua .json .xml .html .css ")) return K_CODE;
-    if (ext_is(name, " .zip .tar .gz .bz2 .xz .7z .rar .iso ")) return K_ARCHIVE;
+    if (ext_is(name, " .zip ")) return K_ZIP;
+    if (ext_is(name, " .tar .tgz ") || (ext_is(name, " .gz ") && name_ends_ci(name, ".tar.gz"))) return K_TAR;
+    if (ext_is(name, " .gz ")) return K_GZ;
+    if (ext_is(name, " .bz2 .xz .7z .rar .iso ")) return K_ARCHIVE;
     if (ext_is(name, " .c-os .c-osll .o .a ")) return K_EXEC;
     if (ext_is(name, " .txt .md .log .cfg .conf .ini .csv ") || !strcasecmp(name, "Makefile") || !strcasecmp(name, "README")) return K_TEXT;
     if (ext_is(name, " .pdf .doc .docx .xls .xlsx .ppt .pptx ")) return K_DOC;
@@ -104,6 +108,9 @@ const char *kind_name(int k) {
         case K_VIDEO:   return L("Video", "動画");
         case K_CODE:    return L("Source", "ソースコード");
         case K_ARCHIVE: return L("Archive", "アーカイブ");
+        case K_ZIP:     return L("ZIP archive", "ZIP アーカイブ");
+        case K_TAR:     return L("TAR archive", "TAR アーカイブ");
+        case K_GZ:      return L("GZ compressed file", "GZ 圧縮ファイル");
         case K_EXEC:    return L("Program", "プログラム");
         case K_TEXT:    return L("Text", "テキスト");
         case K_DOC:     return L("Document", "ドキュメント");
@@ -704,6 +711,7 @@ void open_entry(int vi) {
     char p[PATHN]; path_join(p, sizeof p, G.path, e->name);
     if (e->is_dir) nav_to(p, true);
     else if (G.pick) { if (!e->sel) sel_set_only(vi); pick_finish(); }
+    else if (arc_is_extractable(e->name)) arc_extract(vi, true);          /* a double click unpacks an archive into a folder named after it */
     else open_path_external(p);
 }
 
@@ -864,4 +872,152 @@ void dir_poll(void) {
     uint64_t s = sig_of(n, raw);
     if (strcmp(sig_path, G.path)) { snprintf(sig_path, sizeof sig_path, "%s", G.path); sig = s; return; }   /* first look at this folder */
     if (s != sig) { sig = s; dir_load(true); tree_rebuild(); }
+}
+
+/* ---------------------------------------------------------------- */
+/* archives: compress and extract through cosarc.c-os                */
+/* ---------------------------------------------------------------- */
+bool arc_is_extractable(const char *name) {
+    return name_ends_ci(name, ".zip") || name_ends_ci(name, ".tar") || name_ends_ci(name, ".tar.gz") || name_ends_ci(name, ".tgz") || name_ends_ci(name, ".gz");
+}
+bool arc_busy(void) { return G.arc.active; }
+
+static void arc_last_line(const char *path, char *out, size_t cap) {         /* the last line the program printed (the reason, when it failed) */
+    out[0] = 0; static char buf[2048]; cos_stat_t st;
+    if (cos_stat(path, &st) < 0 || st.size == 0) return;
+    ssize_t n = cos_read_file(path, buf, sizeof buf - 1); if (n <= 0) return; buf[n] = 0;
+    char *end = buf + n; while (end > buf && (end[-1] == '\n' || end[-1] == '\r')) *--end = 0;
+    char *nl = strrchr(buf, '\n'); snprintf(out, cap, "%s", nl ? nl + 1 : buf);
+}
+
+static bool arc_start(const char *verb_en, const char *verb_ja, const char *shown_name, const char *const *args, int nargs, const char *result_name, bool select_result) {
+    if (G.arc.active) { status(L("Another archive job is still running", "別の圧縮・展開が実行中です")); return false; }
+    if (!exists_path("/bin/cosarc.c-os")) { status(L("The archive program is missing (update C-OS)", "圧縮プログラムがありません(C-OS を更新してください)")); return false; }
+    const char *av[44]; int ac = 0;
+    snprintf(G.arc.progfile, sizeof G.arc.progfile, "/tmp/.fmarc%d.prog", (int)(cos_time_ms() & 0xFFFF)); cos_mkdir("/tmp"); cos_write_file(G.arc.progfile, "", 0);
+    G.arc.done = G.arc.total = 0; G.arc.cur[0] = 0; G.arc.prog_t = 0;
+    av[ac++] = "/bin/cosarc.c-os"; av[ac++] = "--cwd"; av[ac++] = G.path; av[ac++] = "--progress"; av[ac++] = G.arc.progfile;
+    for (int i = 0; i < nargs && ac < 38; ++i) av[ac++] = args[i];
+    av[ac] = NULL;
+    cos_mkdir("/tmp"); snprintf(G.arc.outfile, sizeof G.arc.outfile, "/tmp/.fmarc%d.out", (int)(cos_time_ms() & 0xFFFF)); cos_write_file(G.arc.outfile, "", 0);
+    char env[80]; snprintf(env, sizeof env, "COS_STDOUT=%s", G.arc.outfile); const char *envp[] = { env, NULL };
+    int64_t pid = cos_spawn_argv("/bin/cosarc.c-os", av, envp);
+    if (pid <= 0) { status(L("Could not start the archive program", "圧縮プログラムを起動できません")); cos_unlink(G.arc.outfile); return false; }
+    G.arc.pid = pid; G.arc.active = true; G.arc.t0 = cos_time_ms(); G.arc.select_result = select_result;
+    snprintf(G.arc.verb, sizeof G.arc.verb, "%s", G.jp ? verb_ja : verb_en);
+    snprintf(G.arc.name, sizeof G.arc.name, "%s", shown_name);
+    snprintf(G.arc.result, sizeof G.arc.result, "%s", result_name ? result_name : "");
+    status(L("%s %s ...", "%s: %s ..."), G.arc.verb, G.arc.name);
+    G.dlg = D_PROGRESS; G.dlg_btn_hover = 0; G.dirty = true;                       /* the progress window: a bar, the file in work, Cancel */
+    return true;
+}
+
+static void unique_with_ext(const char *base, const char *ext, char *out, size_t cap) {
+    char p[PATHN]; snprintf(out, cap, "%s%s", base, ext); path_join(p, sizeof p, G.path, out);
+    for (int i = 2; exists_path(p) && i < 1000; ++i) { snprintf(out, cap, "%s (%d)%s", base, i, ext); path_join(p, sizeof p, G.path, out); }
+}
+
+void arc_compress(int action) {
+    int n = sel_count(); if (n <= 0) return;
+    static char names[32][300]; const char *args[40]; int na = 0, cnt = 0, first = -1;
+    for (int i = 0; i < G.nvis && cnt < 32; ++i) if (ent_at(i)->sel) { if (first < 0) first = i; snprintf(names[cnt], sizeof names[cnt], "./%s", ent_at(i)->name); cnt++; }
+    if (cnt == 0) return;
+    if (n > 32) { status(L("Select at most 32 items at once", "一度に選べるのは32個までです")); return; }
+    char base[256];
+    if (cnt == 1) snprintf(base, sizeof base, "%s", ent_at(first)->name);
+    else { const char *b = strcmp(G.path, "/") ? path_base(G.path) : "archive"; snprintf(base, sizeof base, "%s", b); }
+    const char *ext = action == A_COMPRESS_ZIP ? ".zip" : action == A_COMPRESS_TAR ? ".tar" : action == A_COMPRESS_TGZ ? ".tar.gz" : ".gz";
+    char want[300], out[300];
+    if (action == A_COMPRESS_GZ) {                                                        /* one file: NAME -> NAME.gz, the original stays */
+        if (cnt != 1 || ent_at(first)->is_dir) { status(L("GZ compresses one file (use ZIP or TAR for folders)", "GZ は1つのファイル用です(フォルダーは ZIP か TAR)")); return; }
+        snprintf(out, sizeof out, "%s.gz", base);
+        char p[PATHN]; path_join(p, sizeof p, G.path, out); if (exists_path(p)) { status(L("%s already exists", "%s は既にあります"), out); return; }
+        args[na++] = "gzip"; args[na++] = "-k"; args[na++] = names[0];
+        G.arc.compress = true; G.arc.to_folder = false; G.arc.dest[0] = 0;
+        arc_start("Compressing", "圧縮中", base, args, na, out, true);
+        return;
+    }
+    (void)want; unique_with_ext(base, ext, out, sizeof out);                              /* NAME.zip, then NAME (2).zip ... */
+    if (action == A_COMPRESS_ZIP) { args[na++] = "zip"; args[na++] = out; }
+    else if (action == A_COMPRESS_TAR) { args[na++] = "tar"; args[na++] = "-cf"; args[na++] = out; }
+    else { args[na++] = "tar"; args[na++] = "-czf"; args[na++] = out; }
+    for (int i = 0; i < cnt && na < 38; ++i) args[na++] = names[i];
+    G.arc.compress = true; G.arc.to_folder = false; G.arc.dest[0] = 0;
+    arc_start("Compressing", "圧縮中", cnt == 1 ? base : L("selected items", "選択した項目"), args, na, out, true);
+}
+
+void arc_extract(int vi, bool to_folder) {
+    Ent *e = ent_at(vi); if (!e || e->is_dir) return;
+    const char *name = e->name; char folder[300], dest[PATHN]; const char *args[8]; int na = 0;
+    size_t l = strlen(name);
+    bool zip = name_ends_ci(name, ".zip"), tgz = name_ends_ci(name, ".tgz"), targz = name_ends_ci(name, ".tar.gz"), tar = name_ends_ci(name, ".tar");
+    static char file_arg[300]; snprintf(file_arg, sizeof file_arg, "./%s", name);
+    if (!zip && !tgz && !targz && !tar && !name_ends_ci(name, ".gz")) { status(L("This archive type is not supported", "この形式の圧縮ファイルには対応していません")); return; }
+    if (!zip && !tgz && !targz && !tar) {                                                 /* a plain .gz: gunzip next to it, the .gz stays */
+        char stem[300]; snprintf(stem, sizeof stem, "%s", name); stem[l - 3] = 0;
+        char p[PATHN]; path_join(p, sizeof p, G.path, stem); if (exists_path(p)) { status(L("%s already exists", "%s は既にあります"), stem); return; }
+        args[na++] = "gunzip"; args[na++] = "-k"; args[na++] = file_arg;
+        G.arc.compress = false; G.arc.to_folder = false; G.arc.dest[0] = 0;
+        arc_start("Extracting", "展開中", name, args, na, stem, true);
+        return;
+    }
+    size_t cut = zip ? 4 : tgz ? 4 : targz ? 7 : 4;
+    snprintf(folder, sizeof folder, "%s", name); folder[l - cut] = 0; if (!folder[0]) snprintf(folder, sizeof folder, "extracted");
+    static char destname[300];
+    if (to_folder) { unique_name(G.path, folder, destname, sizeof destname); path_join(dest, sizeof dest, G.path, destname); }
+    else { snprintf(dest, sizeof dest, "%s", G.path); destname[0] = 0; }
+    static char dest_arg[PATHN]; snprintf(dest_arg, sizeof dest_arg, "%s", dest);
+    if (zip) { args[na++] = "unzip"; args[na++] = "-d"; args[na++] = dest_arg; args[na++] = file_arg; }
+    else { args[na++] = "tar"; args[na++] = "-xf"; args[na++] = file_arg; args[na++] = "-C"; args[na++] = dest_arg; }
+    G.arc.compress = false; G.arc.to_folder = to_folder; snprintf(G.arc.dest, sizeof G.arc.dest, "%s", to_folder ? dest : "");
+    arc_start("Extracting", "展開中", name, args, na, to_folder ? destname : "", to_folder);
+}
+
+void arc_tick(void) {
+    if (!G.arc.active) return;
+    int st = 0; int64_t r = cos_waitpid(G.arc.pid, &st, false);
+    uint64_t t = cos_time_ms();
+    if (r != G.arc.pid) {                                                                 /* still running: read the progress file and keep the status line alive */
+        if (t - G.arc.prog_t > 200) {
+            G.arc.prog_t = t; static char pb[400]; ssize_t pn = cos_read_file(G.arc.progfile, pb, sizeof pb - 1);
+            if (pn > 0) { pb[pn] = 0; unsigned long long d = 0, tt = 0; char *nl = strchr(pb, '\n'); if (nl) *nl = 0; if (sscanf(pb, "%llu %llu", &d, &tt) == 2) { G.arc.done = d; G.arc.total = tt; if (nl) { char *nm = nl + 1; char *e2 = strchr(nm, '\n'); if (e2) *e2 = 0; snprintf(G.arc.cur, sizeof G.arc.cur, "%s", nm); } } }
+            G.dirty = true;
+        }
+        static uint64_t last; if (t - last > 1000) { last = t; status(L("%s %s ... %d s", "%s: %s ... %d 秒"), G.arc.verb, G.arc.name, (int)((t - G.arc.t0) / 1000)); }
+        G.dirty = true; return;
+    }
+    char last[300]; arc_last_line(G.arc.outfile, last, sizeof last); cos_unlink(G.arc.outfile); cos_unlink(G.arc.progfile);
+    G.arc.active = false; if (G.dlg == D_PROGRESS) G.dlg = D_NONE;
+    if (st != 0) status(L("Failed: %s", "失敗しました: %s"), last[0] ? last : "?");
+    else status(G.jp ? "完了しました: %s" : "Done: %s", G.arc.result[0] ? G.arc.result : G.arc.name);
+    dir_load(true); tree_rebuild();
+    if (st == 0 && G.arc.select_result && G.arc.result[0]) {
+        for (int i = 0; i < G.nvis; ++i) if (!strcmp(ent_at(i)->name, G.arc.result)) { sel_set_only(i); G.focus = G.anchor = i; ensure_visible(i); break; }
+    }
+}
+
+static void rm_tree(const char *path) {                                                   /* a folder and everything in it (cancelled extraction) */
+    static cos_dirent_t ent; int fd = cos_opendir(path);
+    if (fd >= 0) {
+        char **names = (char **)malloc(sizeof(char *) * 4096); int n = 0;
+        while (n < 4096 && cos_readdir(fd, &ent) == 1) if (strcmp(ent.name, ".") && strcmp(ent.name, "..")) names[n++] = strdup(ent.name);
+        cos_close(fd);
+        for (int i = 0; i < n; ++i) { char p[PATHN]; path_join(p, sizeof p, path, names[i]); rm_tree(p); free(names[i]); }
+        free(names);
+    }
+    cos_unlink(path);
+}
+
+void arc_cancel(void) {
+    if (!G.arc.active) return;
+    cos_kill((int)G.arc.pid, 9);
+    int st = 0; for (int i = 0; i < 50 && cos_waitpid(G.arc.pid, &st, false) != G.arc.pid; ++i) cos_sleep_ms(20);
+    G.arc.active = false; if (G.dlg == D_PROGRESS) G.dlg = D_NONE;
+    cos_unlink(G.arc.outfile); cos_unlink(G.arc.progfile);
+    char p[PATHN];
+    if (G.arc.compress && G.arc.result[0]) { path_join(p, sizeof p, G.path, G.arc.result); cos_unlink(p); char q[PATHN + 8]; snprintf(q, sizeof q, "%s.part", p); cos_unlink(q); }
+    else if (!G.arc.compress && G.arc.to_folder && G.arc.dest[0]) rm_tree(G.arc.dest);
+    else if (!G.arc.compress && G.arc.result[0]) { path_join(p, sizeof p, G.path, G.arc.result); cos_unlink(p); }
+    status(G.arc.compress || G.arc.to_folder || G.arc.result[0] ? L("Cancelled - nothing was kept", "取り消しました(途中までのものは削除しました)") : L("Cancelled - files already extracted stay", "取り消しました(展開済みのファイルは残ります)"));
+    dir_load(true); tree_rebuild();
 }

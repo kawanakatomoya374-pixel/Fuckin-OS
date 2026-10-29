@@ -196,6 +196,7 @@ static void apu_prepare(uint32_t id) {
     /* The shared GDT with this CPU's own TSS; ring3 -> ring0 entries during a job land on the top of the per-AP area. */
     gdt_cpu_init(id);
     *tss_esp0_ptr(id) = (uint64_t)(uintptr_t)(s_apu_area[id] + APU_AREA_SIZE);
+    { extern void cos_syscall_set_kstack(unsigned, uint64_t); cos_syscall_set_kstack(id, (uint64_t)(uintptr_t)(s_apu_area[id] + APU_AREA_SIZE)); }
     ctx->lapic = smp_lapic_registers();
     if (ctx->lapic) ctx->lapic[0x0F0 / 4] = 0x1FFu;           /* software-enable this CPU's LAPIC */
     ctx->prepared = true;

@@ -1,6 +1,6 @@
 /**
  * page_fault.c - Page Fault Handler
- * C-OS 4.0.8 alpha
+ * C-OS 4.1.0
  *
  * Handles page faults with proper error analysis and simple recovery.
  * This version is wired to the active 64-bit paging implementation.
@@ -182,6 +182,7 @@ void page_fault_handler(uint64_t error_code, uint64_t fault_addr) {
             serial_puts(" heap 0x"); serial_puthex(proc->heap_start); serial_puts("..0x"); serial_puthex(proc->heap_end); serial_puts("\n");
         }
         if (proc) {
+            { extern void cos_crash_note(process_t *p, uint32_t vector, uint64_t err, uint64_t rip, uint64_t addr); cos_crash_note(proc, 14, error_code, page_fault_rip, fault_addr); }
             process_exit(proc, -1);
             return;
         }
@@ -218,7 +219,17 @@ void page_fault_handler(uint64_t error_code, uint64_t fault_addr) {
             if (v >= 0x100000 && v < 0x4ca000) { serial_puts("[PF]   stack+"); serial_putdec((uint64_t)k * 8); serial_puts(" text 0x"); serial_puthex(v); serial_puts("\n"); }
         }
     }
+    {   /* The kernel itself touched an invalid user address while serving a program (a bad pointer from a system call): end that program instead of the system. */
+        process_t *cur = process_get_current();
+        if (cur && cur->type == TASK_TYPE_USER && fault_addr < 0x0000800000000000ULL) {
+            serial_puts("[PF] kernel fault on a user address while serving pid "); serial_putdec(cur->pid); serial_puts(" - ending that program, the system goes on\n");
+            { extern void cos_crash_note(process_t *p, uint32_t vector, uint64_t err, uint64_t rip, uint64_t addr); cos_crash_note(cur, 14, error_code, page_fault_rip, fault_addr); }
+            process_exit(cur, -1);
+            return;
+        }
+    }
     serial_puts("[PF] Unhandled kernel page fault - halting\n");
+    { extern void cos_panic_screen(uint32_t vector, uint64_t err, uint64_t rip, uint64_t addr, const char *where); cos_panic_screen(14, error_code, page_fault_rip, fault_addr, "kernel page fault"); }
     __asm__ volatile("cli");
     for (;;) {
         __asm__ volatile("hlt");

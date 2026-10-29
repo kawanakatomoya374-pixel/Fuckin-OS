@@ -76,6 +76,8 @@ uint64_t memory_get_free(void);
 uint64_t memory_get_heap_total(void);
 uint64_t memory_get_heap_used(void);
 uint64_t memory_get_heap_peak(void);
+/* Cuts the heap (a static array in the kernel image) down to keep_bytes and returns the frames of the rest to the physical allocator; call once at boot. Returns bytes released. */
+uint64_t memory_trim_heap(uint64_t keep_bytes);
 uint64_t memory_get_heap_free(void);
 uint64_t memory_get_apps_used(void);
 

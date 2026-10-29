@@ -1,6 +1,6 @@
 /**
  * net_api.c - Network API Layer Implementation
- * C-OS 4.0.8 alpha
+ * C-OS 4.1.0
  * 
  * This layer wraps the existing network stack (http.c, dns.c, etc.) to provide
  * a clean interface between GUI/Applications and network functionality.

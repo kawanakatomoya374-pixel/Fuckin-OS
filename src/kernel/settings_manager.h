@@ -1,5 +1,5 @@
 /**
- * settings_manager.h - C-OS 4.0.8 alpha Settings Manager Header
+ * settings_manager.h - C-OS 4.1.0 Settings Manager Header
  */
 
 #ifndef SETTINGS_MANAGER_H
@@ -48,7 +48,7 @@ const char* settings_key_animations(void);
 const char* settings_key_hostname(void);
 const char* settings_dump_header(void);
 
-// C-OS 4.0.8 alpha New Settings & API
+// C-OS 4.1.0 New Settings & API
 const char* settings_get_os_version(void);
 const char* settings_get_os_name(void);
 bool settings_is_network_enabled(void);

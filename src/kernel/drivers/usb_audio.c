@@ -117,12 +117,11 @@ static uint16_t parse_function(uint8_t daddr, tusb_desc_interface_t const *itf, 
 }
 
 /* ------------------------------------------------------------------ class driver */
-static _Bool ua_init(void) { memset(&s_ua, 0, sizeof s_ua); }
+static bool ua_init(void) { memset(&s_ua, 0, sizeof s_ua); return true; }
 static bool ua_deinit(void) { return true; }
 static uint16_t ua_open(uint8_t rhport, uint8_t dev_addr, tusb_desc_interface_t const *itf_desc, uint16_t max_len) {
     (void)rhport;
     return parse_function(dev_addr, itf_desc, max_len);
-    return 1;
 }
 
 static void step_freq_done(tuh_xfer_t *x);

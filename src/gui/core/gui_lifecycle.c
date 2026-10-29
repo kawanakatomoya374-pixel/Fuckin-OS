@@ -471,6 +471,7 @@ void gui_update(void) {
      * performs bounded work and never blocks the GUI on a full audio ring. */
     mk_mp3_update();
     { extern void cos_app_window_gui_tick(void); cos_app_window_gui_tick(); }
+    { extern void cos_crash_gui_tick(void); cos_crash_gui_tick(); }
     {
         /* Keyboard volume keys -> OS master volume (see keyboard.c). */
         extern bool keyboard_take_volume_request(int* delta, bool* mute_toggle);

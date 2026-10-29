@@ -219,7 +219,7 @@ static int cos_h2_submit_get(nghttp2_session *session, http_client_t *http,
     static const uint8_t authority[] = ":authority";
     static const uint8_t path[] = ":path";
     static const uint8_t user_agent[] = "user-agent";
-    static const uint8_t user_agent_value[] = "C-OS/4.0.8";
+    static const uint8_t user_agent_value[] = "C-OS/4.1.0";
     static const uint8_t accept[] = "accept";
     static const uint8_t accept_value[] = "text/html,application/xhtml+xml,*/*;q=0.8";
     static const uint8_t accept_encoding[] = "accept-encoding";

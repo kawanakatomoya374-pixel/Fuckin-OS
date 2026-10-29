@@ -115,6 +115,8 @@ int cos_ipc_notify(uint64_t dst_pid, uint64_t event_type,
  * a GUI server's framebuffer being the obvious case. */
 int cos_shm_create(uint64_t size, uint64_t *out_shm_id);
 int cos_shm_attach(uint64_t shm_id, void **out_addr);
+/* maps a named /dev/shm object of the Linux side (the Xvfb screen is "Xvfb_screen0"); NULL when there is none */
+void *cos_lxshm_map(const char *name, uint64_t *size);
 /* blocking=false performs a WNOHANG-style single check. Returns the
  * collected child's pid, or -1. */
 int64_t  cos_waitpid(int64_t pid, int *status, bool blocking);
@@ -261,6 +263,7 @@ int      cos_thread_join(int64_t tid, uint64_t timeout_ms);
 
 /* ---- time --------------------------------------------------------------- */
 uint64_t cos_time_ms(void);     /* monotonic milliseconds since boot */
+uint64_t cos_time_us(void);     /* monotonic microseconds since boot (the TSC, calibrated against the RTC; use it to time input and audio, e.g. in a rhythm game) */
 typedef struct { uint32_t year, month, day, hour, minute, second; } cos_datetime_t;
 int cos_rtc_now(cos_datetime_t *out);   /* real wall-clock date/time; cos_time_ms() above is boot-relative only */
 
@@ -335,6 +338,8 @@ enum {
 enum {
     COS_ACTION_POWER_SLEEP = 1, COS_ACTION_POWER_RESTART, COS_ACTION_POWER_SHUTDOWN,
     COS_ACTION_NET_DHCP_RENEW, COS_ACTION_OPEN_TERMINAL, COS_ACTION_SECURITY_FULL_SCAN,
+    COS_ACTION_FS_FORMAT_FAT32, COS_ACTION_FS_FORMAT_EXFAT, COS_ACTION_FS_FORMAT_CANCEL,   /* ask for the data volume to be formatted at the next start (erases it); cancel the ask */
+    COS_ACTION_FS_QUERY,   /* returns (volume now) | (format asked for) << 4, each 0 none / 1 FAT32 / 2 exFAT */
 };
 int cos_settings_get(cos_settings_t *out);
 int cos_settings_set(int key, int value);
@@ -873,6 +878,7 @@ int     cos_audio_close(void);
 #define COS_EV_OPEN        7   /* the OS asks you to open a file (cos_win2_get_path) */
 #define COS_EV_SHELL_SHOW  9    /* shell layer 2 (the start menu) was opened */
 #define COS_EV_SHELL_HIDE  10   /* ... and was closed by the compositor */
+#define COS_EV_RESIZE      11   /* the window was maximized/restored/tiled: x, y = the new client size. Apps that do nothing get their surface stretched; cos_win2_resize() to that size gives 1:1 */
 #define COS_EV_DROP        8   /* a file was dropped on the window at x,y (cos_win2_get_path) */
 typedef struct {
     uint32_t type;
@@ -949,6 +955,7 @@ typedef struct {
 int      cos_kernel_update_status(cos_kupd_status_t *out);
 int      cos_kernel_update_install(const void *blob, size_t len);   /* 0 ok, negative: refused; cos_kernel_update_why() says why */
 int      cos_kernel_update_why(char *buf96);
+int      cos_kernel_update_clear_bad(void);                          /* forget the serial of a kernel update that failed to start (so it can be installed again); 0 ok */
 int      cos_notify(const char *title, const char *message, int type);  /* a desktop toast (type: 0 info, 1 warning, 2 error, 3 success); at most one per 0.4 s */
 int      cos_notif_list(cos_notif_t *out, int max);                     /* the toasts on screen */
 int      cos_desktop_list(cos_dicon_t *out, int max);                   /* up to 64 icons */
@@ -974,7 +981,7 @@ typedef struct {
     uint64_t ram_total, kheap_used, kheap_free, pages_total, pages_free;
     uint64_t stor_total, stor_used, stor_free;
     uint64_t ustor_total, ustor_free;
-    uint32_t ustor_devices, has_password, cpus_online, cpus_possible, cpus_bios, has_apic, has_acpi, reserved;
+    uint32_t ustor_devices, has_password, cpus_online, cpus_possible, cpus_bios, has_apic, has_acpi, reserved;   /* reserved = the battery: bit 0 present, bit 1 charging, bits 8..15 percent, bits 16..31 minutes left (0 when unknown) */
     char cpu_vendor[16], bios_vendor[16], bios_version[16], bios_date[16];
     char os_name[48], os_version[32], boot_msg[96];
     uint32_t pcache_frames, pcache_maps;      /* shared read-only pages (cos_pcache.c): frames held, page-table entries that map them */

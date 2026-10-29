@@ -9,7 +9,7 @@ typedef struct {
     uint64_t ram_total, kheap_used, kheap_free, pages_total, pages_free;
     uint64_t stor_total, stor_used, stor_free;
     uint64_t ustor_total, ustor_free;
-    uint32_t ustor_devices, has_password, cpus_online, cpus_possible, cpus_bios, has_apic, has_acpi, reserved;
+    uint32_t ustor_devices, has_password, cpus_online, cpus_possible, cpus_bios, has_apic, has_acpi, reserved;   /* reserved = the battery: bit 0 present, bit 1 charging, bits 8..15 percent, bits 16..31 minutes left (0 when unknown) */
     char cpu_vendor[16], bios_vendor[16], bios_version[16], bios_date[16];
     char os_name[48], os_version[32], boot_msg[96];
     uint32_t pcache_frames, pcache_maps;      /* shared read-only pages (cos_pcache.c): frames held, page-table entries that map them */

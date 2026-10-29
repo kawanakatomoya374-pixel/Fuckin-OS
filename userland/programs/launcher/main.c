@@ -38,6 +38,23 @@ static int win_w, win_h;
 static int s_tab, s_sel = NVER - 1, s_scroll, s_hover = -1;
 static int64_t s_pid;                     /* the game this launcher started (0 = none) */
 static char s_msg[160];
+static bool s_installing;                 /* the Linux app pack installer is running (followed through /system/linuxpack/progress.txt) */
+
+#define FX_PATH "/linux/usr/lib/firefox/firefox"
+#define VNC_PATH "/linux/usr/bin/Xtigervnc"
+#define INSTALLER_PATH "/apps/linux/LinuxInstall.c-os"
+static bool cos_stat_ok(const char *p);
+static bool fx_installed(void) { return cos_stat_ok(FX_PATH) && cos_stat_ok(VNC_PATH); }
+/* what the installer reports in /system/linuxpack/progress.txt: "<running|done|error> <chunks done> <chunks> <bytes done> <bytes> <message>" */
+typedef struct { char state[12]; int done, total; unsigned long long bytes_done, bytes; char msg[96]; bool ok; } inst_t;
+static inst_t read_progress(void) {
+    inst_t r; memset(&r, 0, sizeof r);
+    char b[320]; ssize_t n = cos_read_file("/system/linuxpack/progress.txt", b, sizeof b - 1);
+    if (n <= 0) return r; b[n] = 0; char *nl = strchr(b, '\n'); if (nl) *nl = 0;
+    int used = 0;
+    if (sscanf(b, "%11s %d %d %llu %llu %n", r.state, &r.done, &r.total, &r.bytes_done, &r.bytes, &used) >= 5) { snprintf(r.msg, sizeof r.msg, "%s", b + used); r.ok = true; }
+    return r;
+}
 
 static bool cos_stat_ok(const char *p) { cos_stat_t st; return cos_stat(p, &st) == 0; }
 static bool game_path(char *out, size_t n, int tab, int ver, bool survival) {
@@ -53,9 +70,20 @@ static bool running(void) {
     return true;
 }
 static void play(bool survival) {
+    if (s_installing) { snprintf(s_msg, sizeof s_msg, "The installation is running."); return; }
     if (running()) { snprintf(s_msg, sizeof s_msg, "A game is already running."); return; }
+    if (s_tab == 2 && !fx_installed()) {                                       /* nothing to start yet: download and install it */
+        const char *iv[2] = { INSTALLER_PATH, NULL };
+        if (!cos_stat_ok(INSTALLER_PATH)) { snprintf(s_msg, sizeof s_msg, "The installer is missing."); return; }
+        cos_mkdir("/system"); cos_mkdir("/system/linuxpack");
+        static const char starting[] = "running 0 0 0 0 starting\n"; cos_write_file("/system/linuxpack/progress.txt", starting, sizeof starting - 1);     /* the old result must not be taken for this run's */
+        /* cos_waitpid(WNOHANG) cannot tell "still running" from "no such child" (both -1), so the installer is followed through its progress file */
+        int64_t ip = cos_spawn_argv(INSTALLER_PATH, iv, NULL);
+        if (ip <= 0) { snprintf(s_msg, sizeof s_msg, "Could not start the installer."); } else { s_installing = true; s_msg[0] = 0; }
+        return;
+    }
     char path[160];
-    if (!game_path(path, sizeof path, s_tab, s_sel, survival)) { snprintf(s_msg, sizeof s_msg, "This game is not installed."); return; }
+    if (!game_path(path, sizeof path, s_tab, s_sel, survival)) { snprintf(s_msg, sizeof s_msg, "Not installed: get Minecraft Classic in C-OS Apps."); return; }
     const char *argv[3] = { path, s_tab == 2 ? "firefox" : NULL, NULL };
     s_pid = cos_spawn_argv(path, argv, NULL);
     if (s_pid <= 0) { s_pid = 0; snprintf(s_msg, sizeof s_msg, "Could not start the game."); }
@@ -102,13 +130,31 @@ static void draw(void) {
         cui_text(&c, f_s, x, y, "E / R choose the block   1-9 hotbar   T chat   F12 full screen   Esc release the mouse", RGB(150, 156, 170)); y += 22;
         cui_text(&c, f_s, x, y, "Craft is MIT licensed (github.com/fogleman/Craft).", RGB(110, 116, 130));
     } else if (s_tab == 2) {
-        int x = 40, y = TAB_H + 36; bool fx = cos_stat_ok("/linux/usr/lib/firefox/firefox") && cos_stat_ok("/linux/usr/bin/Xtigervnc");
+        int x = 40, y = TAB_H + 36; bool fx = fx_installed();
         cui_text(&c, f_h, x, y, "Firefox", RGB(255, 255, 255)); y += 56;
         cui_text(&c, f_m, x, y, "Mozilla Firefox, a Linux program, in a C-OS window.", RGB(200, 205, 215)); y += 28;
         cui_text(&c, f_s, x, y, "The Linux layer runs an X server (TigerVNC) and Firefox; this window is its viewer.", RGB(150, 156, 170)); y += 22;
         cui_text(&c, f_s, x, y, "The first start takes minutes: the Linux programs are emulated and loaded from disk.", RGB(150, 156, 170)); y += 40;
-        cui_text(&c, f_s, x, y, fx ? "Linux root file system found in /linux." : "Needs a Linux root file system with Firefox and Xtigervnc in /linux (docs/LINUX_COMPAT.md).", fx ? RGB(120, 200, 130) : RGB(240, 180, 90)); y += 22;
-        cui_text(&c, f_s, x, y, "Firefox and the Linux programs are not part of C-OS: they come with the root file system you provide.", RGB(110, 116, 130));
+        if (fx) {
+            cui_text(&c, f_s, x, y, "Firefox is installed. Press Start.", RGB(120, 200, 130)); y += 22;
+        } else {
+            inst_t pr = read_progress();
+            if (s_installing && pr.ok && (!strcmp(pr.state, "done") || !strcmp(pr.state, "error"))) s_installing = false;
+            bool busy = s_installing;
+            cui_text(&c, f_s, x, y, "Firefox is not installed yet. Install downloads it (about 330 MB) and needs about 1 GB on the disk.", RGB(240, 180, 90)); y += 22;
+            cui_text(&c, f_s, x, y, "The download is checked against a signature before anything is installed.", RGB(150, 156, 170)); y += 30;
+            if (busy || (pr.ok && !strcmp(pr.state, "error"))) {
+                int bw = win_w - x - 40; if (bw > 520) bw = 520;
+                unsigned pct = pr.ok && pr.bytes ? (unsigned)(pr.bytes_done * 100 / pr.bytes) : 0; if (pct > 100) pct = 100;
+                cui_round_rect(&c, x, y, bw, 18, 8, RGB(38, 42, 50));
+                if (pct) cui_round_rect(&c, x, y, bw * (int)pct / 100 < 16 ? 16 : bw * (int)pct / 100, 18, 8, busy ? RGB(62, 150, 70) : RGB(190, 110, 40));
+                y += 26; char t[160];
+                if (busy) snprintf(t, sizeof t, "%u%%   part %d of %d   %s", pct, pr.ok ? pr.done : 0, pr.ok ? pr.total : 0, pr.ok ? pr.msg : "starting");
+                else snprintf(t, sizeof t, "Stopped: %s. Press Install to continue where it stopped.", pr.msg);
+                cui_text_fit(&c, f_s, x, y, win_w - x - 24, t, busy ? RGB(200, 205, 215) : RGB(240, 180, 90));
+            }
+        }
+        cui_text(&c, f_s, x, win_h - 120, "Firefox and the Linux programs are not part of C-OS: they are downloaded from C-OS-APPS on GitHub.", RGB(110, 116, 130));
     } else {
         rect_t lr = list_rect();
         cui_round_rect(&c, lr.x, lr.y, lr.w, lr.h, 8, RGB(24, 26, 31));
@@ -129,16 +175,19 @@ static void draw(void) {
         cui_text(&c, f_s, x, y, k_ver[s_sel].date, RGB(140, 146, 160)); y += 28;
         cui_text(&c, f_m, x, y, k_ver[s_sel].blurb, RGB(210, 214, 224)); y += 30;
         cui_text_fit(&c, f_s, x, y, win_w - x - 24, k_ver[s_sel].more, RGB(150, 156, 170)); y += 40;
-        cui_text_fit(&c, f_s, x, y, win_w - x - 24, "mc-classic-c by degradka (GPL-3.0): Minecraft Classic rewritten in C.", RGB(110, 116, 130));
+        cui_text_fit(&c, f_s, x, y, win_w - x - 24, "mc-classic-c by degradka (GPL-3.0): Minecraft Classic rewritten in C.", RGB(110, 116, 130)); y += 30;
+        { char q[160]; if (!game_path(q, sizeof q, 1, s_sel, false)) cui_text_fit(&c, f_s, x, y, win_w - x - 24, "Not installed yet: open C-OS Apps and download Minecraft Classic.", RGB(240, 180, 90)); }
     }
     char p[160]; bool have = game_path(p, sizeof p, s_tab, s_sel, false);
+    bool need_install = s_tab == 2 && !fx_installed();
+    if (need_install) have = cos_stat_ok(INSTALLER_PATH);
     if (s_msg[0]) cui_text(&c, f_s, win_w - 232, win_h - 164 - (has_survival() ? 64 : 0), s_msg, RGB(240, 180, 90));
     if (has_survival()) {
         rect_t sr = surv_rect(); char q[160]; bool hs = game_path(q, sizeof q, 1, s_sel, true);
         button(sr, run ? "Running..." : "Play Survival", hs && !run, s_hover == 202, RGB(190, 110, 40));
     }
     rect_t pr = play_rect();
-    button(pr, run ? "Running..." : (has_survival() ? "Play Creative" : s_tab == 2 ? "Start" : "Play"), have && !run, s_hover == 201, RGB(62, 150, 70));
+    button(pr, s_installing ? "Installing..." : run ? "Running..." : (has_survival() ? "Play Creative" : s_tab == 2 ? (need_install ? "Install" : "Start") : "Play"), have && !run && !s_installing, s_hover == 201, RGB(62, 150, 70));
 }
 
 static void on_click(int x, int y) {

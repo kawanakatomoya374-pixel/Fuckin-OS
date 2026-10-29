@@ -1,3 +1,4 @@
+extern cos_xsave_on
 extern cos_smap_active
 ; C-OS 4.0.6 IRQ Stubs (64-bit Long Mode)
 ; Each IRQ stub saves all registers, calls _irq_handler, sends EOI, restores.
@@ -50,15 +51,43 @@ irq_common_stub:
     ; aligned 512-byte area on this thread's own kernel stack; rbx is
     ; callee-saved and keeps the original frame pointer across the call.
     mov rbx, rsp
-    sub rsp, 512
-    and rsp, -16
+    sub rsp, 1088           ; COS_FPU_STACK (task.h): XSAVE area (1024) + 64 for the alignment
+    and rsp, -64
+    ; which format this entry saved is recorded IN the area (offset 1016, past everything XSAVE/FXSAVE write): a register would have to survive the C handler and any task switch inside it
+    cmp byte [rel cos_xsave_on], 0
+    je .fx_save
+    mov qword [rsp+1016], 1
+    ; XSAVE only sets the XSTATE_BV bits of the components it saves and leaves the other bits of the 64-byte header as they were: all 64 bytes are cleared first, or stale stack bytes make the XRSTOR later fault (#GP)
+    mov qword [rsp+512], 0
+    mov qword [rsp+520], 0
+    mov qword [rsp+528], 0
+    mov qword [rsp+536], 0
+    mov qword [rsp+544], 0
+    mov qword [rsp+552], 0
+    mov qword [rsp+560], 0
+    mov qword [rsp+568], 0
+    mov eax, -1
+    mov edx, -1
+    xsave64 [rsp]
+    jmp .fx_saved
+.fx_save:
+    mov qword [rsp+1016], 0
     fxsave64 [rsp]
+.fx_saved:
 
     ; Pass pointer to stack frame as first argument (rdi = System V AMD64 ABI)
     mov rdi, rbx
     call _irq_handler
 
+    cmp qword [rsp+1016], 0
+    je .fx_rest
+    mov eax, -1
+    mov edx, -1
+    xrstor64 [rsp]
+    jmp .fx_restd
+.fx_rest:
     fxrstor64 [rsp]
+.fx_restd:
     mov rsp, rbx
 
     ; Restore all general-purpose registers

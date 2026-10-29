@@ -25,6 +25,7 @@ int  imeui_key(const cos_win_event_t *ev, char *commit, size_t cap);
 int  imeui_key_gated(const cos_win_event_t *ev, bool active, char *commit, size_t cap);   /* active=false: only the on/off key is looked at */
 void imeui_cancel(void);                                      /* drop the composition (a click moved the caret, ...) */
 void imeui_draw(cui_canvas *c, cui_font *f, int caret_x, int caret_y, int line_h);
+bool imeui_last_rect(int *x, int *y, int *w, int *h);          /* the rectangle the last imeui_draw() covered (false: it drew nothing) - for programs whose pixels are rewritten from outside */
 size_t imeui_utf8_prev(const char *s, size_t pos);                  /* byte offset of the character before pos (for Backspace) */
 void imeui_indicator(cui_canvas *c, cui_font *f, int x, int y);   /* a small あ chip while Japanese input is on */
 #endif

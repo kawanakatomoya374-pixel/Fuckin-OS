@@ -1,5 +1,5 @@
 /**
- * bios.h - C-OS 4.0.8 alpha BIOS Interface
+ * bios.h - C-OS 4.1.0 BIOS Interface
  * Basic Input/Output System for hardware abstraction
  */
 

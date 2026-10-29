@@ -1,5 +1,4 @@
-int atoi(const char *str);
-long atol(const char *str);
+#include <stdlib.h>
 /* taskbar.c-os - the desktop taskbar, as a ring-3 program.
  *
  * It owns the strip at the bottom of the screen (cos_shell_create(1, ...)): the compositor draws this surface where the
@@ -186,6 +185,20 @@ static void layout(int width)
     for (int i = 0; i < nwin && x0 + 46 * (i + 1) <= right - 84; i++) add_hit(x0 + i * 46, 46, T_WIN, i);
 }
 
+static unsigned long long mem_used_b, mem_total_b; static uint32_t batt;       /* batt: cos_sysinfo_t.reserved (bit 0 present, bit 1 charging, bits 8..15 percent) */
+
+/* a vertical battery, five thin lines inside (each is 20 %); without a battery (a desktop PC) it shows the five lines in a calm blue: mains power */
+static void draw_battery(int x, int y)
+{
+    bool present = (batt & 1) != 0, chg = (batt & 2) != 0; int pct = (int)((batt >> 8) & 255); if (pct > 100) pct = 100;
+    int lit = present ? (pct + 19) / 20 : 5; if (present && pct > 0 && lit < 1) lit = 1;
+    uint32_t edge = 0x8CA0C8, on = !present ? 0x6F8FD0 : pct >= 50 ? 0x5CC98A : pct >= 25 ? 0xF0A03C : 0xE5484D, off = 0x2B3550;
+    cui_fill(&c, x + 5, y, 6, 3, edge);                                       /* the cap */
+    cui_round_rect_outline(&c, x, y + 3, 16, 27, 3, 1.0f, edge);
+    for (int i = 0; i < 5; ++i) cui_fill(&c, x + 3, y + 7 + i * 4, 10, 2, (4 - i) < lit ? on : off);
+    if (chg) { cui_line(&c, (float)(x + 9), (float)(y + 8), (float)(x + 6), (float)(y + 17), 2.0f, 0xFFE066); cui_line(&c, (float)(x + 6), (float)(y + 17), (float)(x + 10), (float)(y + 17), 2.0f, 0xFFE066); cui_line(&c, (float)(x + 10), (float)(y + 17), (float)(x + 7), (float)(y + 26), 2.0f, 0xFFE066); }
+}
+
 static void draw(int hover, int mem_pct, int usb, const cos_datetime_t *t)
 {
     int W = c.w, H = c.h;
@@ -224,17 +237,29 @@ static void draw(int hover, int mem_pct, int usb, const cos_datetime_t *t)
     int tx = W - 320;
     char b[48];
     snprintf(b, sizeof b, "MEM %d%%", mem_pct);
-    cui_text(&c, f, tx, 8, b, MUTED);
-    cui_round_rect(&c, tx, H - 14, 62, 5, 2, 0x16203A);
-    int fw = 62 * mem_pct / 100;
-    if (fw > 0) cui_round_rect(&c, tx, H - 14, fw, 5, 2, mem_pct > 85 ? 0xE05A4B : 0x5CC98A);
+    cui_text(&c, f, tx, 3, b, MUTED);
     snprintf(b, sizeof b, "USB %d", usb);
-    cui_text(&c, f, tx + 90, 8, b, usb ? 0x6FB4FF : MUTED);
+    cui_text(&c, f, tx + 82, 3, b, usb ? 0x6FB4FF : MUTED);
+    {   /* used / total in MB, two decimals */
+        unsigned long long u = mem_used_b * 100 / 1048576ull, tt = mem_total_b * 100 / 1048576ull;
+        cui_font *fs = cui_font_default(12);
+        snprintf(b, sizeof b, "%llu.%02llu/%llu.%02lluMB", u / 100, u % 100, tt / 100, tt % 100);
+        cui_text(&c, fs, tx, 21, b, MUTED);
+    }
+    cui_round_rect(&c, tx, H - 10, 124, 4, 2, 0x16203A);
+    int fw = 124 * mem_pct / 100;
+    if (fw > 0) cui_round_rect(&c, tx, H - 10, fw, 4, 2, mem_pct > 85 ? 0xE05A4B : 0x5CC98A);
     snprintf(b, sizeof b, "%02d:%02d", (int)t->hour, (int)t->minute);
     cui_text(&c, fb, W - 170, 6, b, TXT);
     snprintf(b, sizeof b, "%04d-%02d-%02d", (int)t->year, (int)t->month, (int)t->day);
     cui_text(&c, f, W - 170, 24, b, MUTED);
-    cui_text(&c, f, W - 78, 14, "C-OS", MUTED);
+    cui_text(&c, f, W - 78, 6, "C-OS", MUTED);
+    {   /* the battery percent under the name (AC without a battery) */
+        bool present = (batt & 1) != 0; int pct = (int)((batt >> 8) & 255); if (pct > 100) pct = 100;
+        if (present) snprintf(b, sizeof b, "%d%%", pct); else snprintf(b, sizeof b, "AC");
+        cui_text(&c, cui_font_default(13), W - 78, 24, b, !present ? 0x6F8FD0 : pct >= 50 ? 0x5CC98A : pct >= 25 ? 0xF0A03C : 0xE5484D);
+    }
+    draw_battery(W - 32, (H - 30) / 2);
 }
 
 int main(void)
@@ -285,7 +310,7 @@ int main(void)
         if (now - last_slow >= 1000) {
             last_slow = now;
             cos_sysinfo_t si;
-            if (cos_sysinfo(&si) == 0 && si.pages_total) mem = (int)(100 - (si.pages_free * 100 / si.pages_total));
+            if (cos_sysinfo(&si) == 0 && si.pages_total) { mem = (int)(100 - (si.pages_free * 100 / si.pages_total)); mem_total_b = (unsigned long long)si.pages_total * 4096ull; mem_used_b = (unsigned long long)(si.pages_total - si.pages_free) * 4096ull; batt = si.reserved; }
             cos_device_info_t dv[16]; usb = 0;
             int nd = cos_devices_list(dv, 16);
             for (int i = 0; i < nd; i++) if (dv[i].kind == COS_DEV_USB_DEVICE && dv[i].present) usb++;
@@ -298,7 +323,7 @@ int main(void)
             uint32_t bkey = (uint32_t)(up_state * 1000 + up_pct * 3 + (bw ? 1 : 0));
             if (bkey != last_bkey) { last_bkey = bkey; dirty = true; if (hb > 0) { draw_balloon(&cbal, now); cos_win2_present(hb); } }
         }
-        uint32_t key = (uint32_t)(t.minute * 7 + t.hour * 131 + mem * 17 + usb * 3 + n * 1009 + up_state * 53 + up_pct);
+        uint32_t key = (uint32_t)(t.minute * 7 + t.hour * 131 + mem * 17 + (int)(mem_used_b >> 16) * 5 + (int)batt * 7 + usb * 3 + n * 1009 + up_state * 53 + up_pct);
         if (up_state == UP_AVAILABLE && ((now / 500) & 1) != last_pulse) { last_pulse = (now / 500) & 1; dirty = true; }
         if (n != nwin || memcmp(nw, wins, (size_t)n * sizeof(cos_winfo_t)) != 0) { memcpy(wins, nw, (size_t)n * sizeof(cos_winfo_t)); nwin = n; dirty = true; }
         if (key != last_key) { last_key = key; dirty = true; }

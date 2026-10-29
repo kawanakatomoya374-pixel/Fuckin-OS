@@ -48,6 +48,11 @@ typedef struct {
 } fs_monitor_t;
 
 void        fs_init(void);
+#define FS_FORMAT_FAT32 1
+#define FS_FORMAT_EXFAT 2
+int         fs_format_request_get(void);      /* the format asked for, applied at the next start (0 = none) */
+bool        fs_format_request_set(int type);  /* FS_FORMAT_FAT32 / FS_FORMAT_EXFAT, or 0 to cancel */
+int         fs_current_type(void);            /* the data volume now: 0 not mounted, FS_FORMAT_FAT32, FS_FORMAT_EXFAT */
 fs_entry_t* fs_list_dir(const char* path);
 int         fs_entry_count(void);
 int         fs_entry_count_for_path(const char* path);
@@ -60,6 +65,10 @@ fs_stream_t* fs_stream_open(const char* path);
 int64_t      fs_stream_read_at(fs_stream_t* st, uint64_t offset, void* buf, uint64_t n);
 uint64_t     fs_stream_size(fs_stream_t* st);
 void         fs_stream_close(fs_stream_t* st);
+typedef struct fs_wstream fs_wstream_t;
+fs_wstream_t* fs_wstream_open(const char* path);                          /* creates the file (or empties it) for writing */
+bool          fs_wstream_write(fs_wstream_t* w, const void* data, uint64_t n);   /* appends; false when the volume is full */
+bool          fs_wstream_close(fs_wstream_t* w);
 
 /* Path-based operations (new) */
 bool        fs_create_file_at(const char* path, const char* name);

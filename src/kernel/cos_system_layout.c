@@ -41,9 +41,13 @@ extern int64_t cos_launch_elf_image_args(const char *name, const unsigned char *
 #include "cos_kmod_fixtures.h"
 #endif
 #include "cos_tcc_elf.h"
+#include "cos_cosarc_elf.h"
 #include "cos_craft_elf.h"
 #include "cos_linuxgui_elf.h"
 #include "cos_linuxpack_elf.h"
+#include "cos_sprint_elf.h"
+#include "cos_cosapps_sp.h"
+#include "cos_cosapps_icon.h"
 #include "cos_mc_games.h"
 #include "cos_mc_audio.h"
 #include "cos_py2c_elf.h"
@@ -177,6 +181,7 @@ static const char k_readme[] =
     "                  Photo.c-os  - PNG/JPEG photo viewer\n"
     "                  test.c-os   - Text to binary converter\n"
     "                  tcc.c-os    - TinyCC 0.9.28rc, the C compiler\n"
+    "                  cosarc.c-os - tar, gzip, gunzip, zcat, zip, unzip (type the command in the Terminal)\n"
     "                  Py2C.c-os   - Python to C transpiler / Studio\n"
     "                  Terminal.c-os - modern cos_ui terminal\n"
     "/apps/samples   Sample programs (source: userland/programs/samples)\n"
@@ -191,7 +196,7 @@ static const char k_readme[] =
     "Programs are ordinary ELF files built with tools/cos-cc; files in /bin\n"
     "and /apps/samples are refreshed by the OS when it is updated.\n";
 static const char k_os_release[] =
-    "NAME=\"C-OS\"\nVERSION=\"4.0.8 alpha\"\nID=cos\nPRETTY_NAME=\"C-OS 4.0.8 alpha\"\n"
+    "NAME=\"C-OS\"\nVERSION=\"4.1.0\"\nID=cos\nPRETTY_NAME=\"C-OS 4.1.0\"\n"
     "HOME_URL=\"https://github.com/\"\n";
 static const char k_hostname[] = "c-os\n";
 
@@ -219,11 +224,13 @@ static void install_pack(const char *base, const cos_sdk_file_t *files, unsigned
 }
 
 void cos_system_layout_ensure(void) {
+    { uint64_t sz = 0; bool d = false; if (fs_stat_path("/system/serial_verbose", &sz, &d)) serial_set_verbose(1); }       /* a file with this name turns the full log on (docs: LINUX_COMPAT.md) */
     ensure_dir("/", "bin");
     ensure_dir("/", "lib");                                              /* the default library search path: /lib:/usr/lib:/ */
     ensure_dir("/", "apps");
     ensure_dir("/apps", "samples");
     ensure_dir("/apps", "linux");                                                                             /* the viewer for Linux GUI programs (userland/programs/linuxgui), started by the Launcher's Linux tab */
+    ensure_dir("/apps", "cosapps");
     ensure_dir("/apps", "minecraft");                                                                         /* the games the Launcher starts: Craft and the versions of mc-classic-c (docs/MC_CLASSIC.md) */
     ensure_dir("/", "etc");
     ensure_dir("/", "system");
@@ -267,6 +274,7 @@ void cos_system_layout_ensure(void) {
     ensure_file("/bin", "Photo.c-os", cos_photo_elf, cos_photo_elf_len);
     ensure_file("/bin", "test.c-os", cos_asset_test_c_os, cos_asset_test_c_os_len);
     ensure_file("/bin", "tcc.c-os", cos_tcc_elf, cos_tcc_elf_len);
+    ensure_file("/bin", "cosarc.c-os", cos_cosarc_elf, cos_cosarc_elf_len);                               /* tar, gzip, gunzip, zcat, zip, unzip (the Terminal runs it) */
     ensure_file("/bin", "Py2C.c-os", cos_py2c_elf, cos_py2c_elf_len);
     ensure_file("/bin", "Terminal.c-os", cos_terminal_elf, cos_terminal_elf_len);
     ensure_file("/bin", "cosupdate.c-os", cos_cosupdate_elf, cos_cosupdate_elf_len);               /* app updates: cosupdate check | install | rollback (docs/app_update.md) */
@@ -293,6 +301,19 @@ void cos_system_layout_ensure(void) {
     ensure_file("/apps/minecraft", "Craft.c-os", cos_craft_elf, cos_craft_elf_len);
     ensure_file("/apps/linux", "Linux.c-os", cos_linuxgui_elf, cos_linuxgui_elf_len);
     ensure_file("/apps/linux", "LinuxInstall.c-os", cos_linuxpack_elf, cos_linuxpack_elf_len);                  /* downloads and installs a Linux app pack (userland/programs/linuxpack) */
+    ensure_file("/bin", "sprint.c-os", cos_sprint_elf, cos_sprint_elf_len);                                     /* the Sprint interpreter (ports/sprint) */
+    ensure_file("/apps/cosapps", "CosApps.sp", cos_cosapps_sp, cos_cosapps_sp_len);                              /* the store: C-OS Apps, a Sprint program (ports/sprint/apps/cosapps.sp) */
+    ensure_file("/apps/cosapps", "icon.png", cos_cosapps_icon, cos_cosapps_icon_len);
+    {   /* its desktop shortcut: put there once (the user may delete it); the first version of it started a C program, which is replaced by the Sprint one */
+        static const char sc[] = "# C-OS app shortcut\nname=C-OS Apps\nexec=/apps/cosapps/CosApps.sp\nicon=/apps/cosapps/icon.png\n"
+            "args=--allow-ffi --allow-read=/apps --allow-read=/system --allow-read=/desktop --allow-write=/apps --allow-write=/desktop --allow-write=/system\n";
+        uint64_t sz = 0; bool dir = false;
+        if (fs_stat_path("/apps/cosapps/CosApps.c-os", &sz, &dir)) fs_delete_file("/apps/cosapps/CosApps.c-os");
+        if (!fs_stat_path("/system/apps/seeded2", &sz, &dir)) {
+            ensure_dir("/", "system"); ensure_dir("/system", "apps");
+            if (fs_write_file_at("/desktop", "C-OS Apps.app", sc, sizeof sc - 1)) fs_write_file_at("/system/apps", "seeded2", "1", 1);
+        }
+    }
 #include "cos_mc_games.inc"
 #include "cos_mc_audio.inc"
     ensure_file("/apps/samples", "ui_gallery.c-os", cos_sample_gallery_elf, cos_sample_gallery_elf_len);
@@ -323,6 +344,7 @@ void cos_system_layout_ensure(void) {
     ensure_file("/linux-test", "threads", cos_linuxtest_threads, cos_linuxtest_threads_len);
     ensure_file("/linux-test", "fds", cos_linuxtest_fds, cos_linuxtest_fds_len);
     ensure_file("/linux-test", "procs", cos_linuxtest_procs, cos_linuxtest_procs_len);
+    ensure_file("/linux-test", "avx", cos_linuxtest_avx, cos_linuxtest_avx_len);
     ensure_dir("/", "linux"); ensure_dir("/linux", "lib64"); ensure_dir("/linux", "lib"); ensure_dir("/linux/lib", "x86_64-linux-gnu"); ensure_dir("/linux", "etc");   /* the root file system of Linux programs */
     ensure_file("/linux/lib64", "ld-linux-x86-64.so.2", cos_linuxtest_ld, cos_linuxtest_ld_len);
     ensure_file("/linux/lib/x86_64-linux-gnu", "libc.so.6", cos_linuxtest_libc, cos_linuxtest_libc_len);

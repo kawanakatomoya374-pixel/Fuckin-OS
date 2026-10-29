@@ -1,6 +1,6 @@
 /**
  * memory.c - Unified Memory Management System
- * C-OS 4.0.8 alpha
+ * C-OS 4.1.0
  *
  * This file provides the kernel heap allocator used by the demo kernel.
  * The rest of the physical/virtual memory code is kept separate, but the
@@ -12,6 +12,7 @@
 #include "memory.h"
 #include "sync.h"
 #include "mm/paging.h"
+#include "memory_physical.h"
 #include <stdint.h>
 
 // Freestanding string primitives are provided by src/lib/string.c.
@@ -126,6 +127,10 @@ typedef struct {
 } memory_stats_t;
 
 static uint8_t kernel_heap[HEAP_SIZE] __attribute__((aligned(4096)));
+/* The part of kernel_heap[] the allocator may use. It starts as the whole array; memory_trim_heap() (called once at boot, when the heap is almost empty) cuts it down and
+ * hands the frames of the unused tail back to the physical allocator: the array is part of the kernel image, whose frames are reserved from the first byte, and a machine
+ * with 2-4 GiB was keeping 512 MiB for a heap that is about 40 MiB full at idle. */
+static uint64_t heap_limit_bytes = HEAP_SIZE;
 /* Heap の base アドレスを公開するための公開シンボル。
    paging.c はリンク時にこのラベルを解決してヒープ先頭アドレスを取得する。 */
 const uint8_t __attribute__((used)) cos_kernel_heap_base_marker_[1] = {0};
@@ -216,7 +221,7 @@ static void free_list_remove(memory_block_t* block) {
 static bool block_is_in_heap(const memory_block_t* block) {
     uintptr_t addr = (uintptr_t)block;
     uintptr_t start = (uintptr_t)&kernel_heap[0];
-    uintptr_t end = start + HEAP_SIZE;
+    uintptr_t end = start + heap_limit_bytes;
     /* validate_block() reads a complete header after this test.  Reject a
        pointer whose header would cross the heap boundary before dereferencing
        it, including malformed pointers supplied by third-party libraries. */
@@ -301,7 +306,7 @@ static memory_block_t* find_block_from_user_ptr(void* ptr) {
        kernel page fault. */
     uintptr_t user = (uintptr_t)ptr;
     uintptr_t heap_start = (uintptr_t)&kernel_heap[0];
-    uintptr_t heap_end = heap_start + HEAP_SIZE;
+    uintptr_t heap_end = heap_start + heap_limit_bytes;
     if (user >= heap_start + sizeof(void*) && user < heap_end) {
         void* raw = *(void**)((uint8_t*)ptr - sizeof(void*));
         if (raw) {
@@ -342,6 +347,34 @@ static void split_block(memory_block_t* block, uint64_t size) {
     /* The remainder is a brand-new free block; publish it. */
     free_list_insert(next);
     mem_stats.fragmentation_count++;
+}
+
+/* Cuts the heap down to `keep_bytes` and gives the frames of the rest back to the physical allocator. Only the last block of the heap may be trimmed, and only when it is
+ * free and reaches the end: at boot that is the whole unused tail. Returns the number of bytes released (0: nothing done). Call it once, early, after the physical allocator
+ * and the runtime memory sizes are known. */
+uint64_t memory_trim_heap(uint64_t keep_bytes) {
+    uint64_t irq = sync_irq_save();
+    init_heap_once();
+    keep_bytes = ALIGN_UP(keep_bytes, (uint64_t)PAGE_SIZE);
+    uintptr_t start = (uintptr_t)&kernel_heap[0];
+    if (keep_bytes < (16ULL << 20) || keep_bytes >= heap_limit_bytes) { sync_irq_restore(irq); return 0; }
+    uintptr_t old_end = start + heap_limit_bytes, new_end = start + keep_bytes;
+    memory_block_t* last = heap_head;
+    while (last->next) last = last->next;
+    uintptr_t last_payload = (uintptr_t)last + HEADER_SIZE;
+    if (!last->is_free || last_payload + last->size != old_end || last_payload + MIN_SPLIT_PAYLOAD > new_end) {
+        serial_puts("[MEMORY] heap not trimmed: the end of the heap is in use\n");
+        sync_irq_restore(irq); return 0;
+    }
+    last->size = new_end - last_payload;
+    refresh_checksum(last);
+    heap_limit_bytes = keep_bytes;
+    sync_irq_restore(irq);
+    uint64_t released = 0;
+    for (uintptr_t a = new_end; a < old_end; a += PAGE_SIZE) { phys_free_page((phys_addr_t)a); released += PAGE_SIZE; }
+    cos_runtime_memory_set_heap(keep_bytes);
+    serial_puts("[MEMORY] heap trimmed to "); serial_putdec(keep_bytes >> 20); serial_puts(" MiB, "); serial_putdec(released >> 20); serial_puts(" MiB returned to the physical allocator\n");
+    return released;
 }
 
 void memory_init(void) {
@@ -444,7 +477,7 @@ static uint64_t cos_ext_get_cap(void)
      * same file (see near the top, with the other g_runtime_* globals) -
      * already in scope here, no extern needed or valid. */
     uint64_t available = g_runtime_available_bytes;
-    if (available < HEAP_SIZE * 4ULL) {
+    if (available < heap_limit_bytes * 4ULL) {
         cos_ext_cap_bytes = 0;   /* not enough headroom to safely use any */
         return 0;
     }
@@ -561,7 +594,7 @@ void* kmalloc_flags(size_t size, uint8_t flags) {
     init_heap_once();
     
     size = (size_t)ALIGN_UP((uint64_t)size, 16ULL);
-    if (size > HEAP_SIZE) {
+    if (size > heap_limit_bytes) {
         sync_irq_restore(irq_flags);
         return NULL;
     }
@@ -929,10 +962,10 @@ bool memory_heap_ready(void) {
  * src/kernel/mm/memory.h is now a thin document of how the heap fits      *
  * together, so every caller uses these.                                     *
  * -------------------------------------------------------------------------- */
-uint64_t kmemory_total(void)              { return HEAP_SIZE; }
+uint64_t kmemory_total(void)              { return heap_limit_bytes; }
 void     kmemory_get_stats(mem_stats_t* st){
     if (!st) return;
-    st->total_mb     = HEAP_SIZE / (1024 * 1024);
+    st->total_mb     = heap_limit_bytes / (1024 * 1024);
     st->used_mb      = (mem_stats.current_usage + (512ULL*1024)) / (1024*1024);
     st->free_mb      = st->total_mb - st->used_mb;
     st->active_allocs= mem_stats.allocation_count - mem_stats.free_count;
@@ -940,9 +973,9 @@ void     kmemory_get_stats(mem_stats_t* st){
     st->peak_used    = mem_stats.peak_usage;
 }
 void memory_stats(uint64_t* total, uint64_t* used, uint64_t* free_mem, uint64_t* active){
-    if (total)     *total    = HEAP_SIZE;
+    if (total)     *total    = heap_limit_bytes;
     if (used)      *used     = mem_stats.current_usage;
-    if (free_mem)  *free_mem = (HEAP_SIZE > mem_stats.current_usage) ? (HEAP_SIZE - mem_stats.current_usage) : 0;
+    if (free_mem)  *free_mem = (heap_limit_bytes > mem_stats.current_usage) ? (heap_limit_bytes - mem_stats.current_usage) : 0;
     if (active)    *active   = mem_stats.allocation_count - mem_stats.free_count;
 }
 uint64_t memory_verify_all(void) { return memory_check_integrity() ? 0 : 1; }
@@ -951,10 +984,10 @@ uint64_t memory_verify_all(void) { return memory_check_integrity() ? 0 : 1; }
 /* Canonical heap runtime queries — paging / allocator consumer 共通入口      */
 /* -------------------------------------------------------------------------- */
 void* cos_heap_get_base(void)           { return (void*)&kernel_heap[0]; }
-uint64_t cos_heap_get_total_size(void)  { return HEAP_SIZE; }
+uint64_t cos_heap_get_total_size(void)  { return heap_limit_bytes; }
 uint64_t cos_heap_get_used_size(void)   { return mem_stats.current_usage; }
 uint64_t cos_heap_get_free_size(void)   {
-    uint64_t total = HEAP_SIZE;
+    uint64_t total = heap_limit_bytes;
     return (mem_stats.current_usage >= total) ? 0 : (total - mem_stats.current_usage);
 }
 

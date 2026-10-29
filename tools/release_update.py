@@ -14,7 +14,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # name -> (install path on the device, file in the build tree)
 ITEMS = [
     ("Terminal", "/bin/Terminal.c-os", "terminal.c-os"), ("Files", "/bin/files.c-os", "cos_files.c-os"), ("Py2C", "/bin/Py2C.c-os", "py2c/Py2C.c-os"),
-    ("TinyCC", "/bin/tcc.c-os", "studio/tcc.c-os"), ("Studio", "/bin/studio.c-os", "studio/studio.c-os"), ("Music", "/bin/music.c-os", "cos_music.c-os"),
+    ("TinyCC", "/bin/tcc.c-os", "studio/tcc.c-os"), ("Archive", "/bin/cosarc.c-os", "cosarc.c-os"), ("Studio", "/bin/studio.c-os", "studio/studio.c-os"), ("Music", "/bin/music.c-os", "cos_music.c-os"),
     ("Media", "/bin/Media.c-os", "media.c-os"), ("Photo", "/bin/Photo.c-os", "photo.c-os"), ("Updater", "/bin/cosupdate.c-os", "cosupdate.c-os"),
     ("MessageServer", "/bin/CosMsgServer.c-os", "cosmsgd.c-os"), ("Py2CCli", "/bin/python-code-to-c.c-os", "p2ccli/python-code-to-c.c-os"),
     ("LangJa", "/system/lang/ja.c-osll", "langpacks/ja.c-osll"),

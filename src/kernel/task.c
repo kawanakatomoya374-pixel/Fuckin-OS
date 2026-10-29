@@ -4,6 +4,9 @@
  * Minimal but functional process / thread model for the kernel.
  */
 
+#include "memory_physical.h"
+void task_reap_note(void);
+void task_reap_idle(void);
 #include "cos_kevent.h"
 #include "smp_user.h"
 #include "task.h"
@@ -112,6 +115,7 @@ static void process_init_credentials(process_t* proc, task_type_t type) {
 
 static void release_user_process_pages(process_t* proc) {
     if (!proc || proc->type != TASK_TYPE_USER || !proc->page_dir) return;
+    uint64_t free_before = phys_memory_get_stats()->free_pages;
 
     uint64_t flags = sync_irq_save();
     page_directory_t* saved = paging_get_current_directory();
@@ -135,6 +139,10 @@ static void release_user_process_pages(process_t* proc) {
 
     if (saved) paging_switch_directory(saved);
     sync_irq_restore(flags);
+    if (proc->linux_ctx) {
+        static uint32_t logged; if (logged++ < 40) { serial_puts("[TASK] pages of pid "); serial_putdec(proc->pid); serial_puts(" released: free frames "); serial_putdec(free_before >> 8); serial_puts(" -> "); serial_putdec(phys_memory_get_stats()->free_pages >> 8); serial_puts(" MiB\n"); }
+        extern void cos_linux_release_final(process_t *p); cos_linux_release_final(proc);       /* the table of ranges was needed until now */
+    }
 }
 
 static void destroy_threads_for_process(process_t* proc) {
@@ -229,7 +237,7 @@ static void idle_task_entry(void* arg) {
     for (;;) {
         /* Safe reap point: see task_reap_zombies()'s comment for why
          * idle is exactly the right place to do this. */
-        task_reap_zombies();
+        task_reap_idle();
         __asm__ volatile("sti; hlt");
     }
 }
@@ -402,6 +410,7 @@ void process_exit(process_t* proc, int status) {
     proc->exit_status = status;
     proc->exit_status_valid = true;
     proc->state = TASK_ZOMBIE;
+    task_reap_note();
     cos_kmod_event(COSYS_EV_PROC_EXIT, proc->pid, (uint64_t)(int64_t)status, 0);
 
     /* Compute jobs this process left running on other cores execute under
@@ -468,6 +477,7 @@ void process_exit(process_t* proc, int status) {
     while (th) {
         thread_t* next_th = th->proc_next;
         th->state = TASK_ZOMBIE;
+        task_reap_note();
         if (th == self) {
             /* Can't fully remove/destroy the thread we are currently
              * running as - just take it out of the run queue so it will
@@ -596,7 +606,7 @@ int64_t process_try_reap_child_ex(uint64_t parent_pid, int64_t want_pid, int* ou
         saw_child = true;
         if (p->state == TASK_ZOMBIE && p->exit_status_valid) {
             if (out_status) *out_status = p->exit_status;
-            if (consume) p->exit_status_valid = false;   /* collected; reaper may recycle */
+            if (consume) { p->exit_status_valid = false; task_reap_note(); }   /* collected; reaper may recycle */
             result = (int64_t)p->pid;
             break;
         }
@@ -609,11 +619,25 @@ int64_t process_try_reap_child_ex(uint64_t parent_pid, int64_t want_pid, int* ou
 
 /* A thread that ended while its process lives on (pthread_exit, a returned thread function) stays a ZOMBIE until this gives its slot and its kernel stack back:
  * without it a program that creates and ends threads all day (a browser) runs out of the 1024 thread slots. */
+/* The idle loops (every CPU, at every interrupt) used to call the reaper each time, and the reaper takes the kernel lock twice and scans the thread table: with several idle CPUs that was a
+ * large part of the lock's traffic for nothing. Something now says when there is anything to reap: a thread or a process that ended, a child whose exit status was collected. The idle
+ * loop calls the reaper only then, and until a pass leaves nothing behind (a zombie whose thread is still on a CPU has to be tried again). */
+static volatile uint32_t g_reap_hint, g_reap_done;
+static volatile bool g_reap_incomplete;
+void task_reap_note(void) { __atomic_add_fetch(&g_reap_hint, 1u, __ATOMIC_RELEASE); }
+void task_reap_idle(void) {
+    uint32_t seen = __atomic_load_n(&g_reap_hint, __ATOMIC_ACQUIRE);
+    if (seen == __atomic_load_n(&g_reap_done, __ATOMIC_ACQUIRE)) return;
+    g_reap_incomplete = false;
+    task_reap_zombies();
+    if (!g_reap_incomplete) __atomic_store_n(&g_reap_done, seen, __ATOMIC_RELEASE);
+}
 void task_reap_dead_threads(void) {
     uint64_t flags = sync_irq_save();
     thread_t *cur = scheduler_get_current_thread();
     for (size_t i = 0; i < MAX_THREADS; ++i) {
         thread_t *t = &thread_table[i];
+        if (t->state == TASK_ZOMBIE && (t->on_cpu || t == cur)) g_reap_incomplete = true;
         if (t->state != TASK_ZOMBIE || t->on_cpu || t == cur) continue;
         process_t *p = process_get_by_pid(t->pid);
         if (!p || p->state == TASK_ZOMBIE || p->state == TASK_UNUSED) continue;            /* a dead process is reaped whole below */
@@ -635,6 +659,7 @@ void task_reap_zombies(void) {
         for (size_t i = 0; i < MAX_THREADS; ++i)
             if (thread_table[i].state != TASK_UNUSED && thread_table[i].pid == proc->pid && thread_table[i].on_cpu) { proc->reap_defer = 1; break; }
         if (proc->reap_defer) {
+            g_reap_incomplete = true;
             static uint32_t defer_logs;
             if (defer_logs++ < 12) { serial_puts("[TASK] reap deferred: pid="); serial_putdec(proc->pid); serial_puts("\n"); }
             proc = next; continue;
@@ -671,6 +696,7 @@ void task_reap_zombies(void) {
         zombie_list = p->next;
 
         if (p->reap_defer) {                      /* not released yet: stays on the list */
+            g_reap_incomplete = true;
             p->next = keep_head;
             keep_head = p;
             continue;
@@ -826,7 +852,7 @@ static thread_t* thread_create_impl(process_t* proc, void* entry_point, void* ar
 
     memset(&th->context, 0, sizeof(th->context));
     memset(th->fpu_state, 0, sizeof(th->fpu_state));
-    __asm__ volatile("fninit\n\tfxsave64 %0" : "=m"(th->fpu_state) :: "memory");
+    cos_fpu_init_area(cos_fpu_area(th));
     th->context.rdi = (uint64_t)arg;
     th->context.rax = (uint64_t)entry_point;
     th->context.rip = (proc->type == TASK_TYPE_USER)
@@ -957,6 +983,7 @@ void thread_exit(thread_t* thread, int code) {
 
     scheduler_remove_task(thread);
     thread->state = TASK_ZOMBIE;
+    task_reap_note();
 
     if (proc) {
         detach_thread_from_process(proc, thread);
@@ -1197,7 +1224,10 @@ bool task_handle_page_fault(uint64_t fault_addr, uint64_t error_code) {
         uint64_t heap_flags = PAGE_PRESENT | PAGE_RW | PAGE_USER;
         if (cos_elf_nx_available()) heap_flags |= PAGE_NX;
         page_fault_kind = "heap";
-        return task_alloc_page(proc, page, heap_flags);
+        {   /* fault-around: a heap that is filled in order takes one fault per page otherwise (an IME dictionary load took 17 000) */
+            uint64_t left = (proc->heap_end - page) / PAGE_SIZE; unsigned n = left > 8 ? 8 : (unsigned)left;
+            return task_alloc_page_run(proc, page, n ? n : 1, heap_flags);
+        }
     }
 
     /* Anonymous mmap regions: same demand-paging treatment as the heap.
@@ -1324,7 +1354,8 @@ bool task_alloc_page(process_t* proc, uint64_t virt_addr, uint64_t flags) {
 
     uint64_t dir_flags = sync_irq_save();
     page_directory_t* saved = paging_get_current_directory();
-    paging_switch_directory((page_directory_t*)proc->page_dir);
+    if (saved != (page_directory_t*)proc->page_dir) paging_switch_directory((page_directory_t*)proc->page_dir);     /* (a switch reloads CR3: the page is usually in the running process) */
+    else saved = NULL;
 
     if (paging_virt_to_phys(virt_addr & PAGE_MASK)) {
         if (saved) paging_switch_directory(saved);
@@ -1376,6 +1407,31 @@ bool task_alloc_page(process_t* proc, uint64_t virt_addr, uint64_t flags) {
     if (saved) paging_switch_directory(saved);
     sync_irq_restore(dir_flags);
     return TRUE;
+}
+
+/* Demand paging with "fault-around": maps `n` consecutive zeroed pages from `virt_addr` in one go (one interrupt-off section, one address-space switch). Pages that are already mapped are skipped.
+ * The first page must succeed; if memory runs out for a later one the run just ends there (it will fault again when touched). A program that touches memory in order (an allocator carving a
+ * fresh arena, a buffer being filled) takes a fault per page otherwise: 56 000 of them in one Firefox process before it shows a window. */
+bool task_alloc_page_run(process_t* proc, uint64_t virt_addr, unsigned n, uint64_t flags) {
+    if (!proc || !proc->page_dir || !n) return FALSE;
+    uint64_t dir_flags = sync_irq_save();
+    page_directory_t* saved = paging_get_current_directory();
+    if (saved != (page_directory_t*)proc->page_dir) paging_switch_directory((page_directory_t*)proc->page_dir);
+    else saved = NULL;
+    uint64_t map_flags = flags | PAGE_PRESENT;
+    if (proc->type == TASK_TYPE_USER) map_flags |= PAGE_USER;
+    bool ok = TRUE;
+    for (unsigned i = 0; i < n; ++i) {
+        uint64_t va = (virt_addr & PAGE_MASK) + (uint64_t)i * PAGE_SIZE;
+        if (paging_virt_to_phys(va)) continue;
+        uint64_t phys = paging_alloc_physical();
+        if (!phys) { if (i == 0) ok = FALSE; break; }
+        if (!paging_map_page(va, phys, map_flags)) { paging_free_physical(phys); if (i == 0) ok = FALSE; break; }
+        memset((void*)(uintptr_t)PHYS_TO_VIRT(phys), 0, PAGE_SIZE);
+    }
+    if (saved) paging_switch_directory(saved);
+    sync_irq_restore(dir_flags);
+    return ok;
 }
 
 void task_free_page(process_t* proc, uint64_t virt_addr) {

@@ -2471,6 +2471,7 @@ bool cos_elf_setup_stack_ex(page_directory_t *dir, uint64_t stack_top,
      * would promise, and a libc selecting an AVX memcpy on the strength
      * of a lie would fault. */
     AUX(COS_AT_HWCAP, 0);
+    if (params->at_sysinfo_ehdr) { AUX(COS_AT_SYSINFO_EHDR, params->at_sysinfo_ehdr); }
     if (params->at_linkmap) { AUX(COS_AT_COS_LINKMAP, params->at_linkmap); }
     if (params->at_tp)      { AUX(COS_AT_COS_TP, params->at_tp); }
     AUX(COS_AT_NULL, 0);

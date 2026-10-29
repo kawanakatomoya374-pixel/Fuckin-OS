@@ -20,8 +20,8 @@
 
 /* Per-JSRuntime limit for untrusted page scripts.  This is intentionally
  * separate from NetSurf's shared resource/cache budget: JavaScript has a
- * deterministic 64MiB ceiling even when HTML/CSS/image caches are larger. */
-#define COS_QUICKJS_RUNTIME_MEMORY_LIMIT_BYTES (64u * 1024u * 1024u)
+ * deterministic 32MiB ceiling even when HTML/CSS/image caches are larger. */
+#define COS_QUICKJS_RUNTIME_MEMORY_LIMIT_BYTES (32u * 1024u * 1024u)
 
 #ifdef __cplusplus
 extern "C" {
@@ -29,7 +29,7 @@ extern "C" {
 
 /* Creates a JSRuntime whose allocator is backed by kmalloc/krealloc/
  * kfree (the same kernel heap everything else in C-OS uses), with the
- * COS_QUICKJS_RUNTIME_MEMORY_LIMIT_BYTES (64MiB) bounded memory limit so a
+ * COS_QUICKJS_RUNTIME_MEMORY_LIMIT_BYTES (32MiB) bounded memory limit so a
  * runaway script cannot exhaust the shared browser/kernel allocation pool.
  * Returns NULL on allocation failure. */
 JSRuntime* cos_js_new_runtime(void);

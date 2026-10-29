@@ -1,6 +1,6 @@
 /**
  * timer.c - Programmable Interval Timer Implementation
- * C-OS 4.0.8 alpha Timer Management
+ * C-OS 4.1.0 Timer Management
  */
 #include "timer.h"
 #include "io.h"
@@ -52,6 +52,8 @@ void timer_tick(void) {
         }
     }
     
+    { extern void cos_vdso_tick(void); cos_vdso_tick(); }          /* the time page of the Linux vDSO */
+
     // Call scheduler tick
     scheduler_tick();
 }
@@ -76,7 +78,31 @@ uint64_t timer_get_ms_exact(void) {
     uint64_t last = cal_last_ret; if (ms < last) ms = last; cal_last_ret = ms;                  /* never backwards */
     return ms;
 }
+/* microseconds since boot, from the same calibrated TSC (a rhythm game judges a hit in a few milliseconds: the millisecond clock above is too coarse for it); without a calibration, the tick count */
+uint64_t timer_get_us_exact(void) {
+    uint64_t hz = cal_hz;
+    uint64_t ticks_us = (timer_ticks * 1000000ull) / TIMER_FREQ;
+    if (!hz) return ticks_us;
+    uint64_t d = rdtsc_now() - cal_base_tsc;
+    uint64_t us = cal_last_ms_base * 1000ull + (d / hz) * 1000000ull + ((d % hz) * 1000000ull) / hz;     /* 64-bit only (no __udivti3 in the kernel): d % hz < 8e9, times 1e6 fits */
+    if (us < ticks_us) us = ticks_us;
+    static uint64_t last_us; if (us < last_us) us = last_us; last_us = us;                      /* never backwards */
+    return us;
+}
+/* what the vDSO of the Linux layer needs to work out timer_get_ms_exact() in user mode (cos_linux.c, cos_vdso_tick): the TSC rate, the TSC value and the uptime at the last calibration, and the tick-count uptime */
+void timer_vdso_snapshot(uint64_t *hz, uint64_t *base_tsc, uint64_t *base_ms, uint64_t *tick_ms) {
+    *hz = cal_hz; *base_tsc = cal_base_tsc; *base_ms = cal_last_ms_base; *tick_ms = (timer_ticks * 1000) / TIMER_FREQ;
+}
 static void rtc_clock_sample(void) {
+    /* Once the TSC rate is known, the next change of the RTC's seconds register is expected at a known TSC value: read the RTC (two port accesses, each a VM exit in a virtual machine)
+     * only within about 25 ms of that moment instead of every 4 ms. If no change has been seen for three seconds the estimate is not trusted and the sampling goes back to every call. */
+    if (cal_hz && cal_last_tsc) {
+        uint64_t t = rdtsc_now(), since = t - cal_last_tsc;
+        if (since < 3 * cal_hz) {
+            uint64_t into = since % cal_hz, window = cal_hz / 40;
+            if (into > window && into < cal_hz - window) return;
+        }
+    }
     outb(0x70, 0x00); int sec = inb(0x71);
     if (sec == cal_prev_sec) return;
     uint64_t t = rdtsc_now();

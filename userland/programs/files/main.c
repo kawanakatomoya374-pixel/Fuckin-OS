@@ -32,6 +32,7 @@ int main(int argc, char **argv) {
             do { input_event(&ev); memset(&ev, 0, sizeof ev); } while (!G.quit && cos_win2_poll(G.win, &ev) > 0);
         }
         job_tick();
+        arc_tick();
         thumb_load_pending();
         dir_poll();
         fplug_poll();

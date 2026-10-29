@@ -1,5 +1,5 @@
 /**
- * gui_apps_common.c - C-OS 4.0.8 alpha GUI Apps (分割ファイル)
+ * gui_apps_common.c - C-OS 4.1.0 GUI Apps (分割ファイル)
  * 複数アプリから共有される汎用ユーティリティ関数
  *
  * 元は単一の gui_apps.c (11,638行) に含まれていたコードを、
@@ -177,6 +177,65 @@ bool fm_is_cos_executable(const char* name) {
     return has_suffix(name, ".c-os");
 }
 
+/* ---- ".app" shortcut: a small text file describing one installed app ----
+ *   name=PSXFunkin
+ *   exec=/apps/psxfunkin/psxfunkin.c-os
+ *   icon=/apps/psxfunkin/icon.png      (PNG, any size up to 128x128)
+ * The desktop draws icon= instead of a kernel glyph and opening the file
+ * launches exec=. Lines starting with '#' are ignored. */
+bool fm_is_app_shortcut(const char* name) {
+    return has_suffix(name, ".app");
+}
+
+bool gui_app_shortcut_read(const char* path, char* name, size_t name_n,
+                           char* exec, size_t exec_n, char* icon, size_t icon_n) {
+    if (!path || !path[0]) return false;
+    char buf[1024];
+    uint64_t got = 0;
+    if (!fs_read_path_into(path, buf, sizeof(buf) - 1, &got) || got == 0) return false;
+    buf[got] = '\0';
+    if (name && name_n) name[0] = '\0';
+    if (exec && exec_n) exec[0] = '\0';
+    if (icon && icon_n) icon[0] = '\0';
+    char* p = buf;
+    while (*p) {
+        char* e = p;
+        while (*e && *e != '\n' && *e != '\r') ++e;
+        char save = *e; *e = '\0';
+        if (*p != '#') {
+            char* v = strchr(p, '=');
+            if (v) {
+                *v++ = '\0';
+                char* dst = NULL; size_t dn = 0;
+                if (!strcmp(p, "name")) { dst = name; dn = name_n; }
+                else if (!strcmp(p, "exec")) { dst = exec; dn = exec_n; }
+                else if (!strcmp(p, "icon")) { dst = icon; dn = icon_n; }
+                if (dst && dn) { strncpy(dst, v, dn - 1); dst[dn - 1] = '\0'; }
+            }
+        }
+        *e = save;
+        p = e;
+        while (*p == '\n' || *p == '\r') ++p;
+    }
+    return exec && exec[0];
+}
+
+/* the args= line of a shortcut (what is put before the program's own arguments, e.g. the permissions of a Sprint app) */
+bool gui_app_shortcut_args(const char* path, char* out, size_t n) {
+    if (!path || !out || !n) return false;
+    out[0] = '\0';
+    char buf[1536]; uint64_t got = 0;
+    if (!fs_read_path_into(path, buf, sizeof(buf) - 1, &got) || got == 0) return false;
+    buf[got] = '\0';
+    for (char* p = buf; *p; ) {
+        char* e = p; while (*e && *e != '\n' && *e != '\r') ++e;
+        char save = *e; *e = '\0';
+        if (!strncmp(p, "args=", 5)) { strncpy(out, p + 5, n - 1); out[n - 1] = '\0'; return true; }
+        *e = save; p = e; while (*p == '\n' || *p == '\r') ++p;
+    }
+    return false;
+}
+
 /* Reads a .c-os file from disk and launches it as a real ring3 process
  * through the same ELF loader (cos_elf.c) and launcher
  * (cos_launch_elf_image()) already used for the boot-time demo programs.
@@ -188,7 +247,10 @@ bool fm_is_cos_executable(const char* name) {
  * (which copies whatever it needs into the new process's own pages and
  * does not retain the pointer), and freed before returning - the loader
  * never sees anything beyond the single call it needs. */
-void cos_launch_elf_file(const char* path) {
+static void launch_elf_file_args(const char* path, const char* const* argv, int argc);
+void cos_launch_elf_file(const char* path) { launch_elf_file_args(path, NULL, 0); }
+
+static void launch_elf_file_args(const char* path, const char* const* argv, int argc) {
     if (!path || !path[0]) return;
 
     /* fs_find()/the file manager's listing and storage_read_file() are two
@@ -273,7 +335,10 @@ void cos_launch_elf_file(const char* path) {
 
     extern int64_t cos_launch_elf_image(const char* name, const unsigned char* image,
                                         unsigned int image_len);
-    int64_t launched = cos_launch_elf_image(base, buffer, (unsigned int)entry->size);
+    extern int64_t cos_launch_elf_image_args(const char *name, const unsigned char *image, unsigned int image_len,
+                                             const char *const *argv, int argc, const char *const *envp, int envc);
+    int64_t launched = argc > 0 ? cos_launch_elf_image_args(base, buffer, (unsigned int)entry->size, argv, argc, NULL, 0)
+                                : cos_launch_elf_image(base, buffer, (unsigned int)entry->size);
     kfree(buffer);
 
     if (launched < 0) {
@@ -294,12 +359,36 @@ void fm_open_text_editor(const char* filename) {
 void gui_open_file_in_app(const char* path, int file_type) {
     (void)file_type;
     if (!path || !path[0]) return;
-    if (fm_is_cos_executable(path)) {
+    if (fm_is_app_shortcut(path)) {
+        char exec[128];
+        if (gui_app_shortcut_read(path, NULL, 0, exec, sizeof(exec), NULL, 0)) {
+            char args[512]; static char argbuf[600]; const char* av[24]; int ac = 0;
+            (void)gui_app_shortcut_args(path, args, sizeof args);
+            if (has_suffix(exec, ".sp")) {                       /* a Sprint app: the interpreter runs it, the shortcut's args= are its permissions */
+                av[ac++] = "sprint.c-os"; av[ac++] = "run";
+            }
+            strncpy(argbuf, args, sizeof argbuf - 1); argbuf[sizeof argbuf - 1] = '\0';
+            for (char* t = argbuf; *t && ac < 21; ) { while (*t == ' ') ++t; if (!*t) break; av[ac++] = t; while (*t && *t != ' ') ++t; if (*t) *t++ = '\0'; }
+            if (has_suffix(exec, ".sp")) { av[ac++] = exec; launch_elf_file_args("/bin/sprint.c-os", av, ac); }
+            else if (ac) { av[ac] = NULL; static const char* lead[1]; (void)lead; const char* full[24]; int fc = 0; full[fc++] = exec; for (int q = 0; q < ac; ++q) full[fc++] = av[q]; launch_elf_file_args(exec, full, fc); }
+            else cos_launch_elf_file(exec);
+        }
+        else gui_notify(gui_text("Broken app shortcut", "アプリのショートカットが壊れています"), 2000);
+    } else if (fm_is_cos_executable(path)) {
         /* Checked first, ahead of every other type: a .c-os file must
          * never fall through to the text editor (it would show binary
          * garbage) or be misidentified by any future extension check
          * that happens to overlap. */
         cos_launch_elf_file(path);
+    } else if (has_suffix(path, ".sp")) {
+        /* a Sprint script: run by the Sprint interpreter, which is an app of C-OS Apps */
+        uint64_t sz = 0; bool dir = false;
+        if (fs_stat_path("/bin/sprint.c-os", &sz, &dir) && !dir) {
+            const char* av[3] = { "sprint.c-os", "run", path };
+            launch_elf_file_args("/bin/sprint.c-os", av, 3);
+        } else {
+            gui_notify(gui_text("Sprint is not installed: get it in C-OS Apps", "Sprint が未インストールです。C-OS Apps から入手してください"), 3500);
+        }
     } else if (fm_is_studio_file(path)) {
         extern void cos_studio_open(const char* path);
         cos_studio_open(path);  /* the ring-3 IDE (single instance) */

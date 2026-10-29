@@ -199,7 +199,7 @@ static const char* oswide_default_title_for_app(cos_oswide_app_id_t app) {
         case COS_OSWIDE_APP_TEXT_EDITOR:  return "Text Editor";
         case COS_OSWIDE_APP_TERMINAL:      return "Terminal";
         case COS_OSWIDE_APP_SETTINGS:      return "Settings";
-        case COS_OSWIDE_APP_ABOUT:         return "About C-OS 4.0.8 alpha";
+        case COS_OSWIDE_APP_ABOUT:         return "About C-OS 4.1.0";
         case COS_OSWIDE_APP_CALC:          return "Calculator";
         case COS_OSWIDE_APP_STORAGE:       return "Storage";
         case COS_OSWIDE_APP_BROWSER:       return "NetSurf";

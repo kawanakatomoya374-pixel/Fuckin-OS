@@ -461,7 +461,10 @@ static bool smp_enumerate_madt(uint32_t bsp_apic_id, uint32_t detected_count) {
         }
         offset += entry->length;
     }
-    if (detected_count < s_possible_cpus) s_possible_cpus = detected_count;
+    /* The enabled processor entries of the MADT are the firmware's list of the CPUs that exist. `detected_count` (CPUID leaf 0xB / leaf 1) only says how many
+     * logical processors one PACKAGE has: QEMU's -smp N (N sockets of one core, the default of older QEMU and of some Windows builds) and multi-socket machines
+     * report 1 there, and capping the list by it left the system with CPU 0 alone. An AP that does not start is dropped by its own start-up timeout. */
+    (void)detected_count;
     return s_possible_cpus >= 1;
 }
 
@@ -488,6 +491,14 @@ cpu_local_t g_cpu_local[SMP_MAX_CPUS];
 uint32_t smp_current_logical_id(void) { return cpu_id(); }       /* the TR selector, see percpu.h (an AP loads its TSS first thing in smp_ap_entry) */
 
 volatile uint32_t *smp_lapic_registers(void) { return s_lapic; }
+
+/* Stops every other CPU with an NMI (destination shorthand "all excluding self"): their NMI handler (idt.c) parks them when cos_panic_active is set. Used by the
+ * panic screen so that nothing else draws over it or goes on writing to the disk. */
+void smp_halt_other_cpus(void) {
+    if (s_lapic == NULL || s_online_cpus <= 1) return;
+    s_lapic[0x300 / 4] = 0x000C0400u;                               /* all excluding self, NMI, assert */
+    for (uint32_t i = 0; i < 100000 && (s_lapic[0x300 / 4] & 0x1000u); ++i) __asm__ volatile("pause");
+}
 
 void smp_send_fixed_ipi(uint32_t logical_id, uint8_t vector) {
     if (s_lapic == NULL || logical_id >= s_possible_cpus || !s_cpus[logical_id].present) return;
@@ -557,13 +568,24 @@ static void smp_ipi_cpu(uint32_t cpu, uint32_t mode) {
 void smp_kick_cpu(uint32_t cpu) { smp_ipi_cpu(cpu, 1); }
 void smp_tick_cpu(uint32_t cpu) { smp_ipi_cpu(cpu, 2); }
 
+/* An idle AP does not need a tick every millisecond: before it halts its LAPIC timer is slowed to one tick per 16 ms (a deadman, in case a wake-up IPI is ever missing), and the first
+ * interrupt it takes (the tick, a kick IPI for a ready thread or queued work, a TLB request) puts the 1 ms tick back. On a hypervisor with the interrupt controller in user space
+ * (QEMU WHPX with kernel-irqchip=off) every tick of every idle CPU costs a trip to QEMU. */
+#define SMP_IDLE_SLOW_TICK_MS 16u
+static volatile uint8_t s_slow_tick[SMP_MAX_CPUS];
+static inline void smp_tick_fast(void) {
+    uint32_t id = cpu_id();
+    if (id < SMP_MAX_CPUS && s_slow_tick[id]) { s_slow_tick[id] = 0; if (s_lapic) s_lapic[0x380 / 4] = s_lapic_ticks_per_ms; }
+}
 static void smp_timer_irq(struct regs *r) {
+    smp_tick_fast();
     { extern void cos_linux_prof_sample(struct regs *); cos_linux_prof_sample(r); }
     scheduler_capture_interrupt_context(r);
     scheduler_cpu_tick(false);
     scheduler_end_interrupt_tick();
 }
 static void smp_kick_irq(struct regs *r) {
+    smp_tick_fast();
     { extern void cos_linux_prof_sample(struct regs *); cos_linux_prof_sample(r); }
     scheduler_capture_interrupt_context(r);
     uint32_t mode = g_cpu_local[cpu_id()].kick;
@@ -571,7 +593,7 @@ static void smp_kick_irq(struct regs *r) {
     scheduler_cpu_tick(mode != 2u);
     scheduler_end_interrupt_tick();
 }
-static void smp_tlb_irq(struct regs *r) { (void)r; smp_service_requests(); }
+static void smp_tlb_irq(struct regs *r) { (void)r; smp_tick_fast(); smp_service_requests(); }
 
 /* Does CPU `cpu` have kernel work or a compute job waiting? Then its idle thread must run (scheduler.c: pick_next_task). */
 bool smp_cpu_has_pending_work(uint32_t cpu) {
@@ -617,6 +639,7 @@ static void smp_ap_idle_thread(void *arg) {
         } else {
             /* Nothing to do: halt. The tick (1 ms), the kick IPI sent when work is queued for this CPU and a TLB request all wake it. sti;hlt is atomic, no wake-up
              * can fall between them. */
+            if (s_lapic && s_lapic_ticks_per_ms && id < SMP_MAX_CPUS) { s_slow_tick[id] = 1; s_lapic[0x380 / 4] = s_lapic_ticks_per_ms * SMP_IDLE_SLOW_TICK_MS; }
             __asm__ volatile("sti; hlt");
         }
     }
@@ -662,6 +685,7 @@ void smp_sched_enable(void) {
 }
 
 void smp_ap_entry(void) {
+    { extern void cos_xsave_init_cpu(void); cos_xsave_init_cpu(); }   /* before anything can interrupt this CPU: the stubs save state with XSAVE once the boot CPU has switched it on */
     uint32_t ebx = 0;
     smp_cpuid(1, 0, NULL, &ebx, NULL, NULL);
     uint32_t apic_id = (ebx >> 24) & 0xFFu;
@@ -710,6 +734,7 @@ void smp_ap_entry(void) {
      * it, not after. */
     cos_elf_nx_enable();
     { extern void cos_security_harden_cpu(void); cos_security_harden_cpu(); }
+    { extern void cos_syscall_init_cpu(void); cos_syscall_init_cpu(); }          /* the SYSCALL instruction of the Linux layer (gdt.c) */
 
     /* Never return to the trampoline's legacy HLT park. APs execute real
      * kernel work queued by the BSP. The pause idle path deliberately leaves

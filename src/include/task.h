@@ -11,6 +11,8 @@
  * this header, not the other way around - task.h cannot include
  * scheduler.h back) needing to define wait_queue_t itself. */
 typedef struct thread thread_t;
+#define COS_FPU_AREA 1024          /* bytes of one saved FPU state (x87 + SSE + AVX = 832 with XSAVE; 512 with FXSAVE) */
+#define COS_FPU_STACK 1088         /* what the exception and interrupt stubs reserve below a frame: COS_FPU_AREA + 64 for the alignment */
 
 /* Wait queue - moved here (rather than staying only in scheduler.h,
  * where it originally lived) specifically so process_t can embed one by
@@ -202,7 +204,7 @@ typedef struct thread {
      * not the KERNEL_STACK_SIZE constant, or a custom-sized stack would only
      * be partially freed. */
     uint64_t kernel_stack_size;
-    uint8_t  fpu_state[512] __attribute__((aligned(16)));
+    uint8_t  fpu_state[COS_FPU_AREA + 64];     /* the saved FPU/SSE/AVX state: an XSAVE image (FXSAVE where XSAVE is missing), 64-byte aligned inside this array: cos_fpu_area() */
 
     /* Futex state. A futex has no kernel-side object - that is the whole
      * point (see cos_futex.c) - so what identifies a waiter has to live
@@ -341,5 +343,13 @@ int64_t cos_launch_elf_image_args(const char *name, const unsigned char *image,
                                   unsigned int image_len,
                                   const char *const *argv, int argc,
                                   const char *const *envp, int envc);
+
+/* The FPU/SSE/AVX state (gdt.c, scheduler.c). cos_xsave_on: XSAVE is in use (CR4.OSXSAVE, XCR0 = x87|SSE|AVX), set before the first interrupt stub could look at it. */
+extern uint8_t cos_xsave_on;
+void cos_xsave_init_cpu(void);
+bool task_alloc_page_run(process_t *proc, uint64_t virt_addr, unsigned n, uint64_t flags);   /* n zeroed pages from virt_addr in one go (fault-around) */
+uint8_t *cos_fpu_area(thread_t *t);                 /* the 64-byte aligned save area inside t->fpu_state */
+void cos_fpu_init_area(uint8_t *area);              /* a clean state (fninit, default MXCSR) saved into the area */
+void cos_fpu_sanitize(uint8_t *area);               /* makes a user-supplied image safe to load (valid header and MXCSR) */
 
 #endif // TASK_H

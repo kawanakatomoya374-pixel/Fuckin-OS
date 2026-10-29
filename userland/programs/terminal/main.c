@@ -150,7 +150,9 @@ static bool find_program(const char *name, char *out, size_t cap) {
     return false;
 }
 /* arguments that name existing files (or follow -o) are given as absolute paths: a started program does not know this terminal's directory */
-static void start_program(const char *path, char **argvs, int argc) {
+static void start_program_ex(const char *path, char **argvs, int argc, bool raw);
+static void start_program(const char *path, char **argvs, int argc) { start_program_ex(path, argvs, argc, false); }
+static void start_program_ex(const char *path, char **argvs, int argc, bool raw) {
     int slot = -1; for (int i = 0; i < MAX_JOBS; i++) if (!jobs[i].used) { slot = i; break; }
     if (slot < 0) { log_line("too many programs are running (jobs, kill)"); return; }
     static char abs_args[24][320]; const char *av[26]; int ac = 0;
@@ -158,7 +160,7 @@ static void start_program(const char *path, char **argvs, int argc) {
     for (int i = 1; i < argc && ac < 25; i++) {
         const char *a = argvs[i]; char *dst = abs_args[ac - 1];
         bool after_o = i > 1 && !strcmp(argvs[i - 1], "-o");
-        if (a[0] != '-' && a[0] != '/' && (after_o || strchr(a, '.') || strchr(a, '/'))) {
+        if (!raw && a[0] != '-' && a[0] != '/' && (after_o || strchr(a, '.') || strchr(a, '/'))) {
             char full[320]; path_join(a, full, sizeof full);
             if (after_o || is_file(full)) { snprintf(dst, 320, "%s", full); av[ac++] = dst; continue; }
         }
@@ -244,7 +246,7 @@ static void do_kill(const char *arg) {
     cos_kill((int)pid, 15);
 }
 #include "plugins.inc"
-static const char *BUILTINS[] = { "help", "pwd", "cd", "ls", "cat", "mkdir", "rm", "mv", "cp", "touch", "echo", "free", "date", "jobs", "kill", "history", "clear", "about", "run", "make", "kmod", "audit", "lspci", NULL };
+static const char *BUILTINS[] = { "help", "pwd", "cd", "ls", "cat", "mkdir", "rm", "mv", "cp", "touch", "echo", "free", "date", "jobs", "kill", "history", "clear", "about", "run", "make", "kmod", "audit", "lspci", "format-data", "tar", "gzip", "gunzip", "zcat", "zip", "unzip", NULL };
 static void execute_command(const char *line0) {
     char line[CMD_CAP]; plug_rewrite(line0, line, sizeof line);
     char work[CMD_CAP], *v[24]; snprintf(work, sizeof work, "%s", line);
@@ -264,12 +266,14 @@ static void execute_command(const char *line0) {
         log_line("jobs / kill PID  programs that are running / stop one (Ctrl+C stops the newest)");
         log_line("audit [N]        the last N (default 20) entries of the kernel audit log (module audit.c-osys): process starts/exits, sandbox refusals");
         log_line("lspci            the PCI devices (module pci.c-osys)");
+        log_line("tar -czf OUT.tgz DIR / tar -xf FILE [-C DIR] / tar -tf FILE   gzip FILE / gunzip FILE.gz / zcat FILE.gz   zip OUT.zip DIR... / unzip [-l] [-d DIR] FILE.zip   (more: type the command alone)");
+        log_line("format-data [exfat|fat32 --yes | cancel]   which file system the data volume has; ask for it to be formatted (erases it) at the next start");
         log_line("kmod list | load PATH [PASSWORD] | unload NAME [PASSWORD]   kernel modules (.c-osys); the password is the administrator password, if one is set");
         log_line("history / clear");
         log_line("plugin [on|off NAME]   the plugins that add commands while the terminal runs (list below when loaded)");
         plug_help();
         log_line("NAME [ARGS]      run NAME.c-os from this directory or /bin   (example:  tcc -v)");
-        log_line("keys: Up/Down history, Tab complete, Ctrl+L clear, Ctrl+U erase the line, PageUp/PageDown scroll, Ctrl+Space Japanese input");
+        log_line("keys: Up/Down history, Tab complete, Ctrl+L clear, Ctrl+U erase the line, PageUp/PageDown scroll, Ctrl+Shift+J or Ctrl+Space Japanese input");
         return;
     }
     if (!strcmp(v[0], "clear")) { clear_screen(); return; }
@@ -304,6 +308,32 @@ static void execute_command(const char *line0) {
             else if (r->type == 2) logf("#%llu t=%llums pid %u: system call %u refused by the sandbox (missing capabilities 0x%llx)", (unsigned long long)r->seq, (unsigned long long)r->time_ms, r->pid, (unsigned)(r->b & 0xFFFF), (unsigned long long)(r->b >> 16));
             else if (r->type == 3) logf("#%llu t=%llums pid %u narrowed its capabilities to 0x%llx", (unsigned long long)r->seq, (unsigned long long)r->time_ms, r->pid, (unsigned long long)r->b);
         }
+        return;
+    }
+    if (!strcmp(v[0], "tar") || !strcmp(v[0], "gzip") || !strcmp(v[0], "gunzip") || !strcmp(v[0], "zcat") || !strcmp(v[0], "zip") || !strcmp(v[0], "unzip")) {
+        char *av[28]; int ac = 0; av[ac++] = (char *)"cosarc"; av[ac++] = (char *)"--cwd"; av[ac++] = cwd;
+        for (int i = 0; i < n && ac < 27; i++) av[ac++] = v[i];
+        start_program_ex("/bin/cosarc.c-os", av, ac, true);        /* the program takes the folder with --cwd and finds its own files; the arguments stay as typed */
+        return;
+    }
+    if (!strcmp(v[0], "format-data")) {
+        int q = cos_settings_action(COS_ACTION_FS_QUERY, 0), now = q & 15, pend = (q >> 4) & 15;
+        if (n < 2) {
+            logf("Data volume: %s", now == 2 ? "exFAT (one file can be bigger than 4 GB)" : now == 1 ? "FAT32 (one file up to 4 GB)" : "not mounted");
+            if (pend) logf("Asked for at the next start: format as %s (everything is erased)", pend == 2 ? "exFAT" : "FAT32");
+            log_line("usage: format-data exfat --yes | format-data fat32 --yes | format-data cancel");
+            log_line("A format erases the whole data volume (files, the Linux system and its apps) and is done at the next start.");
+            return;
+        }
+        if (!strcmp(v[1], "cancel")) { cos_settings_action(COS_ACTION_FS_FORMAT_CANCEL, 0); log_line("The format request was cancelled."); return; }
+        int act = !strcmp(v[1], "exfat") ? COS_ACTION_FS_FORMAT_EXFAT : !strcmp(v[1], "fat32") ? COS_ACTION_FS_FORMAT_FAT32 : 0;
+        if (!act) { log_line("format-data: expected exfat, fat32 or cancel"); return; }
+        if (n < 3 || strcmp(v[2], "--yes")) {
+            log_line("This erases the whole data volume (your files, the Linux system and its apps) at the next start.");
+            logf("To go on, type: format-data %s --yes", v[1]); return;
+        }
+        if (cos_settings_action(act, 0) != 0) { log_line("format-data: the request could not be saved."); return; }
+        logf("The data volume will be formatted as %s at the next start. Restart the computer to do it, or type: format-data cancel", act == COS_ACTION_FS_FORMAT_EXFAT ? "exFAT" : "FAT32");
         return;
     }
     if (!strcmp(v[0], "lspci")) {

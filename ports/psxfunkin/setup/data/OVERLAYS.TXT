@@ -1,0 +1,6 @@
+menu/menu.exe: menu/back.tim menu/ng.tim menu/story.tim menu/title.tim font/bold.tim font/arial.tim
+week1/week1.exe: stage/hud0.tim week1/hud1.tim week1/back0.tim week1/back1.tim
+week2/week2.exe: stage/hud0.tim week1/hud1.tim week2/back0.tim week2/back1.tim week2/back2.tim
+week3/week3.exe: stage/hud0.tim week1/hud1.tim week3/back0.tim week3/back1.tim week3/back2.tim week3/back3.tim week3/back4.tim week3/back5.tim
+week4/week4.exe: stage/hud0.tim week1/hud1.tim week4/back0.tim week4/back1.tim week4/back2.tim week4/back3.tim week4/back4.tim
+week6/week6.exe: week6/hud0.tim week6/hud1.tim week6/back0.tim week6/back1.tim week6/back2.tim week6/back3.tim

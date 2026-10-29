@@ -50,7 +50,7 @@ time_t time(time_t *tloc);
 struct tm *localtime_r(const time_t *timer, struct tm *result);
 struct tm *gmtime_r(const time_t *timer, struct tm *result);
 
-/* C-OS 4.0.8 alpha: added for QuickJS Date support (getTimezoneOffset).
+/* C-OS 4.1.0: added for QuickJS Date support (getTimezoneOffset).
  * mktime() converts a broken-down UTC struct tm back to a time_t.
  * difftime() returns the difference between two time_t values in seconds. */
 time_t mktime(struct tm *tm);

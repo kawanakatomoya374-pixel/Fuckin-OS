@@ -1,5 +1,5 @@
 /*
- * cos_logging.h - C-OS 4.0.8 alpha Unified Logging System
+ * cos_logging.h - C-OS 4.1.0 Unified Logging System
  * Provides common logging macros for all subsystems
  */
 

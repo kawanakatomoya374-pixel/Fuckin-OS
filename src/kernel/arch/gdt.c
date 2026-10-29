@@ -196,14 +196,77 @@ void tss_init(void) {
     tss_entry.ist[0] = (uint64_t)(uintptr_t)(ist1_emergency_stack + IST1_STACK_SIZE);
 }
 
+/* ---- XSAVE: the YMM halves (AVX) are part of the state that is saved at every interrupt and task switch ----------------------------------------------------
+ * Without it the context switch saved only FXSAVE state (x87 + XMM), so CR4.OSXSAVE had to stay off and programs saw no AVX at all (a decoder like dav1d or ffvpx then runs its
+ * SSE code). cos_xsave_init_cpu() turns it on for one CPU: CR4.OSXSAVE, XCR0 = x87|SSE|AVX; the stubs (isr.asm, irq.asm), the scheduler and the signal frames then use XSAVE images. */
+uint8_t cos_xsave_on;
+
+void cos_xsave_init_cpu(void) {
+    uint32_t a, b, c, d;
+    __asm__ volatile("cpuid" : "=a"(a), "=b"(b), "=c"(c), "=d"(d) : "a"(1), "c"(0));
+    if (!(c & (1u << 26))) return;                                            /* no XSAVE */
+    __asm__ volatile("cpuid" : "=a"(a), "=b"(b), "=c"(c), "=d"(d) : "a"(0xDu), "c"(0));
+    uint32_t supported = a;
+    if ((supported & 3u) != 3u) return;
+    uint64_t xcr0 = 3u | (supported & 4u);                                    /* x87, SSE and, where there is one, AVX */
+    uint64_t cr4; __asm__ volatile("mov %%cr4, %0" : "=r"(cr4));
+    __asm__ volatile("mov %0, %%cr4" :: "r"(cr4 | (1ull << 18)) : "memory");   /* CR4.OSXSAVE */
+    __asm__ volatile("xsetbv" :: "a"((uint32_t)xcr0), "d"(0u), "c"(0u) : "memory");
+    __asm__ volatile("cpuid" : "=a"(a), "=b"(b), "=c"(c), "=d"(d) : "a"(0xDu), "c"(0));
+    if (b > 1024u) { __asm__ volatile("xsetbv" :: "a"(3u), "d"(0u), "c"(0u) : "memory"); }   /* more state than the save areas hold: SSE only */
+    cos_xsave_on = 1;
+}
+
+/* ---- the SYSCALL instruction ---------------------------------------------------------------------------------------------------------------------
+ * A Linux program's `syscall` used to raise #UD (EFER.SCE off), which costs an exception per call (microcode, IDT, decoding the faulting bytes) and, on a
+ * hypervisor, far more. With EFER.SCE on, `syscall` jumps to cos_syscall_entry (isr.asm), which switches to the thread's kernel stack (GS-relative: the GS base of
+ * every CPU points at its cos_percpu_t, never swapped, since nothing in the kernel or in the Linux layer uses GS) and builds exactly the frame the #UD gate built
+ * (vector 6, RIP = the syscall bytes), so cos_linux_try_syscall() and the return through iretq stay as they were. */
+typedef struct { uint64_t kstack, scratch; uint64_t pad[6]; } cos_percpu_t;
+cos_percpu_t cos_percpu[GDT_MAX_CPUS] __attribute__((aligned(64)));
+static int g_syscall_insn;                                               /* 1 when this machine has SYSCALL (CPUID 0x80000001 EDX bit 11) and it was switched on */
+
+void cos_syscall_set_kstack(unsigned cpu, uint64_t rsp0) { if (cpu < GDT_MAX_CPUS) cos_percpu[cpu].kstack = rsp0; }
+
 void tss_set_kernel_stack(uint64_t rsp0) {
     unsigned cpu;
     uint16_t tr; __asm__ volatile("str %0" : "=r"(tr));
     cpu = tr >= GDT_TSS ? (unsigned)((tr - GDT_TSS) >> 4) : 0u;
     g_tss[cpu].esp0 = rsp0;
+    cos_percpu[cpu].kstack = rsp0;
 }
 
+extern void cos_syscall_entry(void);
+/* run on every CPU after its GDT/TSS are loaded (BSP: kernel.c, APs: smp.c) */
+void cos_syscall_init_cpu(void) {
+    uint32_t a, b, c, d; __asm__ volatile("cpuid" : "=a"(a), "=b"(b), "=c"(c), "=d"(d) : "a"(0x80000001u), "c"(0));
+    if (!(d & (1u << 11))) return;
+    uint16_t tr; __asm__ volatile("str %0" : "=r"(tr));
+    unsigned cpu = tr >= GDT_TSS ? (unsigned)((tr - GDT_TSS) >> 4) : 0u;
+    if (cpu >= GDT_MAX_CPUS) return;
+    uint32_t lo, hi;
+    __asm__ volatile("rdmsr" : "=a"(lo), "=d"(hi) : "c"(0xC0000080u)); lo |= 1u;                                              /* EFER.SCE */
+    __asm__ volatile("wrmsr" :: "a"(lo), "d"(hi), "c"(0xC0000080u));
+    __asm__ volatile("wrmsr" :: "a"(0u), "d"(0x00100008u), "c"(0xC0000081u));                                                  /* STAR: kernel CS 0x08 (SS 0x10) */
+    uint64_t entry = (uint64_t)(uintptr_t)cos_syscall_entry;
+    __asm__ volatile("wrmsr" :: "a"((uint32_t)entry), "d"((uint32_t)(entry >> 32)), "c"(0xC0000082u));                        /* LSTAR */
+    __asm__ volatile("wrmsr" :: "a"(0x44700u), "d"(0u), "c"(0xC0000084u));                                                    /* SFMASK: TF IF DF NT AC cleared on entry */
+    uint64_t gs = (uint64_t)(uintptr_t)&cos_percpu[cpu];
+    __asm__ volatile("wrmsr" :: "a"((uint32_t)gs), "d"((uint32_t)(gs >> 32)), "c"(0xC0000101u));                              /* GS base: this CPU's cos_percpu_t */
+    g_syscall_insn = 1;
+}
+int cos_syscall_insn_enabled(void) { return g_syscall_insn; }
+
 uint64_t *tss_esp0_ptr(unsigned cpu) { return &g_tss[cpu].esp0; }
+
+/* true when `rsp` lies on one of the IST1 stacks (#UD/#DF/#GP/#PF handlers run there): a thread that is switched away from while on such a stack leaves its frames in memory
+ * the next exception of that CPU overwrites (diagnostic, scheduler.c) */
+bool gdt_rsp_on_ist1(uint64_t rsp) {
+    uint64_t b = (uint64_t)(uintptr_t)ist1_emergency_stack;
+    if (rsp >= b && rsp < b + IST1_STACK_SIZE) return true;
+    b = (uint64_t)(uintptr_t)ist1_ap_stack;
+    return rsp >= b && rsp < b + sizeof(ist1_ap_stack);
+}
 
 /* An application processor: its own TSS (with its own IST1 stack) in the GDT every CPU shares, then the same segment setup the BSP did. */
 void gdt_cpu_init(unsigned cpu) {

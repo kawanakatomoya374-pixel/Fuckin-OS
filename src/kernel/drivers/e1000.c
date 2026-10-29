@@ -746,7 +746,7 @@ void e1000_poll(void) {
     if (frames != 0u) {
         __atomic_fetch_add(&e1000_deferred_frames, frames, __ATOMIC_RELAXED);
     }
-    if (drain <= 8u || frames != 0u) {
+    if (drain <= 8u || (drain & 0xFFFu) == 0u) {                      /* a line per receive batch slowed every download (the serial port is slow): the first few and a sample */
         serial_puts("[E1000] deferred drain irq=");
         serial_putdec(__atomic_load_n(&e1000_irq_count, __ATOMIC_RELAXED));
         serial_puts(" frames=");

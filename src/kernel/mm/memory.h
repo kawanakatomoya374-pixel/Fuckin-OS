@@ -3,7 +3,7 @@
 
 #include "types.h"
 
-/* C-OS 4.0.8 alpha Memory Manager
+/* C-OS 4.1.0 Memory Manager
  *
  * 履歴 / 落とし穴:
  *   旧版では HEAP_BASE=0x4000000 / HEAP_SIZE=3.5GB をこのヘッダに直書きし、

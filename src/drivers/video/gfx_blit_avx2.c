@@ -145,6 +145,6 @@ void gfx_blit_avx2_copy_row(uint32_t* dst, const uint32_t* src, int count) {
     gfx_write_cr4(cr4 | (1ULL << 18));                       /* CR4.OSXSAVE */
     if ((gfx_xgetbv0() & 0x7) != 0x7) gfx_xsetbv0(0x7);
     avx2_copy_row_inner(dst, src, count);
-    gfx_write_cr4(cr4 & ~(1ULL << 18));                      /* user code must not see AVX as usable */
+    gfx_write_cr4(cr4);                                      /* as it was (OSXSAVE is on for good once XSAVE state is saved at every switch: gdt.c) */
     if (fl & 0x200) __asm__ volatile("sti" ::: "memory");
 }

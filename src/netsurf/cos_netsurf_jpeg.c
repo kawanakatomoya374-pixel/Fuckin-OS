@@ -34,7 +34,9 @@
 /* The freestanding JPEG decoder densely packs rows at the decoded width.
  * Decode to bounded BSS first, then copy into an exactly-sized NetSurf bitmap
  * so the plotter's bitmap stride always equals the image width. */
-static uint8_t cos_ns_jpeg_decode_scratch[COS_NS_JPEG_SCRATCH_BYTES];
+/* The decode area (about 8 MiB) is allocated for the length of one decode and given back: a static array of this size sat in the kernel image, reserved from the first byte. */
+static uint8_t *cos_ns_jpeg_decode_scratch;
+static bool cos_ns_jpeg_data_complete_inner(struct content *c);
 
 typedef struct cos_ns_jpeg_content {
     struct content base;
@@ -72,7 +74,7 @@ static bool cos_ns_jpeg_process_data(struct content *c, const char *data,
     return true;
 }
 
-static bool cos_ns_jpeg_data_complete(struct content *c)
+static bool cos_ns_jpeg_data_complete_inner(struct content *c)
 {
     cos_ns_jpeg_content *jpeg = (cos_ns_jpeg_content *)c;
     size_t source_size = 0;
@@ -175,6 +177,20 @@ static bool cos_ns_jpeg_is_opaque(struct content *c)
 static content_type cos_ns_jpeg_type(void)
 {
     return CONTENT_IMAGE;
+}
+
+static bool cos_ns_jpeg_data_complete(struct content *c)
+{
+    cos_ns_jpeg_decode_scratch = malloc(COS_NS_JPEG_SCRATCH_BYTES);
+    if (cos_ns_jpeg_decode_scratch == NULL) {
+        content_broadcast_error(c, NSERROR_NOMEM, "JPEG decode memory unavailable");
+        content_set_error(c);
+        return false;
+    }
+    bool ok = cos_ns_jpeg_data_complete_inner(c);
+    free(cos_ns_jpeg_decode_scratch);
+    cos_ns_jpeg_decode_scratch = NULL;
+    return ok;
 }
 
 static const content_handler cos_ns_jpeg_handler = {

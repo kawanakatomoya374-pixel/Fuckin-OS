@@ -1,6 +1,6 @@
 /**
  * password_screen_enhanced.c - Enhanced Password Screen with Modern UI
- * C-OS 4.0.8 alpha - Redesigned Login Interface
+ * C-OS 4.1.0 - Redesigned Login Interface
  * 
  * Features:
  * - Modern flat design with rounded corners
@@ -208,7 +208,7 @@ static void render_login_screen(void) {
     draw_button(button_x, button_y, CARD_WIDTH - 40, BUTTON_HEIGHT, "Login", false, false);
     
     /* Draw footer text */
-    draw_text_centered(card_x + 20, button_y + BUTTON_HEIGHT + 30, "C-OS 4.0.8 alpha", COLOR_TEXT_SECONDARY);
+    draw_text_centered(card_x + 20, button_y + BUTTON_HEIGHT + 30, "C-OS 4.1.0", COLOR_TEXT_SECONDARY);
 }
 
 /* ============================================================================

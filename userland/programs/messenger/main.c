@@ -2268,7 +2268,7 @@ static void key(const cos_win_event_t *ev) {
     if (pk.open) { pk_key(ev); return; }
     if (gl.open) { if (ev->special == COS_KEY_ESC) { gl.open = false; dirty = true; } return; }
     if ((sr.open || pf.open) && ev->special == COS_KEY_ESC) { sr.open = pf.open = false; dirty = true; return; }
-    if ((ev->mods & COS_MOD_CTRL) && ev->ascii == ' ') { toggle_ime(); return; }
+    if ((ev->mods & COS_MOD_CTRL) && (ev->ascii == ' ' || ((ev->mods & COS_MOD_SHIFT) && (ev->ascii == 'j' || ev->ascii == 'J' || ev->ascii == 10)))) { toggle_ime(); return; }
     if (ime && cosime_enabled(ime)) {
         bool bypass = in_len == 0 && ev->ascii == '/' && cosime_state(ime) == COSIME_IDLE;      /* commands start with a plain "/" */
         if (!bypass) {

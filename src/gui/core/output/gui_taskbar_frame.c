@@ -229,7 +229,7 @@ void draw_taskbar(void) {
     /* ---- Dock: pinned quick-launch icons ---- */
     int dock_x = (int)SCREEN_W - 320;
     if (dock_x < 56) dock_x = 56;
-    /* C-OS 4.0.8 alpha: NetSurf quick-launch button enabled in dock.
+    /* C-OS 4.1.0: NetSurf quick-launch button enabled in dock.
      * WIN_BROWSER opens the NetSurf window (gui_apps_browser.c) which
      * now calls cos_netsurf_load_url_sync_nowait() for real. */
     struct { int kind; } dock_items[] = {

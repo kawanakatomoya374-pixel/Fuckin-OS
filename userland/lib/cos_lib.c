@@ -878,6 +878,7 @@ int cos_win_poll_mouse(int64_t win, cos_mouse_event_t *out) {
 #define SYS_THREAD_EXIT   31
 #define SYS_THREAD_JOIN   32
 #define SYS_TIME_MS       33
+#define SYS_TIME_US       261
 #define SYS_RTC_NOW       197
 #define SYS_SETTINGS_GET  198
 #define SYS_SETTINGS_SET  199
@@ -987,6 +988,7 @@ int cos_par_stop(int id) { return (int)sys1(SYS_PAR_STOP, (long)id); }
 int cos_par_free(int id) { return (int)sys1(SYS_PAR_FREE, (long)id); }
 
 uint64_t cos_time_ms(void)   { return (uint64_t)sys0(SYS_TIME_MS); }
+uint64_t cos_time_us(void)   { return (uint64_t)sys0(SYS_TIME_US); }
 int cos_rtc_now(cos_datetime_t *out) { if (!out) return -1; return (int)sys1(SYS_RTC_NOW, (long)out); }
 int cos_settings_get(cos_settings_t *out) { if (!out) return -1; return (int)sys1(SYS_SETTINGS_GET, (long)out); }
 int cos_settings_set(int key, int value) { return (int)sys2(SYS_SETTINGS_SET, (long)key, (long)value); }
@@ -1136,6 +1138,7 @@ int cos_ctx_list(cos_ctxsnap_t *out) { return (int)sys1(SYS_CTX_LIST, (long)out)
 #define SYS_KERNEL_UPDATE 250
 int cos_kernel_update_status(cos_kupd_status_t *out) { return (int)sys3(SYS_KERNEL_UPDATE, 0, (long)out, 0); }
 int cos_kernel_update_install(const void *blob, size_t len) { return (int)sys3(SYS_KERNEL_UPDATE, 1, (long)blob, (long)len); }
+int cos_kernel_update_clear_bad(void) { return (int)sys3(SYS_KERNEL_UPDATE, 3, 0, 0); }
 int cos_kernel_update_why(char *buf96) { return (int)sys3(SYS_KERNEL_UPDATE, 2, (long)buf96, 0); }
 int cos_notify(const char *title, const char *message, int type) { return (int)sys3(SYS_NOTIF_SEND, (long)title, (long)message, (long)type); }
 int cos_notif_list(cos_notif_t *out, int max) { return (int)sys2(SYS_NOTIF_LIST, (long)out, (long)max); }
@@ -1710,6 +1713,7 @@ int cos_audio_close(void) { return (int)sys0(SYS_AUDIO_CLOSE); }
 #define SYS_WIN2_INPUT     251
 #define SYS_WIN2_RESIZE 254
 #define SYS_FILE_DROP 255
+#define SYS_LXSHM_MAP 260
 #define SYS_DRAG_GHOST 256
 #define SYS_WIN2_FULLSCREEN 253
 #define SYS_WIN2_GRAB      252
@@ -1763,6 +1767,7 @@ int cos_win2_video_frame_yuv420(int64_t h, const cos_video_yuv420_t *frame) {
 }
 int cos_win2_poll(int64_t h, cos_win_event_t *ev) { return (int)sys2(SYS_WIN2_POLL, (long)h, (long)ev); }
 int cos_win2_resize(int64_t h, int32_t w, int32_t ht, cos_win_info_t *info) { return (int)sys3(SYS_WIN2_RESIZE, (long)h, (long)(((uint64_t)(uint32_t)ht << 32) | (uint32_t)w), (long)info); }
+void *cos_lxshm_map(const char *name, uint64_t *size) { return (void *)sys2(SYS_LXSHM_MAP, (long)name, (long)(uintptr_t)size); }
 int cos_file_drop(const char *path, int copy) { return (int)sys2(SYS_FILE_DROP, (long)path, (long)copy); }
 int cos_drag_ghost(const char *label) { return (int)sys1(SYS_DRAG_GHOST, (long)label); }
 int cos_win2_fullscreen(int64_t h, int mode) { return (int)sys2(SYS_WIN2_FULLSCREEN, (long)h, (long)mode); }

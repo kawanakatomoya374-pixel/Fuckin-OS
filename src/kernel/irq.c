@@ -1,6 +1,6 @@
 /**
  * irq.c - IRQ Management (64-bit)
- * C-OS 4.0.8 alpha Interrupt Request Handler
+ * C-OS 4.1.0 Interrupt Request Handler
  *
  * FIX: keyboard_interrupt_handler() was an empty stub.
  *      Now properly dispatches to keyboard_irq_handler().

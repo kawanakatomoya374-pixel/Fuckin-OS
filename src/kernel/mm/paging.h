@@ -178,7 +178,13 @@ void paging_flush_all_cpus(void);              /* ... then one flush of every CP
 bool paging_cow_share(uint64_t phys);          /* a second page table maps this frame (fork) */
 bool paging_cow_is_shared(uint64_t phys);
 bool paging_cow_drop(uint64_t phys);           /* a mapping goes away: true if others still map the frame */
-bool paging_cow_break(uint64_t virt, uint64_t rw_flags);   /* write fault on a shared read-only page */
+bool paging_cow_break(uint64_t virt, uint64_t rw_flags);
+/* the cache of the frames of read-only file mappings (paging.c) */
+uint64_t paging_pcache_get(uint64_t fh, uint64_t fsz, uint32_t pg);
+bool     paging_pcache_put(uint64_t fh, uint64_t fsz, uint32_t pg, uint64_t phys);
+void     paging_pcache_invalidate_file(uint64_t fh);
+bool     paging_pcache_has_files(void);
+void     paging_pcache_stats(uint64_t *live, uint64_t *hits, uint64_t *misses, uint64_t *puts);   /* write fault on a shared read-only page */
 
 /* Validate a user-supplied buffer against the ACTIVE tables: every page
  * of [virt, virt+len) must be present, user-accessible, and writable if

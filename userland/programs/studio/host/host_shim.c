@@ -45,7 +45,7 @@ int cos_settings_get(cos_settings_t *out) {
     out->mem_total = 4ull * 1024 * 1024 * 1024; out->mem_used = 612ull * 1024 * 1024; out->mem_free = out->mem_total - out->mem_used;
     out->storage_total = 20ull * 1024 * 1024 * 1024; out->storage_used = 3ull * 1024 * 1024 * 1024; out->storage_free = out->storage_total - out->storage_used;
     snprintf(out->cpu_vendor, sizeof out->cpu_vendor, "%s", "x86-64 Compatible (host test)");
-    snprintf(out->os_version, sizeof out->os_version, "%s", "4.0.9 Alpha");
+    snprintf(out->os_version, sizeof out->os_version, "%s", "4.1.0");
     snprintf(out->build_info, sizeof out->build_info, "%s", "C-OS host test build");
     out->screen_w = 1024; out->screen_h = 768;
     out->net_connected = 1;

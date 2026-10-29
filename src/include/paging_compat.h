@@ -1,5 +1,5 @@
 /**
- * paging_fixed.h - C-OS 4.0.8 alpha Clean Paging System
+ * paging_fixed.h - C-OS 4.1.0 Clean Paging System
  * Fixed 64-bit address conversion constants
  */
 

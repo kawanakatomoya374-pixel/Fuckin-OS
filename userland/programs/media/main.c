@@ -82,7 +82,7 @@ typedef struct { int kind, codec; sample_t s[MAX_SAMPLES]; int n; uint32_t times
     ctts_entry_t ctts[MAX_TABLE_ENTRIES]; uint32_t ctts_count; } track_t;
 static uint8_t *file_data; static uint64_t file_size; static uint32_t movie_timescale=1000;
 static track_t tracks[8]; static int ntracks;
-static char path_buf[256], status_buf[160];
+static char path_buf[256], status_buf[160], stats_buf[120];       /* stats_buf: what the player measures about itself while it plays (shown under the status text) */
 static uint64_t playback_start_ms, audio_start_ms, audio_written_frames;
 static bool audio_clock_valid;
 static int64_t win; static cos_win_info_t wi; static cui_canvas cv;
@@ -934,7 +934,7 @@ static bool parse_mp4(void){
          * h264_fatal_error so a genuinely unsupported stream (10-bit,
          * 4:2:2/4:4:4) is still reported accurately instead of either
          * being silently fed garbage or rejected on profile number alone. */
-        {int nt=cos_par_cpus();if(nt>3)nt=3;
+        {int nt=cos_par_cpus();if(nt>3)nt=3;if(nt<2)nt=0;           /* measured (QEMU, 1080p): one worker was slower than none */
 #ifdef COS_H264_THREADS
         nt=COS_H264_THREADS;
 #endif
@@ -991,9 +991,11 @@ static bool parse_mp4(void){
     }
     if(video_track>=0 && tracks[video_track].codec==CODEC_AV1){
         Dav1dSettings settings; dav1d_default_settings(&settings);
-        {   /* SSE2..SSE4.1 asm only: AVX2 paths crashed intermittently under QEMU TCG (kernel only saves FXSAVE state) */
+        {   /* AVX2 asm is used when the CPU has it and the kernel enabled YMM state (XCR0, saved with xsave since r17; dav1d checks xgetbv itself). AVX-512 stays off: XCR0 has no ZMM state.
+             * /linux/etc/cos-nosimd-avx2 (a file) switches AVX2 off again for comparisons and as a fallback. */
             extern void dav1d_set_cpu_flags_mask(unsigned mask);
-            dav1d_set_cpu_flags_mask(~((1u<<3)|(1u<<4)));   /* DAV1D_X86_CPU_FLAG_AVX2 | _AVX512ICL */
+            cos_stat_t st_noavx; bool noavx2=cos_stat("/linux/etc/cos-noavx2",&st_noavx)==0;
+            dav1d_set_cpu_flags_mask(noavx2?~((1u<<3)|(1u<<4)):~(1u<<4));   /* DAV1D_X86_CPU_FLAG_AVX2 = 1<<3, _AVX512ICL = 1<<4 */
         }
         int nt=cos_par_cpus();if(nt>3)nt=3;if(nt<1)nt=1;
 #ifdef COS_AV1_THREADS
@@ -1100,7 +1102,7 @@ static int av1_take_picture(void){
 }
 static void video_step(void){
     if(have_video&&video_track>=0&&tracks[video_track].codec==CODEC_AV1&&av1_dec_open&&(av1_in_pending||video_pos<tracks[video_track].n)){
-        track_t *t=&tracks[video_track];
+        track_t *t=&tracks[video_track]; uint64_t av1_t0=cos_time_ms();
         if(!av1_in_pending){
             sample_t *s=&t->s[video_pos];
             if(!in_file(s->off,s->size)||s->size>32*1024*1024){msg("Invalid video sample");playing=false;return;}
@@ -1114,6 +1116,7 @@ static void video_step(void){
         if(rc==0||av1_in.sz==0)av1_in_pending=false;
         else if(rc!=DAV1D_ERR(EAGAIN)){dav1d_data_unref(&av1_in);av1_in_pending=false;msg("AV1 bitstream decode failed");playing=false;return;}
         if(av1_take_picture()<0){playing=false;return;}
+        {uint64_t e=cos_time_ms()-av1_t0;decode_total_ms+=e;if(e>decode_max_ms)decode_max_ms=e;}      /* the stats line: time spent in dav1d per sample */
         if(video_pos>=t->n&&!av1_in_pending)av1_drained=false;
         return;
     }
@@ -1210,8 +1213,18 @@ static void draw(void){cui_fill(&cv,0,0,cv.w,cv.h,0x0D1119);cui_fill(&cv,0,0,cv.
      * (media_push_yuv420() - see its comment), so there is nothing left
      * to upload here; the compositor keeps presenting it every tick on
      * its own. */
-    int y=cv.h-86;cui_round_rect(&cv,18,y,92,34,6,playing&&!paused?0x4D83E6:0x29364A);cui_text(&cv,cui_font_bold(13),40,y+10,playing&&!paused?"Pause":"Play",0xFFFFFF);cui_round_rect(&cv,120,y,92,34,6,0x29364A);cui_text(&cv,cui_font_default(13),145,y+10,"Stop",0xD6DEED);cui_text_fit(&cv,cui_font_default(11),230,y+11,cv.w-250,status_buf,0xAAB7CC);cui_text_fit(&cv,cui_font_default(10),20,cv.h-34,cv.w-40,path_buf[0]?path_buf:"No file selected",0x77859C);}
-static void present(void){cui_canvas_init(&cv,wi.pixels,wi.width,wi.height,wi.stride);draw();cos_win2_present(win);if(frame_output_pos&&presented_generation!=frame_generation){presented_generation=frame_generation;frame_present_pos++;}}
+    int y=cv.h-86;cui_round_rect(&cv,18,y,92,34,6,playing&&!paused?0x4D83E6:0x29364A);cui_text(&cv,cui_font_bold(13),40,y+10,playing&&!paused?"Pause":"Play",0xFFFFFF);cui_round_rect(&cv,120,y,92,34,6,0x29364A);cui_text(&cv,cui_font_default(13),145,y+10,"Stop",0xD6DEED);cui_text_fit(&cv,cui_font_default(11),230,y+11,cv.w-250,status_buf,0xAAB7CC);if(stats_buf[0])cui_text_fit(&cv,cui_font_default(10),230,y+26,cv.w-250,stats_buf,0x8794AB);cui_text_fit(&cv,cui_font_default(10),20,cv.h-34,cv.w-40,path_buf[0]?path_buf:"No file selected",0x77859C);}
+/* once a second while playing: frame size, decoded frames per second, average and worst decode time, dropped frames (so a slow machine shows it without a log) */
+static void update_stats(void){
+    static uint64_t t0; static uint32_t n0; uint64_t now=cos_time_ms();
+    if(!playing||!have_video||!frame_output_pos){stats_buf[0]=0;t0=0;return;}
+    if(!t0||frame_output_pos<n0){t0=now;n0=frame_output_pos;return;}
+    if(now-t0<1000)return;
+    unsigned fps10=(unsigned)((uint64_t)(frame_output_pos-n0)*10000u/(now-t0)); uint64_t avg=decode_total_ms/(uint64_t)frame_output_pos;
+    snprintf(stats_buf,sizeof stats_buf,"%dx%d  %u.%u fps  decode %llu ms avg, %llu ms worst  dropped %u",frame_w,frame_h,fps10/10,fps10%10,(unsigned long long)avg,(unsigned long long)decode_max_ms,(unsigned)dropped_frames);
+    t0=now;n0=frame_output_pos;
+}
+static void present(void){update_stats();cui_canvas_init(&cv,wi.pixels,wi.width,wi.height,wi.stride);draw();cos_win2_present(win);if(frame_output_pos&&presented_generation!=frame_generation){presented_generation=frame_generation;frame_present_pos++;}}
 #if COS_THREAD_BENCH
 static volatile uint64_t bench_sink[8];
 static volatile uint32_t bench_flag;
@@ -1276,6 +1289,16 @@ int main(int argc,char **argv){
 #endif
             /* Decode a small bounded burst when the CPU fell behind. This
              * catches up without starving audio or the GUI event loop. */
+            /* A decoder that cannot keep up (slow CPU, 1 or 2 cores, 1080p60) falls further behind the audio with every frame: when the picture is a second late, jump to the
+             * next key frame at or after the audio clock (the samples in between are never decoded; "dropped" counts them). The picture stays on the last frame until then. */
+            if(have_video&&video_track>=0&&video_clock_valid&&!hevc_async&&clock>next_frame_ms+1000){
+                track_t *vt=&tracks[video_track]; int j=video_pos;
+                while(j<vt->n&&!(vt->s[j].sync&&sample_pts_ms(vt,j)>=clock))j++;
+                if(j<vt->n&&j>video_pos){dropped_frames+=(uint32_t)(j-video_pos);video_pos=j;
+                    if(vt->codec==CODEC_H264&&h264_dec)edge264_flush(h264_dec);
+                    if(vt->codec==CODEC_AV1&&av1_dec_open){if(av1_in_pending){dav1d_data_unref(&av1_in);av1_in_pending=false;}dav1d_flush(av1_dec);av1_drained=false;}
+next_frame_ms=sample_pts_ms(vt,j)>150?sample_pts_ms(vt,j)-150:0;}
+            }
             while(video_more() && (!video_clock_valid || next_frame_ms<=clock+2) && decoded<3){video_step();decoded++;}
         }/* The video frames themselves are composited by the kernel (media_push_yuv420),
          * so the window chrome only needs repainting when something changed (input, state)

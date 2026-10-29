@@ -67,7 +67,7 @@ static int gui_render_backend = 0;
 static bool gui_gpu_full_draw = false;
 int gui_mouse_drag_threshold = 3;
 int gui_dark_mode = 0;
-static int current_language_idx = 0; /* 0=English, 1=Japanese */
+static int current_language_idx = 1; /* 0=English, 1=Japanese; Japanese is what a system starts with until the user picks English */
 
 /* Keyboard-operated secondary pointer. The pending click is consumed once by
  * gui_handle_input(), so it reuses the normal left/right click dispatcher. */

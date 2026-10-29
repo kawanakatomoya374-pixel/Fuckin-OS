@@ -1,6 +1,6 @@
 /**
  * fs_api.c - File System API Layer Implementation
- * C-OS 4.0.8 alpha
+ * C-OS 4.1.0
  * 
  * This layer wraps the existing fs.c implementation to provide a clean
  * interface between GUI/Applications and the file system.

@@ -3,13 +3,13 @@ extern void gui_set_window_title(void* w, const char* t);
 void gui_set_window_title(void* w, const char* t) {}
 /**
 void gui_set_window_title(void* w, const char* t) {}
- * gui_apps_browser.c - C-OS 4.0.8 alpha GUI Apps (分割ファイル)
+ * gui_apps_browser.c - C-OS 4.1.0 GUI Apps (分割ファイル)
  * Webブラウザ (NetSurf + QuickJS 完全結合)
  *
  * 元は単一の gui_apps.c (11,638行) に含まれていたコードを、
  * 保守性向上のため機能単位に分割したものの一部。
  *
- * C-OS 4.0.8 alpha: cos_netsurf_load_url_sync_nowait() および
+ * C-OS 4.1.0: cos_netsurf_load_url_sync_nowait() および
  * cos_netsurf_eval_script() を実際に呼び出すように変更。
  * javascript: URLスキームの直接QuickJS評価も対応。
  */
@@ -170,11 +170,11 @@ static const builtin_page_t builtin_pages[] = {
         NULL
     }
     },
-    {"c-os://about", "About C-OS 4.0.8 alpha", {
-        "[H] About C-OS 4.0.8 alpha",
+    {"c-os://about", "About C-OS 4.1.0", {
+        "[H] About C-OS 4.1.0",
         "",
         "[P] A lightweight operating system demo built in C.",
-        "[H] C-OS 4.0.8 alpha",
+        "[H] C-OS 4.1.0",
         "[P] The browser renders readable text and lets you open local files.",
         NULL
     }},

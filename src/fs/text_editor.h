@@ -1,6 +1,6 @@
 /**
  * text_editor.h - External Text File Editor Module Header
- * C-OS 4.0.8 alpha
+ * C-OS 4.1.0
  */
 
 #ifndef TEXT_EDITOR_H

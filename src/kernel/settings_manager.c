@@ -1,5 +1,5 @@
 /**
- * settings_manager.c - C-OS 4.0.8 alpha Settings Persistence Manager
+ * settings_manager.c - C-OS 4.1.0 Settings Persistence Manager
  * Handles saving and loading OS settings to persistent storage.
  */
 #include "settings_manager.h"
@@ -255,8 +255,8 @@ __attribute__((weak)) const char* settings_key_animations(void) { return setting
 __attribute__((weak)) const char* settings_key_hostname(void) { return settings_key_hostname_str; }
 __attribute__((weak)) const char* settings_dump_header(void) { return settings_dump_header_str; }
 
-const char* settings_get_os_version(void) { return "C-OS 4.0.8 alpha"; }
-const char* settings_get_os_name(void) { return "C-OS 4.0.8 alpha"; }
+const char* settings_get_os_version(void) { return "C-OS 4.1.0"; }
+const char* settings_get_os_name(void) { return "C-OS 4.1.0"; }
 bool settings_is_network_enabled(void) { return g_settings.network_mode != 0; }
 uint32_t settings_get_max_open_files(void) { return 64; }
 uint32_t settings_get_max_processes(void) { return 128; }
@@ -284,8 +284,8 @@ bool storage_load_config(void) {
 }
 
 void settings_export_all(void) {
-    serial_puts("=== C-OS 4.0.8 alpha Settings Export ===\r\n");
-    serial_puts("OS: C-OS 4.0.8 alpha\r\n");
+    serial_puts("=== C-OS 4.1.0 Settings Export ===\r\n");
+    serial_puts("OS: C-OS 4.1.0\r\n");
     serial_puts("Wallpaper: "); serial_putdec(g_settings.current_wallpaper); serial_puts("\r\n");
     serial_puts("Theme: "); serial_putdec(g_settings.current_theme); serial_puts("\r\n");
     serial_puts("Dark Mode: "); serial_puts(g_settings.dark_mode ? "ON" : "OFF"); serial_puts("\r\n");

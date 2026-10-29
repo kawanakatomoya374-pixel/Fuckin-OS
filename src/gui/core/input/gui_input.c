@@ -513,6 +513,12 @@ void gui_desktop_open_icon(int i)
         gui_app_folder_open(i);
         return;
     }
+    if (ic->is_dynamic && ic->is_file && ic->path[0]) {
+        /* a file on the desktop (README.txt, a ".app" shortcut, ...): open it with whatever handles its type */
+        extern void gui_open_file_in_app(const char* path, int file_type);
+        gui_open_file_in_app(ic->path, 0);
+        return;
+    }
     int existing = gui_find_window(ic->win_kind);
     if (existing >= 0) {
         if (windows[existing].minimized) windows[existing].minimized = FALSE;
@@ -691,6 +697,7 @@ void gui_handle_input(void) {
     minimal_mouse_t* ms = minimal_mouse_get_state();
     bool left_click = ms->left_click || left_edge;
     bool right_click = ms->right_click || right_edge;
+    if (screenshot_active()) goto gui_handle_input_finish;           /* the screenshot bar is modal: a click on it must not also hit the desktop icons or windows under it */
     if (gui_fullscreen_index() >= 0) goto gui_handle_input_finish;   /* a fullscreen game owns the pointer: no taskbar, menus, icons or window chrome underneath */
 
     /* A keyboard-driven click is translated into the exact same left/right
@@ -844,7 +851,7 @@ void gui_handle_input(void) {
         }
         // Taskbar window buttons: click to restore/focus minimized windows
         if (my >= taskbar_y) {
-            /* C-OS 4.0.8 alpha: dock quick-launch icons (NetSurf,
+            /* C-OS 4.1.0: dock quick-launch icons (NetSurf,
              * Calculator) at the right side of the taskbar.
              * Layout mirrors draw_taskbar()'s dock_x = SCREEN_W - 320,
              * each button 36px wide, 30px drawn. */

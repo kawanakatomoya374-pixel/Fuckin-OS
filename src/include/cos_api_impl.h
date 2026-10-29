@@ -466,7 +466,7 @@ int cos_api_check_version(uint64_t major, uint64_t minor, uint64_t patch) {
 
 /* Main API initialization */
 int cos_api_init(void) {
-    API_LOG_INFO("COS_API", "Initializing C-OS 4.0.8 alpha Unified API System");
+    API_LOG_INFO("COS_API", "Initializing C-OS 4.1.0 Unified API System");
     API_LOG_INFO("COS_API", "API Version 1.0.0");
 
     /* Initialize all subsystems */
@@ -480,7 +480,7 @@ int cos_api_init(void) {
 }
 
 int cos_api_cleanup(void) {
-    API_LOG_INFO("COS_API", "Cleaning up C-OS 4.0.8 alpha Unified API System");
+    API_LOG_INFO("COS_API", "Cleaning up C-OS 4.1.0 Unified API System");
     
     cos_storage_cleanup();
     cos_keyboard_cleanup();

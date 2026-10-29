@@ -1,6 +1,6 @@
 /**
  * file_manager.h - File Management System for GUI
- * C-OS 4.0.8 alpha
+ * C-OS 4.1.0
  * 
  * Separated file operations from GUI core
  */

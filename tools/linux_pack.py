@@ -29,6 +29,7 @@ ap = argparse.ArgumentParser()
 ap.add_argument("src"); ap.add_argument("out")
 ap.add_argument("--name", default="firefox"); ap.add_argument("--title", default="Firefox"); ap.add_argument("--version", default="1")
 ap.add_argument("--skip", action="append", default=[], help="another path prefix (relative to SRC) to leave out"); ap.add_argument("--keep", action="append", default=[], help="a path prefix of PACK_SKIP to keep after all")
+ap.add_argument("--overlay", action="append", default=[], help="DIR:PREFIX - also puts the files of DIR into the pack under PREFIX (relative to the root, e.g. the pre-warmed Firefox profile as root)")
 ap.add_argument("--dry-run", action="store_true", help="only print what would go in, by top-level directory"); ap.add_argument("--level", type=int, default=9)
 a = ap.parse_args()
 src = os.path.abspath(a.src)
@@ -54,13 +55,30 @@ for root, dirs, files in os.walk(src, followlinks=False):
         low = r.lower()
         if low in seen_lower: skipped.append((r, "differs only in case from " + seen_lower[low])); continue
         seen_lower[low] = r
-        if os.path.islink(full): manifest.append("L\t/%s\t%s" % (r, os.readlink(full))); continue
+        if os.path.islink(full):
+            if r == "etc/resolv.conf": continue                       # a link to /run/systemd/resolve/..., which the pack does not carry: a real file goes in below
+            manifest.append("L\t/%s\t%s" % (r, os.readlink(full))); continue
         if not os.path.isfile(full): continue
         try: st = os.stat(full)
         except OSError: continue
         if st.st_size >= 4 * 1024 ** 3: skipped.append((r, "4 GiB or more")); continue
         if st.st_mode & 0o111: manifest.append("X\t/%s" % r)
         entries.append((r.replace(os.sep, "/"), full, st.st_size))
+import tempfile
+_dns = tempfile.mkdtemp(prefix="cospack-dns."); os.makedirs(os.path.join(_dns, "etc"))
+open(os.path.join(_dns, "etc", "resolv.conf"), "w").write("# C-OS replaces this with the name server it learnt by DHCP when a program opens it (docs/LINUX_COMPAT.md)\nnameserver 8.8.8.8\nnameserver 1.1.1.1\noptions timeout:2 attempts:2\n")
+a.overlay = a.overlay + [_dns + ":"]
+for spec in a.overlay:                                   # files that are not in SRC (a prepared profile, caches): the same rules, any name allowed on FAT
+    odir, prefix = spec.rsplit(":", 1); odir = os.path.abspath(odir)
+    for root, dirs, files in os.walk(odir):
+        dirs.sort()
+        for f in sorted(files):
+            full = os.path.join(root, f); r = ((prefix.strip("/") + "/" if prefix.strip("/") else "") + os.path.relpath(full, odir)).replace(os.sep, "/")
+            if any(ch in BAD for ch in f) or f.endswith(".") or f.endswith(" "): skipped.append((r, "name not allowed on FAT")); continue
+            if os.path.islink(full) or not os.path.isfile(full): continue
+            st = os.stat(full)
+            if st.st_mode & 0o111: manifest.append("X\t/%s" % r)
+            entries.append((r, full, st.st_size))
 total = sum(e[2] for e in entries)
 if a.dry_run:
     by = {}

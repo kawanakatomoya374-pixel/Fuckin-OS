@@ -333,6 +333,8 @@ extern int jpeg_viewer_decode_file_to_rgb(const char *filename, uint32_t *out, u
 #define SYS_WIN2_CLOSE     185   /* (handle) */
 #define SYS_WIN2_SCREEN    186   /* (int32_t out[2]) -> screen width/height */
 #define SYS_WIN2_INPUT     251   /* (handle, cos_win_input_t *out) -> 0 / -1: keys down, pointer motion since the last call, focus */
+#define SYS_TIME_US        261   /* () -> microseconds since boot (TSC based; monotonic) */
+#define SYS_LXSHM_MAP      260   /* (name of a /dev/shm object, uint64_t *size_out) -> user address of the Linux shared memory object (the Xvfb screen), or 0 */
 #define SYS_FILE_DROP      255   /* (path, copy) -> 0 / -1: drop a file at the pointer: onto the app window under it (COS_EV_DROP) or onto the desktop */
 #define SYS_DRAG_GHOST     256   /* (label or 0) -> 0: show / hide a file-drag label that follows the pointer */
 #define SYS_WIN2_RESIZE    254   /* (handle, w | h << 32, cos_win_info_t *out) -> 0 / -1: replace the pixel surface by one of another size (same address) */
@@ -1033,7 +1035,7 @@ static uint32_t cos_syscall_needs(uint64_t nr, const struct regs *r)
     switch (nr) {
     case SYS_WRITE: case SYS_EXIT: case SYS_BRK: case SYS_SBRK: case SYS_YIELD: case SYS_SLEEP_MS: case SYS_GETPID:
     case SYS_WAITPID: case SYS_SIGACTION: case SYS_SIGRETURN: case SYS_MMAP: case SYS_MUNMAP: case SYS_MPROTECT:
-    case SYS_THREAD_CREATE: case SYS_THREAD_EXIT: case SYS_THREAD_JOIN: case SYS_TIME_MS: case SYS_TIME_UNIX:
+    case SYS_THREAD_CREATE: case SYS_THREAD_EXIT: case SYS_THREAD_JOIN: case SYS_TIME_MS: case SYS_TIME_US: case SYS_TIME_UNIX:
     case SYS_SET_TLS: case SYS_GET_TLS: case SYS_FUTEX_WAIT: case SYS_FUTEX_WAKE: case SYS_GETTID: case SYS_GETCPU: case SYS_RTC_NOW:
     case SYS_NET_AVAILABLE: case SYS_SANDBOX: case SYS_FS_GENERATION:
         return 0;
@@ -1064,6 +1066,7 @@ static uint32_t cos_syscall_needs(uint64_t nr, const struct regs *r)
     case SYS_SETTINGS_ACTION:                                        /* actions 1..3 are sleep / restart / shut down; 5 opens a terminal (a program launcher) */
         if (r->rdi >= 1 && r->rdi <= 3) return COS_CAP_POWER;
         if (r->rdi == 5) return COS_CAP_SETTINGS | COS_CAP_SPAWN;
+        if (r->rdi >= 7 && r->rdi <= 9) return COS_CAP_SETTINGS | COS_CAP_POWER;   /* ask for a format of the data volume (done at the next start) / cancel it */
         return COS_CAP_SETTINGS;
     case SYS_PASSWORD_CHANGE:
         return COS_CAP_ACCOUNT;
@@ -1082,7 +1085,7 @@ static uint32_t cos_syscall_needs(uint64_t nr, const struct regs *r)
     case SYS_WIN2_SET_TITLE: case SYS_WIN2_CLOSE: case SYS_WIN2_SCREEN: case SYS_WIN2_GET_PATH: case SYS_WIN2_VIDEO:
     case SYS_WIN2_VIDEO_YUV420: case SYS_WIN2_VIDEO_MAP: case SYS_WIN2_VIDEO_COMMIT: case SYS_WIN2_PRESENT_RECTS:
     case SYS_WIN2_INPUT: case SYS_WIN2_GRAB: case SYS_WIN2_FULLSCREEN: case SYS_WIN2_RESIZE: case SYS_FILE_DROP: case SYS_DRAG_GHOST:
-    case SYS_UI_PREFS: case SYS_CLIP_SET: case SYS_CLIP_GET: case SYS_IMAGE_DECODE:
+    case SYS_LXSHM_MAP: case SYS_UI_PREFS: case SYS_CLIP_SET: case SYS_CLIP_GET: case SYS_IMAGE_DECODE:
         return COS_CAP_WINDOW;
     default:
         { extern uint32_t cos_kmod_syscall_caps(uint64_t nr); if (nr >= 0x1000 && nr < 0x1040) return cos_kmod_syscall_caps(nr); }      /* a call a kernel module provides: its own capability list */
@@ -2416,6 +2419,9 @@ static void syscall_handler_impl(struct regs* r) {
                 if (!r->rsi || r->rdx < 1024 || r->rdx > (64ull << 20) || !paging_user_range_ok(r->rsi, r->rdx, false)) { r->rax = (uint64_t)-1; break; }
                 char why[96];
                 r->rax = (uint64_t)(int64_t)cos_bootupd_install((const uint8_t *)(uintptr_t)r->rsi, (size_t)r->rdx, why, sizeof why);
+            } else if (r->rdi == 3) {                              /* forget the serial of a failed start (cosupdate reinstall) */
+                extern int cos_bootupd_clear_bad(void);
+                r->rax = (uint64_t)(int64_t)cos_bootupd_clear_bad();
             } else if (r->rdi == 2) {                              /* the reason of the last install */
                 extern const char *cos_bootupd_last_why(void);
                 if (!r->rsi || !paging_user_range_ok(r->rsi, 96, true)) { r->rax = (uint64_t)-1; break; }
@@ -2540,6 +2546,12 @@ static void syscall_handler_impl(struct regs* r) {
             ksi.cpus_bios = bi.num_cpus;
             ksi.has_apic = bi.has_apic;
             ksi.has_acpi = bi.has_acpi;
+            {   /* the battery (ACPI) rides in `reserved` so the structure keeps its size for programs built before: bit 0 present, bit 1 charging, bits 8..15 percent, bits 16..31 minutes left */
+                extern uint64_t acpi_power_get_battery_percent(void); extern bool acpi_power_is_available(void); extern bool acpi_power_is_charging(void); extern uint64_t acpi_power_get_estimated_minutes_remaining(void);
+                uint64_t pct = acpi_power_get_battery_percent(), mins = acpi_power_get_estimated_minutes_remaining();
+                if (pct > 100) pct = 100; if (mins > 65535) mins = 65535;
+                ksi.reserved = (acpi_power_is_available() ? 1u : 0u) | (acpi_power_is_charging() ? 2u : 0u) | ((uint32_t)pct << 8) | ((uint32_t)mins << 16);
+            }
             memcpy(ksi.cpu_vendor, bi.cpu_vendor, sizeof(ksi.cpu_vendor) - 1);
             memcpy(ksi.bios_vendor, bi.bios_vendor, sizeof(ksi.bios_vendor) - 1);
             memcpy(ksi.bios_version, bi.bios_version, sizeof(ksi.bios_version) - 1);
@@ -2561,6 +2573,14 @@ static void syscall_handler_impl(struct regs* r) {
             int cnt = process_snapshot(kpl, (int)n);
             memcpy((void *)(uintptr_t)r->rdi, kpl, (size_t)cnt * sizeof(cos_procinfo_t));
             r->rax = (uint64_t)cnt;
+            break;
+        }
+        case SYS_LXSHM_MAP: {
+            extern uint64_t cos_linux_shm_map(const char *name, uint64_t *size_out);
+            char nm[64]; uint64_t sz = 0;
+            if (!r->rsi || !paging_user_range_ok(r->rsi, sizeof(uint64_t), true) || !cos_syscall_copy_path(nm, sizeof nm, r->rdi) || ({ bool sl = false; for (const char *q = nm; *q; ++q) if (*q == '/') sl = true; sl; })) { r->rax = 0; break; }
+            r->rax = cos_linux_shm_map(nm, &sz);
+            if (r->rax) *(uint64_t *)(uintptr_t)r->rsi = sz;
             break;
         }
         case SYS_WIN2_PRESENT_RECTS: {
@@ -3029,7 +3049,8 @@ static void syscall_handler_impl(struct regs* r) {
         case SYS_SETTINGS_ACTION: {
             /* Must match the COS_ACTION_* enum in userland/include/cos.h. */
             enum { ACT_POWER_SLEEP = 1, ACT_POWER_RESTART, ACT_POWER_SHUTDOWN,
-                   ACT_NET_DHCP_RENEW, ACT_OPEN_TERMINAL, ACT_SECURITY_FULL_SCAN };
+                   ACT_NET_DHCP_RENEW, ACT_OPEN_TERMINAL, ACT_SECURITY_FULL_SCAN,
+                   ACT_FS_FORMAT_FAT32, ACT_FS_FORMAT_EXFAT, ACT_FS_FORMAT_CANCEL, ACT_FS_QUERY };
             extern void gui_save_settings_snapshot(void);
             int action = (int)r->rdi;
             bool ok = true;
@@ -3060,9 +3081,16 @@ static void syscall_handler_impl(struct regs* r) {
                      * and nothing else). Accepted as a no-op rather than
                      * rejected, so the UI can show "scan started". */
                     break;
+                case ACT_FS_FORMAT_FAT32: ok = fs_format_request_set(FS_FORMAT_FAT32); break;
+                case ACT_FS_FORMAT_EXFAT: ok = fs_format_request_set(FS_FORMAT_EXFAT); break;
+                case ACT_FS_FORMAT_CANCEL: ok = fs_format_request_set(0); break;
+                case ACT_FS_QUERY:       /* the volume now (bits 0-1: 0 none, 1 FAT32, 2 exFAT) and the format asked for at the next start (bits 4-5) */
+                    r->rax = (uint64_t)((unsigned)fs_current_type() | ((unsigned)fs_format_request_get() << 4));
+                    goto settings_action_done;
                 default: ok = false; break;
             }
             r->rax = ok ? 0 : (uint64_t)-1;
+            settings_action_done:
             break;
         }
 
@@ -3245,6 +3273,8 @@ static void syscall_handler_impl(struct regs* r) {
             r->rax = timer_get_ms_exact();            /* tick count corrected by the RTC/TSC clock (timer.c): ticks are lost under load */
             break;
         }
+
+        case SYS_TIME_US: { extern uint64_t timer_get_us_exact(void); r->rax = timer_get_us_exact(); break; }
 
         case SYS_TIME_UNIX: {
             r->rax = rtc_get_seconds_since_epoch();      /* real Unix time (it used to be the time of day only) */

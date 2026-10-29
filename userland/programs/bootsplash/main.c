@@ -91,7 +91,7 @@ int main(void) {
         }
 
         splash_text(&c, cx - splash_text_width("C-OS", 6)/2, cy - 30, 6, "C-OS", TEXT, alpha);
-        splash_text(&c, cx - splash_text_width("4.0.9 ALPHA", 2)/2, cy + 30, 2, "4.0.9 ALPHA", MUTED, alpha);
+        splash_text(&c, cx - splash_text_width("4.1.0", 2)/2, cy + 30, 2, "4.1.0", MUTED, alpha);
 
         /* three softly pulsing dots beneath, a quiet "still working" cue rather than a
          * determinate progress bar this program has no real progress to report for */

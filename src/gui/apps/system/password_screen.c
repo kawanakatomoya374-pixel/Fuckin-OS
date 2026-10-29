@@ -1,6 +1,6 @@
 /**
  * password_screen.c - Password Screen Public API
- * C-OS 4.0.8 alpha
+ * C-OS 4.1.0
  *
  * NOTE: The actual login UI/logic lives in password_screen_enhanced.c,
  * which performs real password verification via storage_verify_password().

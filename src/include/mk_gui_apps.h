@@ -1,6 +1,6 @@
 /**
  * mk_gui_apps.h - Enhanced GUI Applications Header
- * C-OS 4.0.8 alpha Enhanced GUI Applications
+ * C-OS 4.1.0 Enhanced GUI Applications
  */
 #ifndef MK_GUI_APPS_H
 #define MK_GUI_APPS_H

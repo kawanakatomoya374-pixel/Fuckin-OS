@@ -245,18 +245,23 @@ int64_t cos_fd_readdir(uint64_t pid, int64_t fd, cos_dirent_t *out)
     return 1;
 }
 
+static void cos_fs_bump_generation(void);
+
 bool cos_fd_close(uint64_t pid, int64_t fd)
 {
     cos_fd_slot_t *s = cos_fd_lookup(pid, fd);
     if (!s) return false;
+    bool wrote = false;
 
     fs_lock_for_external_use();
     if (s->is_dir) {
         (void)f_closedir(&s->h.dir);
     } else {
+        wrote = (s->h.fil.flag & FA_WRITE) != 0;
         (void)f_close(&s->h.fil);
     }
     fs_unlock_for_external_use();
+    if (wrote) cos_fs_bump_generation();        /* a created or changed file: pollers (the desktop, the file manager) re-list */
 
     s->used = false;
     return true;

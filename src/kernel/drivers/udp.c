@@ -100,8 +100,10 @@ int udp_socket_pending(udp_socket_t* sock) {
     return n;
 }
 
-int udp_socket_recvfrom(udp_socket_t* sock, void* buf, size_t max_len, ip_addr_t* from4, ip6_addr_t* from6,
-                        uint16_t* from_port, int* from_v6) {
+/* peek: the datagram stays queued (MSG_PEEK). full_len: return the datagram's real length, not the number of bytes copied (MSG_TRUNC); with a zero-length
+ * buffer and both set this is how a resolver asks how large the next answer is without losing it. */
+int udp_socket_recvfrom_flags(udp_socket_t* sock, void* buf, size_t max_len, ip_addr_t* from4, ip6_addr_t* from6,
+                              uint16_t* from_port, int* from_v6, int peek, int full_len) {
     if (!sock || !sock->queue) return -1;
     udp_lock_acquire();
     if (sock->q_count == 0) { udp_lock_release(); return -1; }
@@ -112,10 +114,15 @@ int udp_socket_recvfrom(udp_socket_t* sock, void* buf, size_t max_len, ip_addr_t
     if (from6) *from6 = d->a6;
     if (from_port) *from_port = d->port;
     if (from_v6) *from_v6 = d->v6;
-    sock->q_head = (uint8_t)((sock->q_head + 1u) % UDP_QUEUE);
-    sock->q_count--;
+    int ret = (int)(full_len ? d->len : n);
+    if (!peek) { sock->q_head = (uint8_t)((sock->q_head + 1u) % UDP_QUEUE); sock->q_count--; }
     udp_lock_release();
-    return (int)n;
+    return ret;
+}
+
+int udp_socket_recvfrom(udp_socket_t* sock, void* buf, size_t max_len, ip_addr_t* from4, ip6_addr_t* from6,
+                        uint16_t* from_port, int* from_v6) {
+    return udp_socket_recvfrom_flags(sock, buf, max_len, from4, from6, from_port, from_v6, 0, 0);
 }
 
 int udp_socket_recv(udp_socket_t* sock, void* buf, size_t max_len, ip_addr_t* from) {

@@ -1,8 +1,8 @@
 /*
  * config_manager.c - Unified Configuration Management System
- * C-OS 4.0.8 alpha Configuration Management Implementation
+ * C-OS 4.1.0 Configuration Management Implementation
  * 
- * Provides centralized configuration storage and retrieval for all C-OS 4.0.8 alpha components.
+ * Provides centralized configuration storage and retrieval for all C-OS 4.1.0 components.
  * Implements persistent storage and runtime configuration management.
  */
 
@@ -348,7 +348,7 @@ int config_manager_init(void) {
     }
     
     // Add default configuration entries only when they are absent
-    if (!config_find_entry("system.name")) config_add_entry("system.name", "C-OS 4.0.8 alpha", true);
+    if (!config_find_entry("system.name")) config_add_entry("system.name", "C-OS 4.1.0", true);
     if (!config_find_entry("system.version")) config_add_entry("system.version", "4.0.7", true);
     if (!config_find_entry("system.architecture")) config_add_entry("system.architecture", "x86_64", true);
     if (!config_find_entry("system.hostname")) config_add_entry("system.hostname", "cos", true);
@@ -367,7 +367,8 @@ int config_manager_init(void) {
     if (!config_find_entry("gui.autostart_terminal")) config_add_entry("gui.autostart_terminal", "0", true);
     if (!config_find_entry("gui.autostart_file_manager")) config_add_entry("gui.autostart_file_manager", "0", true);
     if (!config_find_entry("gui.autostart_browser")) config_add_entry("gui.autostart_browser", "0", true);
-    if (!config_find_entry("gui.language")) config_add_entry("gui.language", "0", true);
+    /* 1 = Japanese: a new system starts in Japanese until the user picks English in Settings */
+    if (!config_find_entry("gui.language")) config_add_entry("gui.language", "1", true);
     if (!config_find_entry("keyboard.layout")) config_add_entry("keyboard.layout", "us", true);
     if (!config_find_entry("debug.enabled")) config_add_entry("debug.enabled", "true", true);
     

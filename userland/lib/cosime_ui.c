@@ -7,6 +7,16 @@
 static cosime *g_ime;
 static bool g_on, g_tried, g_loading;
 static void (*g_redraw)(void);
+static int g_rx, g_ry, g_rw, g_rh;                               /* where the last imeui_draw() put its popup (w = 0: nothing) */
+bool imeui_last_rect(int *x, int *y, int *w, int *h) { *x = g_rx; *y = g_ry; *w = g_rw; *h = g_rh; return g_rw > 0; }
+
+/* Ctrl+Shift+J switches Japanese input on and off in every program (Ctrl+Space and Ctrl+\ still work too). The key may arrive as 'j', 'J' or the control code 10. */
+static bool ime_toggle_key(const cos_win_event_t *ev)
+{
+    if (!(ev->mods & COS_MOD_CTRL)) return false;
+    if (ev->ascii == ' ' || ev->ascii == '\\') return true;
+    return (ev->mods & COS_MOD_SHIFT) && (ev->ascii == 'j' || ev->ascii == 'J' || ev->ascii == 10);
+}
 
 static cosime *eng(void) { if (!g_ime) g_ime = cosime_new(); return g_ime; }
 void imeui_set_redraw(void (*redraw)(void)) { g_redraw = redraw; }
@@ -34,7 +44,7 @@ static void load_dictionary(void)
 int imeui_key(const cos_win_event_t *ev, char *commit, size_t cap)
 {
     if (commit && cap) commit[0] = 0;
-    if ((ev->mods & COS_MOD_CTRL) && (ev->ascii == ' ' || ev->ascii == '\\')) { imeui_toggle(); return COSIME_CONSUMED; }
+    if (ime_toggle_key(ev)) { imeui_toggle(); return COSIME_CONSUMED; }
     if (!g_on || !g_ime) return COSIME_PASS;
     if (ev->ascii >= 'a' && ev->ascii <= 'z' && !(ev->mods & COS_MOD_CTRL)) load_dictionary();
     return cosime_key(g_ime, ev, commit, cap);
@@ -56,6 +66,7 @@ void imeui_indicator(cui_canvas *c, cui_font *f, int x, int y)
 
 void imeui_draw(cui_canvas *c, cui_font *f, int cx, int cy, int lh)
 {
+    g_rw = 0;
     if (!g_on || !g_ime) return;
     int fh = cui_font_height(f);
     if (g_loading) {
@@ -63,6 +74,7 @@ void imeui_draw(cui_canvas *c, cui_font *f, int cx, int cy, int lh)
         int w = cui_text_width(f, t) + 20, h = fh + 10, y = cy + lh + 2;
         if (cx + w > c->w) cx = c->w - w; if (cx < 0) cx = 0;
         if (y + h > c->h) y = cy - h - 2;
+        g_rx = cx; g_ry = y; g_rw = w; g_rh = h;
         cui_round_rect(c, cx, y, w, h, 7, POP_BG); cui_round_rect_outline(c, cx, y, w, h, 7, 1.0f, POP_LINE);
         cui_text(c, f, cx + 10, y + 5, t, POP_TXT);
         return;
@@ -80,6 +92,7 @@ void imeui_draw(cui_canvas *c, cui_font *f, int cx, int cy, int lh)
     int x = cx, y = cy + lh + 2;
     if (x + w > c->w - 4) x = c->w - 4 - w; if (x < 2) x = 2;
     if (y + h > c->h - 2) y = cy - h - 2; if (y < 0) y = 0;
+    g_rx = x; g_ry = y; g_rw = w; g_rh = h;
     cui_round_rect(c, x, y, w, h, 8, POP_BG); cui_round_rect_outline(c, x, y, w, h, 8, 1.0f, POP_LINE);
     int tx = x + 10, ty = y + 6;
     if (st == COSIME_CONVERTING) {                                 /* the chosen candidate of each bunsetsu; the focused one is highlighted */
@@ -109,6 +122,6 @@ int imeui_key_gated(const cos_win_event_t *ev, bool active, char *commit, size_t
 {
     if (active) return imeui_key(ev, commit, cap);
     if (commit && cap) commit[0] = 0;
-    if ((ev->mods & COS_MOD_CTRL) && (ev->ascii == ' ' || ev->ascii == '\\')) { imeui_toggle(); return COSIME_CONSUMED; }
+    if (ime_toggle_key(ev)) { imeui_toggle(); return COSIME_CONSUMED; }
     return COSIME_PASS;
 }

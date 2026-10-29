@@ -9,6 +9,8 @@ void serial_puts(const char* s);
 void serial_puthex(uint64_t val);
 void serial_putdec(uint64_t val);
 char serial_getc(void);
+int serial_is_verbose(void);
+void serial_set_verbose(int on);   /* off: hot-path chatter lines ([TASK] demand page, [PCACHE], [LOCK], ...) are dropped; on when /system/serial_verbose exists */
 
 /* Rate-limited diagnostic channel - see the long note in serial.c.
  *

@@ -317,6 +317,31 @@ int main(void) {
             y += 50;
             if (toggle(&rc, rc.x, y, 140, 32, st.dark_mode != 0, "Dark Mode: On", "Dark Mode: Off", mx, my, click)) { cos_settings_set(COS_SET_DARK_MODE, !st.dark_mode); cos_settings_get(&st); set_status(st.dark_mode ? "Dark mode enabled" : "Light mode enabled"); }
             y += 48;
+            y = section(&rc, "Linux window", y);
+            {   cos_stat_t xs; bool shm = cos_stat("/system/linuxgui_shm", &xs) == 0;      /* read by linuxgui when it starts */
+                if (toggle(&rc, rc.x, y, 330, 32, shm, "Fast display (experimental): On", "Fast display (experimental): Off", mx, my, click)) {
+                    if (shm) cos_unlink("/system/linuxgui_shm"); else cos_write_file("/system/linuxgui_shm", "1\n", 2);
+                    set_status(shm ? "Linux window: normal display (takes effect the next time it starts)" : "Linux window: fast display (takes effect the next time it starts)");
+                }
+                y += 36;
+                cui_text(&c, f_small, rc.x, y, "Shows Firefox and other Linux programs through shared memory; applies the next time the Linux window starts.", rc.muted); y += 28;
+            }
+            y = section(&rc, "Sprint font", y);
+            {   char fb[16]; ssize_t fn = cos_read_file("/system/sprint_font", fb, sizeof fb - 1); bool retro = fn >= 5 && !strncmp(fb, "retro", 5);
+                cui_text(&c, f_small, rc.x, y, "The letters of programs written in Sprint (applies the next time such a program starts).", rc.muted); y += 22;
+                if (chip(&rc, rc.x, y, 110, 32, "C-OS", !retro, true, mx, my, click)) { cos_write_file("/system/sprint_font", "cos\n", 4); set_status("Sprint font: C-OS"); }
+                if (chip(&rc, rc.x + 120, y, 110, 32, "Retro", retro, true, mx, my, click)) { cos_write_file("/system/sprint_font", "retro\n", 6); set_status("Sprint font: Retro"); }
+                y += 48;
+            }
+            y = section(&rc, "Removing apps", y);
+            {   char wb[8]; ssize_t wn = cos_read_file("/system/apps/uninstall_warnings", wb, sizeof wb - 1); int warn = wn > 0 && wb[0] >= '0' && wb[0] <= '3' ? wb[0] - '0' : 3;
+                cui_text(&c, f_small, rc.x, y, "Warnings C-OS Apps shows before it removes an app (0 = none).", rc.muted); y += 22;
+                for (int i = 0; i < 4; ++i) {
+                    char lab[4]; snprintf(lab, sizeof lab, "%d", i);
+                    if (chip(&rc, rc.x + i * 60, y, 50, 32, lab, warn == i, true, mx, my, click)) { char v[3] = { (char)('0' + i), '\n', 0 }; cos_mkdir("/system"); cos_mkdir("/system/apps"); cos_write_file("/system/apps/uninstall_warnings", v, 2); set_status("Warnings before removing an app changed"); }
+                }
+                y += 48;
+            }
             y = section(&rc, "Language", y);
             for (int i = 0; i < 2; ++i) {
                 bool sel = st.japanese == i;
@@ -360,6 +385,36 @@ int main(void) {
             y = row(&rc, "Free", buf3, y);
             char fc[16]; snprintf(fc, sizeof fc, "%d", st.file_count);
             y = row(&rc, "Files indexed", fc, y);
+            y += 12;
+            y = section(&rc, "File system", y);
+            {   static int fmt_confirm = 0;          /* 0 none, 1 FAT32, 2 exFAT: the warning is on screen */
+                int q = cos_settings_action(COS_ACTION_FS_QUERY, 0), now = q & 15, pend = (q >> 4) & 15;
+                y = row(&rc, "Now", now == 2 ? "exFAT  (no 4 GB limit on one file)" : now == 1 ? "FAT32  (one file up to 4 GB)" : "not mounted", y);
+                if (pend) {
+                    y = row(&rc, "At next start", pend == 2 ? "Format as exFAT" : "Format as FAT32", y);
+                    cui_text(&c, f_small, rc.x, y, "Everything on the data volume will be erased: your files, the Linux system and its apps.", 0xFF6B6Bu); y += 24;
+                    if (button(&rc, rc.x, y, 160, 34, "Restart now", true, mx, my, click)) cos_settings_action(COS_ACTION_POWER_RESTART, 0);
+                    if (button(&rc, rc.x + 172, y, 190, 34, "Cancel the format", false, mx, my, click)) { cos_settings_action(COS_ACTION_FS_FORMAT_CANCEL, 0); fmt_confirm = 0; set_status("The format was cancelled"); }
+                    y += 46;
+                } else if (fmt_confirm) {
+                    cui_text(&c, f_lbl, rc.x, y, fmt_confirm == 2 ? "Format the data volume as exFAT?" : "Format the data volume as FAT32?", TEXT); y += 26;
+                    cui_text(&c, f_small, rc.x, y, "Everything on it is erased: your files, the Linux system and its apps. Nothing happens until the next start,", 0xFF6B6Bu); y += 20;
+                    cui_text(&c, f_small, rc.x, y, "and until then you can cancel. Copy what you want to keep first.", 0xFF6B6Bu); y += 28;
+                    if (button(&rc, rc.x, y, 230, 34, "Yes, erase it at the next start", true, mx, my, click)) {
+                        if (cos_settings_action(fmt_confirm == 2 ? COS_ACTION_FS_FORMAT_EXFAT : COS_ACTION_FS_FORMAT_FAT32, 0) == 0) set_status("The format will be done at the next start");
+                        else set_status("The format could not be requested");
+                        fmt_confirm = 0;
+                    }
+                    if (button(&rc, rc.x + 242, y, 110, 34, "Back", false, mx, my, click)) fmt_confirm = 0;
+                    y += 46;
+                } else {
+                    if (chip(&rc, rc.x, y, 200, 34, "Format as exFAT...", false, true, mx, my, click)) fmt_confirm = 2;
+                    if (chip(&rc, rc.x + 212, y, 200, 34, "Format as FAT32...", false, true, mx, my, click)) fmt_confirm = 1;
+                    y += 46;
+                    cui_text(&c, f_small, rc.x, y, "exFAT: one file can be bigger than 4 GB, and Windows and macOS read it. FAT32: works everywhere.", MUTED); y += 20;
+                    cui_text(&c, f_small, rc.x, y, "A format erases the data volume - you are asked again before anything is erased.", MUTED);
+                }
+            }
             break;
         }
         case TAB_ABOUT: {
@@ -603,6 +658,12 @@ int main(void) {
             y += 6;
             if (button(&rc, rc.x, y, 150, 34, "Check now", false, mx, my, click)) { up_run("poll"); set_status("Checking for updates..."); }
             if (button(&rc, rc.x + 160, y, 190, 34, avail && !running ? "Install the update" : "Nothing to install", avail && !running, mx, my, click) && avail && !running) { up_run("install"); set_status("The update has started"); }
+            {   /* "download the update again": only when the newest release the server has is not what is running (a kernel update that did not take, e.g. after a restart that came too early) */
+                cos_kupd_status_t ks; char lt[200], lv[60] = ""; bool not_reflected = false;
+                if (!running && up_read("/system/update/latest.txt", lt, sizeof lt) && up_field(lt, "kernel", lv, sizeof lv) && cos_kernel_update_status(&ks) == 0 && ks.supported && !ks.trial_slot)
+                    not_reflected = (uint64_t)strtoull(lv, NULL, 10) > ks.running_serial;
+                if (button(&rc, rc.x + 360, y, 330, 34, not_reflected ? "Download the update again" : "Download again (only if not applied)", not_reflected, mx, my, click) && not_reflected) { up_run("reinstall"); set_status("Downloading the update again..."); }
+            }
             y += 52;
             y = section(&rc, "Automatic check", y);
             {   char ab[80] = ""; bool on = true; long mins = 30;

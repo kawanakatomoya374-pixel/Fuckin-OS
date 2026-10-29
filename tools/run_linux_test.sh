@@ -27,6 +27,7 @@ PYEOF
   SHOTLOOP=$!; trap 'kill $SHOTLOOP 2>/dev/null; pkill -x qemu-system-x86 2>/dev/null || true' EXIT
 fi
 MC_START=term COS_QMP="$QMP" python3 -u tools/mc_peer.py "$LOG" "$QMP" "$CMD" ${LINUX_TEST_SECS:-20}
+[ -n "${LINUX_TEST_POST:-}" ] && python3 "$LINUX_TEST_POST" "$QMP"     # LINUX_TEST_POST=script.py: runs after the command (clicks, keys through QMP), before the screendump
 [ -n "${LINUX_TEST_SHOT:-}" ] && python3 - "$QMP" "$LINUX_TEST_SHOT" <<'PYEOF'
 import socket, sys, json, time
 s = socket.socket(socket.AF_UNIX); s.connect(sys.argv[1]); s.recv(4096)

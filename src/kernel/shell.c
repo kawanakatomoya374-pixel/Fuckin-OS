@@ -1,5 +1,5 @@
 /**
- * shell.c - Advanced Shell System for C-OS 4.0.8 alpha
+ * shell.c - Advanced Shell System for C-OS 4.1.0
  */
 #include <stdbool.h>
 #include <stdint.h>
@@ -358,7 +358,7 @@ static const char* shell_translate_text(const char* s) {
         {"Current Time: ", "現在時刻: "},
         {"Current Date: 20", "現在日付: 20"},
         {"Uptime: ", "稼働時間: "},
-        {"C-OS 4.0.8 alpha (64-bit Edition)\n", "C-OS 4.0.8 alpha（64ビット版）\n"},
+        {"C-OS 4.1.0 (64-bit Edition)\n", "C-OS 4.1.0（64ビット版）\n"},
         {"ls: cannot access '", "ls: アクセスできません '"},
         {"': No such directory", "': そのようなディレクトリはありません"},
         {"Directory listing: ", "ディレクトリ一覧: "},
@@ -407,7 +407,7 @@ static const char* shell_translate_text(const char* s) {
         {"kill is disabled in this safe build.\n", "kill はこの安全版では無効です。\n"},
         {"Filesystem     Size  Used  Avail  Use%", "ファイルシステム     サイズ  使用済み  空き  使用率%"},
         {"Exiting shell...\n", "シェルを終了しています...\n"},
-        {"[SHELL] C-OS 4.0.8 alpha Shell Initialized\n", "[SHELL] C-OS 4.0.8 alpha シェルを初期化しました\n"},
+        {"[SHELL] C-OS 4.1.0 Shell Initialized\n", "[SHELL] C-OS 4.1.0 シェルを初期化しました\n"},
         {"Type help for a list of commands.\n", "help でコマンド一覧を表示できます。\n"},
         {"Unknown command: ", "不明なコマンド: "},
         {"Redirected output to ", "出力をリダイレクトしました: "},
@@ -633,6 +633,7 @@ void cmd_kill(int argc, char** argv);
 void cmd_free(int argc, char** argv);
 void cmd_df(int argc, char** argv);
 void cmd_fsck(int argc, char** argv);
+void cmd_format_data(int argc, char** argv);
 void cmd_uname(int argc, char** argv);
 void cmd_whoami(int argc, char** argv);
 void cmd_pkg(int argc, char** argv);
@@ -694,6 +695,7 @@ static shell_command_t commands[] = {
     {"kill", "Terminate a process", cmd_kill},
     {"free", "Display memory usage", cmd_free},
     {"df", "Display disk space usage", cmd_df},
+    {"format-data", "Show the data volume type; format-data exfat|fat32 --yes formats it at the next start (erases it), format-data cancel", cmd_format_data},
     {"fsck", "Check the FAT32 volume and the catalog store (fsck -r repairs)", cmd_fsck},
     {"uname", "Print system information", cmd_uname},
     {"whoami", "Print current user", cmd_whoami},
@@ -1357,7 +1359,7 @@ void cmd_sysinfo(int argc, char** argv) {
     uint64_t total = memory_get_total();
     uint64_t free_mem = memory_get_free();
     shell_print_line("System Information:");
-    shell_print("  Version: "); shell_print_line("C-OS 4.0.8 alpha");
+    shell_print("  Version: "); shell_print_line("C-OS 4.1.0");
     shell_print("  Uptime: "); shell_print_uint64(get_timer_ticks() / 1000); shell_print_line(" seconds");
     shell_print("  Memory: "); shell_print_uint64(total / 1024); shell_print(" KB total, ");
     shell_print_uint64((total - free_mem) / 1024); shell_print(" KB used, ");
@@ -1422,7 +1424,7 @@ void cmd_uptime(int argc, char** argv) {
 
 void cmd_ver(int argc, char** argv) {
     (void)argc; (void)argv;
-    shell_print("C-OS 4.0.8 alpha (64-bit Edition)\n");
+    shell_print("C-OS 4.1.0 (64-bit Edition)\n");
 }
 
 void cmd_ls(int argc, char** argv) {
@@ -1733,9 +1735,33 @@ void cmd_fsck(int argc, char** argv) {
     shell_print_line(sok ? "Catalog store is consistent." : "Catalog store has problems.");
 }
 
+static bool shell_word_is(const char* a, const char* b) { while (*a && *a == *b) { ++a; ++b; } return *a == 0 && *b == 0; }
+
+void cmd_format_data(int argc, char** argv) {
+    int now = fs_current_type(), pend = fs_format_request_get();
+    if (argc < 2) {
+        shell_print("Data volume: "); shell_print_line(now == FS_FORMAT_EXFAT ? "exFAT (one file can be bigger than 4 GB)" : now == FS_FORMAT_FAT32 ? "FAT32 (one file up to 4 GB)" : "not mounted");
+        if (pend) { shell_print("Asked for at the next start: format as "); shell_print_line(pend == FS_FORMAT_EXFAT ? "exFAT (everything is erased)" : "FAT32 (everything is erased)"); }
+        shell_print_line("Usage: format-data exfat --yes | format-data fat32 --yes | format-data cancel");
+        shell_print_line("The format erases the whole data volume (files, the Linux system and its apps) and is done at the next start; 'format-data cancel' takes it back.");
+        return;
+    }
+    if (shell_word_is(argv[1], "cancel")) { fs_format_request_set(0); shell_print_line("The format request was cancelled."); return; }
+    int type = shell_word_is(argv[1], "exfat") ? FS_FORMAT_EXFAT : shell_word_is(argv[1], "fat32") ? FS_FORMAT_FAT32 : 0;
+    if (!type) { shell_print_line("format-data: expected exfat, fat32 or cancel"); return; }
+    if (argc < 3 || !shell_word_is(argv[2], "--yes")) {
+        shell_print_line("This erases the whole data volume (your files, the Linux system and its apps) at the next start.");
+        shell_print("To go on, type: format-data "); shell_print(argv[1]); shell_print_line(" --yes");
+        return;
+    }
+    if (!fs_format_request_set(type)) { shell_print_line("format-data: the request could not be saved."); return; }
+    shell_print("The data volume will be formatted as "); shell_print(type == FS_FORMAT_EXFAT ? "exFAT" : "FAT32");
+    shell_print_line(" at the next start. Type 'reboot' to do it now, or 'format-data cancel' to take it back.");
+}
+
 void cmd_uname(int argc, char** argv) {
     (void)argc; (void)argv;
-    shell_print("C-OS 4.0.8 alpha x86_64\n");
+    shell_print("C-OS 4.1.0 x86_64\n");
 }
 
 void cmd_whoami(int argc, char** argv) {
@@ -1752,7 +1778,7 @@ void cmd_exit(int argc, char** argv) {
 void shell_init(void) {
     shell_cwd[0] = '/';
     shell_cwd[1] = '\0';
-    shell_print("[SHELL] C-OS 4.0.8 alpha Shell Initialized\n");
+    shell_print("[SHELL] C-OS 4.1.0 Shell Initialized\n");
     shell_print("Type help for a list of commands.\n");
     shell_print_prompt();
 }

@@ -34,7 +34,7 @@ int main(int argc, char** argv) {
     puts("This program was compiled inside C-OS");
     puts("using the TinyCC compiler.");
     puts("");
-    puts("C-OS Version: 4.0.8 alpha");
+    puts("C-OS Version: 4.1.0");
     puts("Compiler: TinyCC 0.9.27");
     puts("");
     

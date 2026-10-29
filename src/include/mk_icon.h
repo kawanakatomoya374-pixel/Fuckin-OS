@@ -1,6 +1,6 @@
 /**
  * mk_icon.h - Advanced Icon System Header
- * C-OS 4.0.8 alpha Advanced Icon Manager
+ * C-OS 4.1.0 Advanced Icon Manager
  */
 #ifndef MK_ICON_H
 #define MK_ICON_H

@@ -41,7 +41,9 @@ extern bool cos_webp_decode(const uint8_t* data, uint64_t size, uint8_t* out_bgr
 /* Same reasoning as cos_ns_jpeg_decode_scratch in cos_netsurf_jpeg.c:
  * decode to bounded BSS first, then copy into an exactly-sized NetSurf
  * bitmap so the plotter's bitmap stride always equals the image width. */
-static uint8_t cos_ns_webp_decode_scratch[COS_NS_WEBP_SCRATCH_BYTES];
+/* The decode area (about 8 MiB) is allocated for the length of one decode and given back: a static array of this size sat in the kernel image, reserved from the first byte. */
+static uint8_t *cos_ns_webp_decode_scratch;
+static bool cos_ns_webp_data_complete_inner(struct content *c);
 
 typedef struct cos_ns_webp_content {
     struct content base;
@@ -79,7 +81,7 @@ static bool cos_ns_webp_process_data(struct content *c, const char *data,
     return true;
 }
 
-static bool cos_ns_webp_data_complete(struct content *c)
+static bool cos_ns_webp_data_complete_inner(struct content *c)
 {
     cos_ns_webp_content *webp = (cos_ns_webp_content *)c;
     size_t source_size = 0;
@@ -187,6 +189,20 @@ static bool cos_ns_webp_is_opaque(struct content *c)
 static content_type cos_ns_webp_type(void)
 {
     return CONTENT_IMAGE;
+}
+
+static bool cos_ns_webp_data_complete(struct content *c)
+{
+    cos_ns_webp_decode_scratch = malloc(COS_NS_WEBP_SCRATCH_BYTES);
+    if (cos_ns_webp_decode_scratch == NULL) {
+        content_broadcast_error(c, NSERROR_NOMEM, "WebP decode memory unavailable");
+        content_set_error(c);
+        return false;
+    }
+    bool ok = cos_ns_webp_data_complete_inner(c);
+    free(cos_ns_webp_decode_scratch);
+    cos_ns_webp_decode_scratch = NULL;
+    return ok;
 }
 
 static const content_handler cos_ns_webp_handler = {

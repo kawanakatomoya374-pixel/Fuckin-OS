@@ -1,5 +1,5 @@
 /**
- * Memory compatibility helpers - C-OS 4.0.8 alpha
+ * Memory compatibility helpers - C-OS 4.1.0
  *
  * This file keeps compiler/runtime glue minimal and logs when the fallback
  * path is exercised.

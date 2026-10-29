@@ -148,6 +148,7 @@ void cos_app_window_release_for_pid(uint32_t pid);
 #define COS_EV_OPEN        7   /* the OS asks the app to open a file; fetch it with cos_win2_get_path() */
 #define COS_EV_SHELL_SHOW  9   /* shell layer 2 (start menu) was opened */
 #define COS_EV_SHELL_HIDE  10  /* ... and closed by the compositor */
+#define COS_EV_RESIZE      11  /* the client area of the window changed: x, y = its new width and height; cos_win2_resize() to the same size to draw at 1:1 */
 #define COS_EV_DROP        8   /* a file was dropped on the window at x,y; path via cos_win2_get_path() */
 typedef struct {
     uint32_t type;

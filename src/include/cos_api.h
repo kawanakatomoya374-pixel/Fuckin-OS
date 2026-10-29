@@ -4,7 +4,7 @@
 #include "types.h"
 #include "module_interface.h"
 
-/* C-OS 4.0.8 alpha Unified API System
+/* C-OS 4.1.0 Unified API System
  * Provides standardized interface for all OS components
  */
 

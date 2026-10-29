@@ -11,6 +11,7 @@
 #include "task.h"
 #include "memory.h"
 #include "serial.h"
+#include <string.h>
 
 /* Returns the wait_queue_t behind an opaque pointer, lazily allocating
  * it on first use. Centralized here so mutex_init()/sem_init() (which
@@ -65,7 +66,46 @@ static volatile int      g_kernel_lock = 0;
 static volatile uint32_t g_kernel_lock_owner = 0xFFFFFFFFu;   /* APIC ID, valid only while locked */
 static volatile uint32_t g_kernel_lock_depth = 0;
 
-static inline uint32_t sync_apic_id(void) { return cpu_id(); }   /* the lock owner is named by the CPU number (TR selector): cpuid would be a VM exit each time */
+static inline uint32_t sync_apic_id(void) { return cpu_id(); }
+
+/* ---- a profile of the kernel lock: which call sites hold it, for how long, and how long the others waited for it ----------------------------------------------------------
+ * Every sync_irq_save() of the outermost level adds the cycles it waited and the cycles it held the lock to a small table keyed by the return address of the caller
+ * (symbolize it with addr2line on the kernel image of the same build). sync_lock_report() prints the busiest sites and the share of the time the lock was held, then clears the table. */
+#define LP_SLOTS 64
+typedef struct { uint64_t site, count, hold, wait; } lp_slot_t;
+static lp_slot_t lp_tab[LP_SLOTS];
+static uint64_t lp_acq_tsc, lp_site, lp_wait, lp_since_tsc, lp_total_hold, lp_total_wait, lp_total_count;
+static inline uint64_t lp_tsc(void) { uint32_t lo, hi; __asm__ volatile("rdtsc" : "=a"(lo), "=d"(hi)); return ((uint64_t)hi << 32) | lo; }
+static void lp_account(uint64_t site, uint64_t hold, uint64_t wait) {
+    uint32_t h = (uint32_t)((site >> 3) * 2654435761u) % LP_SLOTS;
+    for (uint32_t i = 0; i < LP_SLOTS; ++i) {
+        uint32_t k = (h + i) % LP_SLOTS;
+        if (lp_tab[k].site == site || lp_tab[k].site == 0) { lp_tab[k].site = site; lp_tab[k].count++; lp_tab[k].hold += hold; lp_tab[k].wait += wait; break; }
+    }
+    lp_total_hold += hold; lp_total_wait += wait; lp_total_count++;
+}
+/* the caller (that holds the lock) names what it is doing: a Linux system call, a page fault, an interrupt: the profile then says "system call 9" instead of an address */
+void sync_lock_set_site(uint64_t site) {
+    if (g_kernel_lock && g_kernel_lock_owner == sync_apic_id()) lp_site = site;
+}
+void sync_lock_report(void) {
+    uint64_t f = sync_irq_save();
+    uint64_t now = lp_tsc(), span = now - lp_since_tsc;
+    uint64_t th = lp_total_hold, tw = lp_total_wait, tc = lp_total_count;
+    lp_slot_t top[6]; int nt = 0;
+    for (int r = 0; r < 6; ++r) {
+        int best = -1; uint64_t bv = 0;
+        for (int i = 0; i < LP_SLOTS; ++i) if (lp_tab[i].site && lp_tab[i].hold + lp_tab[i].wait > bv) { bv = lp_tab[i].hold + lp_tab[i].wait; best = i; }
+        if (best < 0) break;
+        top[nt++] = lp_tab[best]; lp_tab[best].hold = lp_tab[best].wait = 0; lp_tab[best].count = 0; lp_tab[best].site = ~0ull;      /* taken out of this report (site ~0 never matches) */
+    }
+    memset(lp_tab, 0, sizeof lp_tab); lp_total_hold = lp_total_wait = lp_total_count = 0; lp_since_tsc = now;
+    sync_irq_restore(f);
+    serial_puts("[LOCK] kernel lock: "); serial_putdec(tc); serial_puts(" acquisitions, held "); serial_putdec(span ? th * 100 / span : 0); serial_puts("% of the time, waited "); serial_putdec(span ? tw * 100 / span : 0);
+    serial_puts("% (summed over CPUs); busiest callers (return address: acquisitions, Mcycles held/waited):");
+    for (int i = 0; i < nt; ++i) { serial_puts(" 0x"); serial_puthex(top[i].site); serial_puts(": "); serial_putdec(top[i].count); serial_puts(", "); serial_putdec(top[i].hold >> 20); serial_puts("/"); serial_putdec(top[i].wait >> 20); serial_puts(";"); }
+    serial_puts("\n");
+}   /* the lock owner is named by the CPU number (TR selector): cpuid would be a VM exit each time */
 
 uint64_t sync_irq_save(void) {
     uint64_t flags;
@@ -87,6 +127,7 @@ uint64_t sync_irq_save(void) {
         ++g_kernel_lock_depth;
         return flags;
     }
+    uint64_t t_wait0 = lp_tsc();
     while (__sync_lock_test_and_set(&g_kernel_lock, 1)) {
         while (g_kernel_lock) {
             __asm__ volatile("pause" ::: "memory");
@@ -95,6 +136,7 @@ uint64_t sync_irq_save(void) {
     }
     g_kernel_lock_owner = me;
     g_kernel_lock_depth = 1;
+    lp_site = (uint64_t)(uintptr_t)__builtin_return_address(0); lp_acq_tsc = lp_tsc(); lp_wait = lp_acq_tsc - t_wait0;
     return flags;
 }
 
@@ -102,6 +144,7 @@ void sync_irq_restore(uint64_t flags) {
     if (g_kernel_lock_depth > 1) {
         --g_kernel_lock_depth;
     } else {
+        lp_account(lp_site, lp_tsc() - lp_acq_tsc, lp_wait);
         g_kernel_lock_depth = 0;
         g_kernel_lock_owner = 0xFFFFFFFFu;
         __sync_lock_release(&g_kernel_lock);
@@ -185,6 +228,7 @@ uint32_t sync_kernel_lock_depth(void) {
 uint32_t sync_kernel_lock_release_for_switch(void) {
     if (!(g_kernel_lock && g_kernel_lock_owner == sync_apic_id())) return 0;      /* not ours: never release another CPU's lock */
     uint32_t saved = g_kernel_lock_depth;
+    lp_account(lp_site, lp_tsc() - lp_acq_tsc, lp_wait);
     g_kernel_lock_depth = 0;
     g_kernel_lock_owner = 0xFFFFFFFFu;
     __sync_lock_release(&g_kernel_lock);
@@ -193,6 +237,7 @@ uint32_t sync_kernel_lock_release_for_switch(void) {
 void sync_kernel_lock_reacquire_after_switch(uint32_t saved_depth) {
     if (saved_depth == 0) return;
     uint32_t me = sync_apic_id();
+    uint64_t t_wait0 = lp_tsc();
     while (__sync_lock_test_and_set(&g_kernel_lock, 1)) {
         while (g_kernel_lock) {
             __asm__ volatile("pause" ::: "memory");
@@ -201,6 +246,7 @@ void sync_kernel_lock_reacquire_after_switch(uint32_t saved_depth) {
     }
     g_kernel_lock_owner = me;
     g_kernel_lock_depth = saved_depth;
+    lp_site = 1; lp_acq_tsc = lp_tsc(); lp_wait = lp_acq_tsc - t_wait0;          /* site 1: the lock taken again after a thread switch */
 }
 
 

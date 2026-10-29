@@ -1,4 +1,3 @@
-float asinf(float x);
 /* r3d.c - software renderer for the C-OS port of Craft. See r3d.h.
  *
  * Pipeline: vertices -> clip space (Craft's matrix) -> reject / back-face cull -> shade per vertex (the vertex shader's job:
@@ -11,6 +10,8 @@ float asinf(float x);
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#define acosf(x) ((float)acos(x))
+#define asinf(x) ((float)asin(x))
 #include <xmmintrin.h>
 #include <emmintrin.h>
 #include "cos.h"

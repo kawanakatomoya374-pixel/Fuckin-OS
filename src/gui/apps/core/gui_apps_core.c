@@ -1,5 +1,5 @@
 /**
- * gui_apps_core.c - C-OS 4.0.8 alpha GUI Apps (分割ファイル)
+ * gui_apps_core.c - C-OS 4.1.0 GUI Apps (分割ファイル)
  * デスクトップアイコン・クリップボード・ファイルマネージャ(コア)
  *
  * 元は単一の gui_apps.c (11,638行) に含まれていたコードを、
@@ -437,7 +437,10 @@ void gui_refresh_desktop_icons(void) {
         if (entries[i].name[0] == '\0') continue;
         if (entries[i].is_hidden || entries[i].is_system) continue;
 
-        const char* fullpath = entries[i].path[0] ? entries[i].path : NULL;
+        /* fs_entry_t::path is the PARENT directory; the icon needs the file's own path */
+        char fullbuf[128];
+        snprintf(fullbuf, sizeof(fullbuf), "%s/%s", entries[i].path[0] ? entries[i].path : "/desktop", entries[i].name);
+        const char* fullpath = fullbuf;
         int found = -1;
         for (int j = 0; j < desktop_icon_count; ++j) {
             if (!desktop_icons[j].is_dynamic) continue;
@@ -451,6 +454,13 @@ void gui_refresh_desktop_icons(void) {
         memset(&ic, 0, sizeof(ic));
         copy_cstr_local(ic.path, sizeof(ic.path), fullpath ? fullpath : "");
         copy_cstr_local(ic.label, sizeof(ic.label), entries[i].name);
+        if (!entries[i].is_dir && fm_is_app_shortcut(entries[i].name)) {
+            char nm[32], ex[8];
+            nm[0] = '\0';
+            (void)gui_app_shortcut_read(fullpath ? fullpath : "", nm, sizeof(nm), ex, sizeof(ex), NULL, 0);
+            if (nm[0]) copy_cstr_local(ic.label, sizeof(ic.label), nm);
+            else { size_t l = strlen(ic.label); if (l > 4) ic.label[l - 4] = '\0'; }
+        }
         ic.win_kind = desktop_icon_guess_kind(fullpath ? fullpath : entries[i].name, entries[i].name, !entries[i].is_dir);
         ic.selected = false;
         ic.anim = 0;
@@ -821,8 +831,43 @@ void gui_init_desktop_icons(void) {
     g_desktop_layout_dirty = false;
 }
 
+static uint64_t desktop_list_hash(void) {
+    uint64_t h = 1469598103934665603ull;
+    fs_entry_t* es = fs_list_dir("/desktop");
+    int n = fs_entry_count_for_path("/desktop");
+    for (int i = 0; es && i < n; ++i) {
+        for (const char* c = es[i].name; *c; ++c) h = (h ^ (uint8_t)*c) * 1099511628211ull;
+        h = (h ^ es[i].size) * 1099511628211ull;
+    }
+    return h;
+}
+
 void gui_process_pending_desktop_layout_load(void) {
-     /* Disabled by default to avoid scanning /desktop during startup. */
+    /* Once, shortly after boot: show what is in /desktop (".app" shortcuts
+     * installed by apps, files the user dropped there). */
+    static bool s_first_scan_done = false;
+    static uint64_t s_list_hash_init = 0;
+    if (!s_first_scan_done && get_timer_ticks() >= 4000u) {
+        s_first_scan_done = true;
+        gui_refresh_desktop_icons();
+        s_list_hash_init = desktop_list_hash();
+    }
+    /* Something wrote to the disk (an app install put a shortcut on the desktop, a file was dropped in): look at /desktop again,
+     * at most once a second, and only rebuild the icons when its listing really changed. */
+    extern uint64_t cos_fs_generation(void);
+    static uint64_t s_gen_seen = 0, s_next_check = 0;
+    if (s_first_scan_done && get_timer_ticks() >= s_next_check) {
+        s_next_check = get_timer_ticks() + 1000u;
+        uint64_t g = cos_fs_generation();
+        if (g != s_gen_seen) {
+            s_gen_seen = g;
+            uint64_t h = desktop_list_hash();
+            if (h != s_list_hash_init) {
+                s_list_hash_init = h;
+                gui_refresh_desktop_icons();
+            }
+        }
+    }
     (void)g_desktop_layout_load_pending;
     (void)g_desktop_layout_load_after_frame;
 }

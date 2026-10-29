@@ -1,6 +1,6 @@
 /**
  * driver_api.h - Unified Driver API
- * C-OS 4.0.8 alpha Driver Interface
+ * C-OS 4.1.0 Driver Interface
  * 
  * Provides unified driver interface for all device types.
  * Drivers implement these operations and register with driver manager.

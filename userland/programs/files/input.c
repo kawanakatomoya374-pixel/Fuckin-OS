@@ -190,6 +190,8 @@ void do_action(int a) {
         case A_GO_ROOT: go("/"); break; case A_GO_STUDIO: go("/C-OS Studio"); break; case A_GO_DESKTOP: go("/desktop"); break;
         case A_GO_DOCS: go("/documents"); break; case A_GO_MUSIC: go("/music"); break; case A_GO_PICTURES: go("/pictures"); break;
         case A_GO_DOWNLOADS: go("/downloads"); break; case A_GO_BIN: go("/bin"); break;
+        case A_COMPRESS_ZIP: case A_COMPRESS_TAR: case A_COMPRESS_TGZ: case A_COMPRESS_GZ: arc_compress(a); break;
+        case A_EXTRACT_HERE: case A_EXTRACT_TO: { int vi = first_selected(); if (vi >= 0) arc_extract(vi, a == A_EXTRACT_TO); break; }
         case A_ABOUT: open_dialog(D_ABOUT); break;
         case A_PLUGINS: fplug_refresh(); open_dialog(D_PLUGINS); break;
         default: if (a >= A_PLUGIN_BASE && a < A_PLUGIN_BASE + fplug_action_slots()) fplug_run_action(a - A_PLUGIN_BASE); break;
@@ -200,7 +202,8 @@ void do_action(int a) {
 static void ctx_exec(int a) {
     int t = G.ctx_target, kind = G.ctx_kind;
     { cos_puts("[CTXMENU] chose action="); char b[12]; snprintf(b, sizeof b, "%d", a); cos_puts(b); cos_puts("\n"); }
-    G.ctx_open = false;
+    if (a == A_COMPRESS_MENU) { G.ctx_sub = 1; G.dirty = true; return; }               /* a click on "Compress >" only opens its submenu */
+    G.ctx_open = false; G.ctx_sub = 0;
     if (kind == 2 && t >= 0 && t < G.nmarks) {
         if (a == A_OPEN) go(G.marks[t].path); else if (a == A_REMOVE_MARK) marks_remove(t); else if (a == A_NEW_WINDOW) do_action(a);
         return;
@@ -240,7 +243,7 @@ static void dlg_accept(int id) {
             if (id == 3) job_answer(1, G.dlg_all); else if (id == 4) job_answer(2, G.dlg_all); else if (id == 5) job_answer(3, G.dlg_all);
             else if (id == 2) job_cancel();
             break;
-        case D_PROGRESS: if (id == 2) job_cancel(); break;
+        case D_PROGRESS: if (id == 2) { if (G.arc.active) arc_cancel(); else job_cancel(); } break;
         case D_PROPS:
             if (id == 10 || id == 11) {
                 uint8_t bit = (id == 10) ? COS_ATTR_RDONLY : COS_ATTR_HIDDEN;
@@ -269,7 +272,7 @@ static void dlg_key(const cos_win_event_t *ev) {
         edit_dlg_text(ev);
         return;
     }
-    if (ev->special == COS_KEY_ESC) { if (G.dlg == D_PROGRESS || G.dlg == D_CONFLICT) job_cancel(); else dlg_close(); return; }
+    if (ev->special == COS_KEY_ESC) { if (G.dlg == D_PROGRESS && G.arc.active) arc_cancel(); else if (G.dlg == D_PROGRESS || G.dlg == D_CONFLICT) job_cancel(); else dlg_close(); return; }
     if (ev->special == COS_KEY_ENTER) { if (G.dlg == D_CONFLICT) dlg_accept(3); else if (G.dlg != D_PROGRESS) dlg_accept(1); return; }
     if (G.dlg == D_CONFLICT && ev->special == COS_KEY_NONE) {
         char c = (char)(ev->ascii | 32);
@@ -322,7 +325,7 @@ static void key_event(const cos_win_event_t *ev) {
         if (ir & COSIME_CONSUMED) return;
     }
     if (G.dlg) { dlg_key(ev); return; }
-    if (G.menu_open >= 0 || G.ctx_open) { if (ev->special == COS_KEY_ESC) { G.menu_open = -1; G.ctx_open = false; } else if (G.ctx_open) { int ca = ctx_key_nav(ev->special); if (ca > 0) ctx_exec(ca); } return; }
+    if (G.menu_open >= 0 || G.ctx_open) { if (ev->special == COS_KEY_ESC && G.ctx_open && G.ctx_sub) { G.ctx_sub = 0; G.ctx_sub_hover = -1; G.dirty = true; } else if (ev->special == COS_KEY_ESC) { G.menu_open = -1; G.ctx_open = false; } else if (G.ctx_open) { int ca = ctx_key_nav(ev->special); if (ca > 0) ctx_exec(ca); } return; }
 
     if (G.addr_edit) {
         if (ev->special == COS_KEY_ESC) { G.addr_edit = false; return; }
@@ -492,7 +495,7 @@ static void mouse_down(const cos_win_event_t *ev) {
         if (right) {
             if (vi >= 0) { if (!ent_at(vi)->sel) sel_set_only(vi); G.focus = vi; G.ctx_kind = 0; }
             else { sel_clear(); G.ctx_kind = 1; }
-            G.ctx_open = true; G.ctx_x = x; G.ctx_y = y; G.ctx_hover = -1; G.ctx_target = vi;
+            G.ctx_open = true; G.ctx_sub = 0; G.ctx_sub_hover = -1; G.ctx_x = x; G.ctx_y = y; G.ctx_hover = -1; G.ctx_target = vi;
             return;
         }
         if (vi >= 0) {

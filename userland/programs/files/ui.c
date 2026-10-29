@@ -16,7 +16,7 @@ static uint32_t kind_color(int k) {
     switch (k) {
         case K_FOLDER: return 0xF5A623; case K_IMAGE: return 0x34A853; case K_AUDIO: return 0xEA4335; case K_VIDEO: return 0xFBBC04;
         case K_CODE: return 0x4285F4; case K_ARCHIVE: return 0x9E3AB5; case K_EXEC: return 0x3B4A6B; case K_TEXT: return 0x7B8794;
-        case K_DOC: return 0x1A73E8; default: return 0x9AA3B2;
+        case K_DOC: return 0x1A73E8; case K_ZIP: return 0xF2994A; case K_TAR: return 0x8D6E63; case K_GZ: return 0x2D9CDB; default: return 0x9AA3B2;
     }
 }
 
@@ -123,6 +123,22 @@ void draw_icon(int kind, int x, int y, int s) {
         case K_ARCHIVE:
             for (int i = 0; i < 5; ++i) cui_fill(C, cx - pw / 12 + ((i & 1) ? pw / 12 : 0), top + i * (bot - top) / 5, pw / 12 + 1, (bot - top) / 8 + 1, ink);
             break;
+        case K_ZIP: {                                              /* a zipper: teeth down the middle, a pull tab at the top */
+            for (int i = 0; i < 6; ++i) cui_fill(C, cx - pw / 10 + ((i & 1) ? pw / 10 : 0), top + (bot - top) * 22 / 100 + i * (bot - top) * 78 / 600, pw / 10 + 1, (bot - top) / 10 + 1, ink);
+            cui_round_rect(C, cx - pw / 7, top - (bot - top) / 12, pw * 2 / 7, (bot - top) * 28 / 100, 2, ink);
+            cui_circle(C, (float)cx, (float)(top + (bot - top) * 7 / 100), (float)pw / 16.0f + 0.5f, G.dark ? 0x3A4256 : 0xFFFFFF);
+            break; }
+        case K_TAR: {                                              /* a parcel: lid, tape */
+            int bx = px + pw / 8, bw = pw * 3 / 4, bt = top + (bot - top) / 8, bh = (bot - top) * 3 / 4;
+            cui_round_rect(C, bx, bt, bw, bh, 2, ink);
+            cui_fill_alpha(C, bx, bt + bh / 4, bw, 1 + s / 40, 0xFFFFFF, 90);
+            cui_fill_alpha(C, cx - pw / 14, bt, pw / 7 + 1, bh, 0xFFFFFF, 70);
+            break; }
+        case K_GZ: {                                               /* press: two arrows meeting in the middle */
+            int mid = (top + bot) / 2, hh = (bot - top) / 3;
+            cui_triangle(C, (float)(cx - pw / 4), (float)(mid - hh), (float)(cx + pw / 4), (float)(mid - hh), (float)cx, (float)(mid - 1), ink);
+            cui_triangle(C, (float)(cx - pw / 4), (float)(mid + hh), (float)(cx + pw / 4), (float)(mid + hh), (float)cx, (float)(mid + 1), ink);
+            break; }
         case K_EXEC:
             cui_line(C, (float)(cx - pw / 4), (float)(top + (bot - top) / 5), (float)(cx), (float)((top + bot) / 2), w * 1.2f, ink);
             cui_line(C, (float)(cx), (float)((top + bot) / 2), (float)(cx - pw / 4), (float)(bot - (bot - top) / 5), w * 1.2f, ink);
@@ -131,6 +147,15 @@ void draw_icon(int kind, int x, int y, int s) {
         default:
             for (int i = 0; i < 4; ++i) cui_fill(C, px + pw / 6, top + i * (bot - top) / 4, i == 3 ? pw / 2 : pw * 2 / 3, s / 24 + 1, ink);
             break;
+    }
+    if (kind == K_ZIP || kind == K_TAR || kind == K_GZ) {                      /* the format's name on the coloured foot of the page, when the icon is big enough to read it */
+        int ph = s * 22 / 100;
+        if (ph >= 11) {
+            const char *lab = kind == K_ZIP ? "ZIP" : kind == K_TAR ? "TAR" : "GZ";
+            cui_font *bf = FN(ph - 3 > 14 ? 14 : ph - 3, true);
+            int tw = cui_text_width(bf, lab);
+            cui_text(C, bf, px + (pw - tw) / 2, y + s * 78 / 100 + (ph - cui_font_height(bf)) / 2, lab, 0xFFFFFF);
+        }
     }
 }
 
@@ -163,7 +188,7 @@ static void glyph(int a, float cx, float cy, uint32_t c) {
 /* ---------------------------------------------------------------- */
 /* menus and popups                                                  */
 /* ---------------------------------------------------------------- */
-typedef struct { int a; char label[80]; char key[24]; bool enabled, check, sep; } PI;
+typedef struct { int a; char label[80]; char key[24]; bool enabled, check, sep, sub; } PI;
 static bool has_sel(void) { return sel_count() > 0; }
 static bool one_sel(void) { return sel_count() == 1; }
 
@@ -175,6 +200,9 @@ bool action_enabled(int a) {
         case A_BACK: return G.hi > 0;
         case A_FORWARD: return G.hi + 1 < G.hn;
         case A_UP: return strcmp(G.path, "/") != 0;
+        case A_COMPRESS_MENU: case A_COMPRESS_ZIP: case A_COMPRESS_TAR: case A_COMPRESS_TGZ: return has_sel() && !G.arc.active && !G.pick;
+        case A_COMPRESS_GZ: { if (!one_sel() || G.arc.active || G.pick) return false; for (int i = 0; i < G.nvis; ++i) if (ent_at(i)->sel) return !ent_at(i)->is_dir; return false; }
+        case A_EXTRACT_HERE: case A_EXTRACT_TO: { if (!one_sel() || G.arc.active || G.pick) return false; for (int i = 0; i < G.nvis; ++i) if (ent_at(i)->sel) return !ent_at(i)->is_dir && arc_is_extractable(ent_at(i)->name); return false; }
         case A_REMOVE_MARK: for (int i = 0; i < G.nmarks; ++i) if (!G.marks[i].builtin && !strcmp(G.marks[i].path, G.path)) return true; return false;
         default: return !G.job.mode || (a != A_NEW_FOLDER && a != A_NEW_FILE && a != A_DELETE && a != A_PASTE);
     }
@@ -275,6 +303,7 @@ static void draw_popup(R box, const PI *v, int n, int hover) {
         uint32_t col = !v[i].enabled ? cui_mix(P.muted, P.panel, 90) : hv ? 0xFFFFFF : P.text;
         if (v[i].check) { cui_line(C, (float)(box.x + 13), (float)(cy + 13), (float)(box.x + 17), (float)(cy + 17), 1.8f, col); cui_line(C, (float)(box.x + 17), (float)(cy + 17), (float)(box.x + 24), (float)(cy + 8), 1.8f, col); }
         txt(box.x + 32, cy, 26, f, col, v[i].label);
+        if (v[i].sub) cui_triangle(C, (float)(box.x + box.w - 20), (float)(cy + 8), (float)(box.x + box.w - 20), (float)(cy + 18), (float)(box.x + box.w - 13), (float)(cy + 13), col);
         if (v[i].key[0]) txt(box.x + box.w - 14 - cui_text_width(fs, v[i].key), cy, 26, fs, hv ? 0xE8F0FF : P.muted, v[i].key);
         cy += 28;
     }
@@ -285,7 +314,10 @@ static int ctx_build(PI *v) {
     int n = 0;
     switch (G.ctx_kind) {
         case 0: ADD(A_OPEN, "Open", "開く", "Enter"); ADD(A_NEW_WINDOW, "Open in new window", "新しいウィンドウで開く", ""); ADD(A_OPEN_STUDIO_HERE, "Open in C-OS Studio", "C-OS Studio で開く", ""); SEP(); ADD(A_CUT, "Cut", "切り取り", "Ctrl+X"); ADD(A_COPY, "Copy", "コピー", "Ctrl+C"); ADD(A_PASTE, "Paste", "貼り付け", "Ctrl+V"); SEP();
-                ADD(A_RENAME, "Rename", "名前の変更", "F2"); ADD(A_DELETE, "Delete", "削除", "Del"); SEP(); ADD(A_COPY_PATH, "Copy path", "パスをコピー", ""); ADD(A_PROPS, "Properties", "プロパティ", "Alt+Enter");
+                ADD(A_RENAME, "Rename", "名前の変更", "F2"); ADD(A_DELETE, "Delete", "削除", "Del"); SEP();
+                ADD(A_COMPRESS_MENU, "Compress", "圧縮する", ""); v[n - 1].sub = true;
+                if (action_enabled(A_EXTRACT_HERE)) { ADD(A_EXTRACT_TO, "Extract to a folder", "フォルダーに展開", ""); ADD(A_EXTRACT_HERE, "Extract here", "ここに展開", ""); }
+                SEP(); ADD(A_COPY_PATH, "Copy path", "パスをコピー", ""); ADD(A_PROPS, "Properties", "プロパティ", "Alt+Enter");
                 { bool first = true; for (int i = 0; i < fplug_action_slots(); ++i) if (fplug_action_live(i)) { if (first) { SEP(); first = false; } pi_add(v, &n, A_PLUGIN_BASE + i, fplug_action_label(i), fplug_action_label(i), ""); v[n - 1].enabled = fplug_action_enabled(i); } }
                 break;
         case 1: ADD(A_NEW_FOLDER, "New folder", "新しいフォルダー", ""); ADD(A_NEW_FILE, "New file", "新しいファイル", ""); SEP(); ADD(A_PASTE, "Paste", "貼り付け", "Ctrl+V"); ADD(A_SELECT_ALL, "Select all", "すべて選択", "Ctrl+A"); SEP();
@@ -303,17 +335,59 @@ static R ctx_box(const PI *v, int n) {
     if (r.y + r.h > WIN_H - 4) r.y = WIN_H - r.h - 4;
     return r;
 }
+/* the "Compress" submenu: ZIP, TAR, TAR.GZ, GZ - opens beside the item that owns it */
+static int ctx_sub_build(PI *v) {
+    int n = 0;
+    ADD(A_COMPRESS_ZIP, "Compress to ZIP", "ZIP に圧縮する", ""); ADD(A_COMPRESS_TAR, "Compress to TAR", "TAR に圧縮する", "");
+    ADD(A_COMPRESS_TGZ, "Compress to TAR.GZ", "TAR.GZ に圧縮する", ""); ADD(A_COMPRESS_GZ, "Compress to GZ (one file)", "GZ に圧縮する(1ファイル)", "");
+    return n;
+}
+static int ctx_sub_parent(const PI *v, int n) { for (int i = 0; i < n; ++i) if (v[i].sub) return i; return -1; }
+static R ctx_sub_box(const PI *v, int n, R box, const PI *sv, int sn) {
+    int w, h; popup_size(sv, sn, &w, &h);
+    int pi = ctx_sub_parent(v, n), cy = box.y + 5;
+    for (int i = 0; i < pi; ++i) cy += v[i].sep ? 9 : 28;
+    R r = { box.x + box.w - 4, cy - 5, w, h };
+    if (r.x + r.w > WIN_W - 4) r.x = box.x - w + 4;
+    if (r.x < 4) r.x = 4;
+    if (r.y + r.h > WIN_H - 4) r.y = WIN_H - r.h - 4;
+    return r;
+}
 int ctx_hit(int x, int y, int *index) {
     PI v[32]; int n = ctx_build(v); R box = ctx_box(v, n);
+    if (G.ctx_sub) {
+        PI sv[8]; int sn = ctx_sub_build(sv); R sb = ctx_sub_box(v, n, box, sv, sn);
+        if (inr(sb, x, y)) {
+            int si = popup_item_at(sv, sn, sb, x, y);
+            G.ctx_sub_hover = si; if (index) *index = ctx_sub_parent(v, n);
+            return si >= 0 && sv[si].enabled ? sv[si].a : 0;
+        }
+    }
     int i = popup_item_at(v, n, box, x, y);
     if (index) *index = i;
     if (!inr(box, x, y)) return -1;
+    if (i >= 0 && v[i].sub && v[i].enabled) { G.ctx_sub = 1; return v[i].a; }      /* hovering the parent opens the submenu; a click on it keeps it open (A_COMPRESS_MENU) */
+    if (i >= 0 && G.ctx_sub) { G.ctx_sub = 0; G.ctx_sub_hover = -1; }
     return i >= 0 && v[i].enabled ? v[i].a : 0;
 }
 
 /* keys while a context menu is open: Up / Down / Home / End move over the enabled items, Enter runs one. Returns the action Enter chose (else 0). */
 int ctx_key_nav(int special) {
     PI v[32]; int n = ctx_build(v);
+    if (G.ctx_sub) {                                                                 /* inside the submenu */
+        PI sv[8]; int sn = ctx_sub_build(sv);
+        if (special == COS_KEY_LEFT || special == COS_KEY_ESC) { G.ctx_sub = 0; G.ctx_sub_hover = -1; G.dirty = true; return 0; }
+        if (special == COS_KEY_DOWN || special == COS_KEY_UP) {
+            int dir = special == COS_KEY_UP ? -1 : 1, from = G.ctx_sub_hover < 0 ? (dir > 0 ? -1 : sn) : G.ctx_sub_hover;
+            for (int k = 1; k <= sn; ++k) { int i = (((from + dir * k) % sn) + sn) % sn; if (sv[i].enabled) { G.ctx_sub_hover = i; G.dirty = true; break; } }
+            return 0;
+        }
+        if (special == COS_KEY_ENTER && G.ctx_sub_hover >= 0 && G.ctx_sub_hover < sn && sv[G.ctx_sub_hover].enabled) return sv[G.ctx_sub_hover].a;
+        if (special != COS_KEY_RIGHT) return 0;
+    }
+    if (special == COS_KEY_RIGHT && G.ctx_hover >= 0 && G.ctx_hover < n && v[G.ctx_hover].sub && v[G.ctx_hover].enabled) {
+        G.ctx_sub = 1; PI sv[8]; int sn = ctx_sub_build(sv); G.ctx_sub_hover = -1; for (int i = 0; i < sn; ++i) if (sv[i].enabled) { G.ctx_sub_hover = i; break; } G.dirty = true; return 0;
+    }
     if (special == COS_KEY_DOWN || special == COS_KEY_UP || special == COS_KEY_HOME || special == COS_KEY_END) {
         int dir = (special == COS_KEY_UP || special == COS_KEY_END) ? -1 : 1;
         int from = (special == COS_KEY_HOME) ? -1 : (special == COS_KEY_END) ? n : G.ctx_hover;
@@ -324,7 +398,7 @@ int ctx_key_nav(int special) {
         }
         return 0;
     }
-    if (special == COS_KEY_ENTER && G.ctx_hover >= 0 && G.ctx_hover < n && v[G.ctx_hover].enabled && !v[G.ctx_hover].sep) return v[G.ctx_hover].a;
+    if (special == COS_KEY_ENTER && G.ctx_hover >= 0 && G.ctx_hover < n && v[G.ctx_hover].enabled && !v[G.ctx_hover].sep) { if (v[G.ctx_hover].sub) { G.ctx_sub = 1; PI sv[8]; int sn = ctx_sub_build(sv); G.ctx_sub_hover = -1; for (int i = 0; i < sn; ++i) if (sv[i].enabled) { G.ctx_sub_hover = i; break; } G.dirty = true; return 0; } return v[G.ctx_hover].a; }
     return 0;
 }
 
@@ -886,7 +960,24 @@ static void draw_dialog(void) {
             dbtn(b.x + b.w - 20 - 130 - 10 - 90, b.y + 160, 90, L("Skip", "スキップ"), 4, false, false);
             dbtn(b.x + b.w - 20 - 130 - 10 - 90 - 10 - 100, b.y + 160, 100, L("Replace", "置き換え"), 3, true, false);
             break; }
-        case D_PROGRESS: {
+        case D_PROGRESS: if (G.arc.active) {
+            R b = dlg_frame(460, 200, G.arc.compress ? L("Compressing", "圧縮中") : L("Extracting", "展開中"));
+            cui_text_fit(C, FN(14, false), b.x + 20, b.y + 56, b.w - 40, G.arc.cur[0] ? G.arc.cur : G.arc.name, P.text);
+            int pct = G.arc.total ? (int)(G.arc.done * 100 / G.arc.total) : 0; if (pct > 99) pct = 99;
+            cui_round_rect(C, b.x + 20, b.y + 90, b.w - 40, 12, 6, P.bg);
+            int fw = G.arc.total ? (int)((b.w - 40) * (uint64_t)pct / 100) : 0; if (fw > 0 && fw < 12) fw = 12;
+            if (fw > 0) cui_round_rect(C, b.x + 20, b.y + 90, fw, 12, 6, P.accent);
+            else {                                                                         /* total not known yet: a block that runs back and forth */
+                int span = b.w - 40 - 60, ph = (int)((cos_time_ms() / 8) % (uint64_t)(2 * span)); if (ph > span) ph = 2 * span - ph;
+                cui_round_rect(C, b.x + 20 + ph, b.y + 90, 60, 12, 6, P.accent);
+            }
+            char a[48], t2[48], el[40]; fmt_size(G.arc.done, a, sizeof a); fmt_size(G.arc.total, t2, sizeof t2);
+            int secs = (int)((cos_time_ms() - G.arc.t0) / 1000); snprintf(el, sizeof el, G.jp ? "%d 秒" : "%d s", secs);
+            if (G.arc.total) snprintf(s, sizeof s, "%s / %s   (%d%%)   %s", a, t2, pct, el); else snprintf(s, sizeof s, "%s", el);
+            txt(b.x + 20, b.y + 110, 22, fs, P.muted, s);
+            dbtn(b.x + b.w - 20 - 110, b.y + 154, 110, L("Cancel", "取り消し"), 2, false, false);
+            break;
+        } else {
             Job *j = &G.job;
             R b = dlg_frame(460, 190, j->mode == 3 ? L("Deleting", "削除中") : j->mode == 2 ? L("Moving", "移動中") : L("Copying", "コピー中"));
             cui_text_fit(C, FN(14, false), b.x + 20, b.y + 60, b.w - 40, j->cur_name, P.text);
@@ -1026,7 +1117,8 @@ void ui_draw(void) {
         draw_popup(box, v, n, G.menu_hover);
     }
     { static bool was_open; if (G.ctx_open && !was_open) { PI lv[32]; int ln = ctx_build(lv); cos_puts("[CTXMENU] open items="); { char b[12]; snprintf(b, sizeof b, "%d", ln); cos_puts(b); } cos_puts(" first="); cos_puts(lv[0].label); cos_puts("\n"); } was_open = G.ctx_open; }
-    if (G.ctx_open) { PI v[32]; int n = ctx_build(v); R box = ctx_box(v, n); draw_popup(box, v, n, G.ctx_hover); }
+    if (G.ctx_open) { PI v[32]; int n = ctx_build(v); R box = ctx_box(v, n); draw_popup(box, v, n, G.ctx_hover);
+        if (G.ctx_sub) { PI sv[8]; int sn = ctx_sub_build(sv); R sb = ctx_sub_box(v, n, box, sv, sn); draw_popup(sb, sv, sn, G.ctx_sub_hover); } }
     if (G.dlg) draw_dialog();
     imeui_indicator(C, FN(12, false), WIN_W - 56, WIN_H - 24);
     if (G.dlg == D_INPUT || (!G.dlg && (G.addr_edit || G.search_focus))) imeui_draw(C, FN(13, false), ime_x, ime_y, 32);

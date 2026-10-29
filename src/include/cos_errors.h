@@ -1,5 +1,5 @@
 /*
- * cos_errors.h - C-OS 4.0.8 alpha Unified Error Code System
+ * cos_errors.h - C-OS 4.1.0 Unified Error Code System
  * Provides standardized error codes for all subsystems
  */
 

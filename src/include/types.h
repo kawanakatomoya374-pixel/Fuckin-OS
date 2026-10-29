@@ -1,5 +1,5 @@
 /**
- * types.h - C-OS 4.0.8 alpha Clean Type System
+ * types.h - C-OS 4.1.0 Clean Type System
  * Pure freestanding environment - compatible with standard headers
  */
 

@@ -1,7 +1,7 @@
 /**
  * auth.h - Authorization & Permission Management
  * 
- * C-OS 4.0.8 alpha 権限管理システム
+ * C-OS 4.1.0 権限管理システム
  */
 
 #ifndef AUTH_H

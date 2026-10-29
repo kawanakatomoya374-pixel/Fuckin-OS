@@ -1,6 +1,6 @@
 /**
  * hal_api.h - Hardware Abstraction Layer API
- * C-OS 4.0.8 alpha HAL Interface
+ * C-OS 4.1.0 HAL Interface
  * 
  * Provides unified HAL interface that abstracts x86_64 hardware.
  * Kernel and drivers use this API instead of direct hardware access.

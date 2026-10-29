@@ -1,6 +1,6 @@
 /**
  * paging.c - Virtual Memory / Paging Implementation
- * C-OS 4.0.8 alpha
+ * C-OS 4.1.0
  *
  * Uses the x86-64 4-level hierarchy: PML4 -> PDPT -> PD -> PT (4KB pages).
  * The header (paging.h) exports a "page_directory_t" / "page_table_t" API
@@ -234,8 +234,12 @@ uint64_t paging_alloc_physical(void) {
     return 0;
 }
 
+static uint16_t *g_cow; static uint64_t g_cow_n;           /* (defined with the copy-on-write code below) */
+static inline bool pc_is_cached(uint64_t pfn);
+static void pc_unlink(uint64_t pfn);
 void paging_free_physical(uint64_t phys) {
     uint64_t irq_flags = sync_irq_save();
+    if (pc_is_cached(phys >> 12)) { pc_unlink(phys >> 12); g_cow[phys >> 12] = 0; }       /* a cached frame freed directly: forget it */
     bool released = false;
     if (phys_is_valid_addr((phys_addr_t)phys)) {
         phys_free_page((phys_addr_t)phys);
@@ -974,13 +978,88 @@ void paging_free_pages(uint64_t virt, uint64_t count) {
  * g_cow (index = frame number); 0 or 1 means one owner. Both mappings are read-only; the first write faults and paging_cow_break() gives the writer a private
  * copy (or, for the last remaining owner, simply makes the page writable again). paging_release_user_range() drops one count per page it tears down. The
  * kernel lock (sync_irq_save) serializes everything here across CPUs. */
-static uint16_t *g_cow; static uint64_t g_cow_n;
 static bool cow_ready(void) {
     if (g_cow) return true;
     uint64_t pages = (phys_get_total_memory() + (2ull << 30)) / PAGE_SIZE;
     uint16_t *t = (uint16_t *)kmalloc(pages * sizeof(uint16_t)); if (!t) return false;
     memset(t, 0, pages * sizeof(uint16_t)); g_cow = t; g_cow_n = pages; return true;
 }
+/* ---- a cache of the frames of read-only file mappings (the Linux layer) --------------------------------------------------------------------------------------
+ * A browser starts several processes and each maps the same libraries (libxul alone is more than a hundred MiB): every process used to read the file and keep its own copy of
+ * the bytes. The mmap of a file that is not writable now asks this cache for the page first (path hash, file size, page number); a hit maps the frame that is already
+ * in memory, read-only, with one more count in g_cow: no read, no copy, no new frame. The first process to fill a page offers it.
+ * The cache holds a count of its own on a frame (a cached frame has count = mappings + 1), so a write - a program that mprotects a library page writable, a relocation in
+ * the text - is always a copy-on-write, never a change of the shared bytes. The cache keeps no frame alive by itself: when the last mapping goes (count 2 -> the cache's own),
+ * the frame is freed and the entry dropped. A file that is written, truncated, renamed or removed is forgotten (paging_pcache_invalidate_file). Everything runs under the kernel lock. */
+#define PC_BUCKETS 65536u
+#define PC_MAX     262144u
+#define PC_FILES   256u
+typedef struct { uint64_t fh, fsz, phys; uint32_t pg, next; } pc_ent_t;
+static uint32_t *pc_head, *pc_rev; static pc_ent_t *pc_ent; static uint32_t pc_used, pc_freelist, pc_live; static bool pc_dead;
+static uint64_t pc_hits, pc_misses, pc_puts, pc_files[PC_FILES]; static uint32_t pc_nfiles;
+static bool cow_ready(void);
+static bool pc_init(void) {
+    if (pc_ent) return true;
+    if (pc_dead || !cow_ready()) return false;
+    pc_head = (uint32_t *)kmalloc(PC_BUCKETS * sizeof(uint32_t));
+    pc_ent  = (pc_ent_t *)kmalloc((size_t)(PC_MAX + 1) * sizeof(pc_ent_t));
+    pc_rev  = (uint32_t *)kmalloc(g_cow_n * sizeof(uint32_t));
+    if (!pc_head || !pc_ent || !pc_rev) { if (pc_head) kfree(pc_head); if (pc_ent) kfree(pc_ent); if (pc_rev) kfree(pc_rev); pc_head = NULL; pc_ent = NULL; pc_rev = NULL; pc_dead = true; return false; }
+    memset(pc_head, 0, PC_BUCKETS * sizeof(uint32_t)); memset(pc_ent, 0, (size_t)(PC_MAX + 1) * sizeof(pc_ent_t)); memset(pc_rev, 0, g_cow_n * sizeof(uint32_t));
+    return true;
+}
+static inline uint32_t pc_bucket(uint64_t fh, uint64_t fsz, uint32_t pg) {
+    uint64_t h = fh ^ (fsz * 0x9E3779B97F4A7C15ull) ^ ((uint64_t)pg * 0xC2B2AE3D27D4EB4Full);
+    h ^= h >> 29; h *= 0xBF58476D1CE4E5B9ull; h ^= h >> 32; return (uint32_t)h & (PC_BUCKETS - 1u);
+}
+static inline bool pc_is_cached(uint64_t pfn) { return pc_rev && pfn < g_cow_n && pc_rev[pfn] != 0; }
+static void pc_unlink(uint64_t pfn) {                    /* takes the frame's entry out of the table (the caller fixes the count) */
+    uint32_t idx = pc_rev[pfn]; if (!idx) return;
+    uint32_t b = pc_bucket(pc_ent[idx].fh, pc_ent[idx].fsz, pc_ent[idx].pg);
+    for (uint32_t *pp = &pc_head[b]; *pp; pp = &pc_ent[*pp].next) if (*pp == idx) { *pp = pc_ent[idx].next; break; }
+    pc_rev[pfn] = 0; memset(&pc_ent[idx], 0, sizeof(pc_ent[idx])); pc_ent[idx].next = pc_freelist; pc_freelist = idx; if (pc_live) pc_live--;
+}
+/* the frame of page `pg` of the file, with one more mapping counted for the caller (0: not cached) */
+uint64_t paging_pcache_get(uint64_t fh, uint64_t fsz, uint32_t pg) {
+    uint64_t irq = sync_irq_save(), r = 0;
+    if (pc_init()) {
+        for (uint32_t i = pc_head[pc_bucket(fh, fsz, pg)]; i; i = pc_ent[i].next)
+            if (pc_ent[i].fh == fh && pc_ent[i].fsz == fsz && pc_ent[i].pg == pg) { uint64_t pfn = pc_ent[i].phys >> 12; if (g_cow[pfn] < 65000) { g_cow[pfn]++; r = pc_ent[i].phys; } break; }
+        if (r) pc_hits++; else pc_misses++;
+    }
+    sync_irq_restore(irq); return r;
+}
+/* offers a frame that was just filled from the file and is mapped (read-only) by exactly one page table: the cache takes its own count */
+bool paging_pcache_put(uint64_t fh, uint64_t fsz, uint32_t pg, uint64_t phys) {
+    uint64_t irq = sync_irq_save(); bool ok = false;
+    uint64_t pfn = phys >> 12;
+    if (pc_init() && phys && !(phys & 0xFFFu) && pfn < g_cow_n && g_cow[pfn] < 2 && !pc_rev[pfn]) {
+        bool dup = false;
+        for (uint32_t i = pc_head[pc_bucket(fh, fsz, pg)]; i; i = pc_ent[i].next) if (pc_ent[i].fh == fh && pc_ent[i].fsz == fsz && pc_ent[i].pg == pg) { dup = true; break; }
+        bool known = false; for (uint32_t k = 0; k < pc_nfiles; ++k) if (pc_files[k] == fh) { known = true; break; }
+        if (!known && pc_nfiles < PC_FILES) { pc_files[pc_nfiles++] = fh; known = true; }
+        uint32_t idx = pc_freelist ? pc_freelist : (pc_used < PC_MAX ? pc_used + 1 : 0);
+        if (!dup && known && idx) {
+            if (pc_freelist) pc_freelist = pc_ent[idx].next; else pc_used++;
+            pc_ent[idx].fh = fh; pc_ent[idx].fsz = fsz; pc_ent[idx].pg = pg; pc_ent[idx].phys = phys;
+            uint32_t b = pc_bucket(fh, fsz, pg); pc_ent[idx].next = pc_head[b]; pc_head[b] = idx; pc_rev[pfn] = idx; g_cow[pfn] = 2; pc_live++; pc_puts++; ok = true;
+        }
+    }
+    sync_irq_restore(irq); return ok;
+}
+/* the file was written, truncated, renamed or removed: its cached pages are forgotten (mappings that already exist keep their frames) */
+void paging_pcache_invalidate_file(uint64_t fh) {
+    uint64_t irq = sync_irq_save();
+    bool known = false; uint32_t kk = 0; for (; kk < pc_nfiles; ++kk) if (pc_files[kk] == fh) { known = true; break; }
+    if (known && pc_ent) {
+        for (uint32_t i = 1; i <= pc_used; ++i) if (pc_ent[i].phys && pc_ent[i].fh == fh) { uint64_t pfn = pc_ent[i].phys >> 12; pc_unlink(pfn); if (g_cow[pfn] > 0) g_cow[pfn]--; }
+        pc_files[kk] = pc_files[--pc_nfiles];
+    }
+    sync_irq_restore(irq);
+}
+bool paging_pcache_has_files(void) { return pc_nfiles != 0; }
+void paging_pcache_stats(uint64_t *live, uint64_t *hits, uint64_t *misses, uint64_t *puts) { if (live) *live = pc_live; if (hits) *hits = pc_hits; if (misses) *misses = pc_misses; if (puts) *puts = pc_puts; }
+
 bool paging_cow_share(uint64_t phys) {
     uint64_t irq = sync_irq_save(); uint64_t pfn = phys >> 12; bool ok = false;
     if (cow_ready() && pfn < g_cow_n && g_cow[pfn] < 65000) { g_cow[pfn] = g_cow[pfn] < 2 ? 2 : (uint16_t)(g_cow[pfn] + 1); ok = true; }
@@ -993,7 +1072,11 @@ bool paging_cow_is_shared(uint64_t phys) {
 /* one mapping of the frame goes away: true when others still map it (so the frame must not be freed) */
 bool paging_cow_drop(uint64_t phys) {
     uint64_t irq = sync_irq_save(); uint64_t pfn = phys >> 12; bool shared = false;
-    if (g_cow && pfn < g_cow_n) { if (g_cow[pfn] >= 2) { g_cow[pfn]--; shared = true; } else g_cow[pfn] = 0; }
+    if (g_cow && pfn < g_cow_n) {
+        if (pc_is_cached(pfn)) {                                  /* count = mappings + the cache's own: the last mapping going leaves the frame to its caller to free */
+            if (g_cow[pfn] > 2) { g_cow[pfn]--; shared = true; } else { pc_unlink(pfn); g_cow[pfn] = 0; }
+        } else if (g_cow[pfn] >= 2) { g_cow[pfn]--; shared = true; } else g_cow[pfn] = 0;
+    }
     sync_irq_restore(irq); return shared;
 }
 /* a write to the read-only page at `virt` (mapped in the active directory): make it writable with `rw_flags`, copying the frame if it is still shared */
@@ -1008,7 +1091,10 @@ bool paging_cow_break(uint64_t virt, uint64_t rw_flags) {
         uint64_t np = paging_alloc_physical();
         if (np) {
             memcpy((void *)(uintptr_t)PHYS_TO_VIRT(np), (const void *)(uintptr_t)PHYS_TO_VIRT(phys), PAGE_SIZE);
-            if (paging_remap_page(virt, np, rw_flags)) { g_cow[pfn]--; ok = true; } else paging_free_physical(np);
+            if (paging_remap_page(virt, np, rw_flags)) {
+                g_cow[pfn]--; ok = true;
+                if (pc_is_cached(pfn) && g_cow[pfn] <= 1) { pc_unlink(pfn); g_cow[pfn] = 0; paging_free_physical(phys); }      /* the writer was the last mapping: only the cache's count was left */
+            } else paging_free_physical(np);
         }
     } else {
         if (g_cow && pfn < g_cow_n) g_cow[pfn] = 0;

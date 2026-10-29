@@ -45,6 +45,7 @@ int udp_socket_bind(udp_socket_t* sock, uint16_t port);            /* 0, or -1 w
 int udp_socket_connect(udp_socket_t* sock, const ip_addr_t* peer, uint16_t port);
 int udp_socket_sendto(udp_socket_t* sock, const ip_addr_t* dst, uint16_t dport, const void* data, size_t len);
 /* Pops one datagram. Returns its length (truncated to max_len), or -1 when the queue is empty. */
+int udp_socket_recvfrom_flags(udp_socket_t* sock, void* buf, size_t max_len, ip_addr_t* from4, ip6_addr_t* from6, uint16_t* from_port, int* from_v6, int peek, int full_len);
 int udp_socket_recvfrom(udp_socket_t* sock, void* buf, size_t max_len, ip_addr_t* from4, ip6_addr_t* from6,
                         uint16_t* from_port, int* from_v6);
 int udp_socket_pending(udp_socket_t* sock);                         /* datagrams waiting */

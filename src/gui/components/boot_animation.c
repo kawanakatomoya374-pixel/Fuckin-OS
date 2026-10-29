@@ -250,7 +250,7 @@ void gui_boot_progress(const char *label) {
     }
 
     gui_boot_draw_centered_scaled("C-OS", cy + 90, 3, TEXT, TEXT);
-    vga_draw_string(gui_boot_center_x("4.0.9 Alpha", 1), cy + 150, "4.0.9 Alpha", MUTED, 0xFFFFFFFF);
+    vga_draw_string(gui_boot_center_x("4.1.0", 1), cy + 150, "4.1.0", MUTED, 0xFFFFFFFF);
 
     int dot_y = cy + 210;
     for (int i = 0; i < 3; ++i) {

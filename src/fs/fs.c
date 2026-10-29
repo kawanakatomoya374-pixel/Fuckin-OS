@@ -343,6 +343,44 @@ void fs_stream_close(fs_stream_t* st) {
     fs_unlock();
 }
 
+
+/* ---- a file written piece by piece (downloads): fs_wstream_open creates or replaces the file, fs_wstream_write appends, fs_wstream_close ends it ---- */
+struct fs_wstream { FIL fp; bool used; };
+#define FS_WSTREAM_MAX 4
+static struct fs_wstream g_wstreams[FS_WSTREAM_MAX];
+
+fs_wstream_t* fs_wstream_open(const char* path) {
+    if (!path || !g_fatfs_mounted) return NULL;
+    fs_lock();
+    struct fs_wstream* w = NULL;
+    for (int i = 0; i < FS_WSTREAM_MAX; ++i) if (!g_wstreams[i].used) { w = &g_wstreams[i]; break; }
+    if (!w || f_open(&w->fp, path, FA_CREATE_ALWAYS | FA_WRITE) != FR_OK) { fs_unlock(); return NULL; }
+    w->used = true;
+    fs_unlock();
+    return w;
+}
+bool fs_wstream_write(fs_wstream_t* w, const void* data, uint64_t n) {
+    if (!w || !w->used) return false;
+    const uint8_t* p = (const uint8_t*)data;
+    while (n) {
+        UINT chunk = n > 65536u ? 65536u : (UINT)n, put = 0;
+        fs_lock();
+        FRESULT fr = f_write(&w->fp, p, chunk, &put);
+        fs_unlock();
+        if (fr != FR_OK || put != chunk) return false;            /* the volume is full, or a write error */
+        p += chunk; n -= chunk;
+    }
+    return true;
+}
+bool fs_wstream_close(fs_wstream_t* w) {
+    if (!w || !w->used) return false;
+    fs_lock();
+    FRESULT fr = f_close(&w->fp);
+    w->used = false;
+    fs_unlock();
+    return fr == FR_OK;
+}
+
 /* Reads up to buf_size bytes of the file at `path` straight from FatFs
  * into the caller's buffer (no shared buffer, no directory cache). */
 bool fs_read_path_into(const char* path, void* buf, uint64_t buf_size, uint64_t* out_read) {
@@ -682,7 +720,7 @@ static void fs_bootstrap_defaults(void) {
     f_mkdir("/tmp");
     f_mkdir("/desktop");
 
-    static const char welcome_msg[] = "Welcome to C-OS 4.0.8 alpha!\n"
+    static const char welcome_msg[] = "Welcome to C-OS 4.1.0!\n"
         "This filesystem is now real FAT32 (via FatFs) - files are no"
         " longer limited to 32KB.\n";
     fs_bootstrap_write_asset("/desktop/welcome.txt", welcome_msg, (uint64_t)strlen(welcome_msg));
@@ -803,6 +841,27 @@ void fs_remount(void) {
     fs_unlock();
 }
 
+/* ---- which file system the data volume has, and the "format it at the next start" request ---- */
+extern bool storage_write_file(const char* filename, const void* data, uint64_t size);
+extern bool storage_read_file(const char* filename, void* buffer, uint64_t buffer_size, uint64_t* out_size);
+extern bool storage_delete_file(const char* filename);
+#define FS_FORMAT_REQ_FILE "cos.fsformat"
+
+int fs_format_request_get(void) {                       /* 0 none, FS_FORMAT_FAT32, FS_FORMAT_EXFAT */
+    char b[8] = {0}; uint64_t n = 0;
+    if (!storage_read_file(FS_FORMAT_REQ_FILE, b, sizeof b - 1, &n) || n == 0) return 0;
+    return b[0] == 'x' ? FS_FORMAT_EXFAT : b[0] == 'f' ? FS_FORMAT_FAT32 : 0;
+}
+bool fs_format_request_set(int type) {                  /* 0 cancels */
+    if (type == 0) { if (fs_format_request_get()) (void)storage_delete_file(FS_FORMAT_REQ_FILE); return true; }
+    if (type != FS_FORMAT_FAT32 && type != FS_FORMAT_EXFAT) return false;
+    return storage_write_file(FS_FORMAT_REQ_FILE, type == FS_FORMAT_EXFAT ? "x" : "f", 1);
+}
+int fs_current_type(void) {                             /* 0 not mounted, FS_FORMAT_FAT32, FS_FORMAT_EXFAT */
+    if (!g_fatfs_mounted) return 0;
+    return g_fatfs.fs_type == FS_EXFAT ? FS_FORMAT_EXFAT : FS_FORMAT_FAT32;
+}
+
 void fs_init(void) {
     if (g_initialized) return;
     g_initialized = true;
@@ -813,15 +872,27 @@ void fs_init(void) {
 
     fatfs_diskio_probe();
 
-    FRESULT fr = f_mount(&g_fatfs, "", 1);
+    /* A format asked for in Settings or the shell (fs_format_request) is done now, before the volume is mounted: the request lives in the catalog store, which is
+     * not on the volume being formatted. It is removed first, so a format that fails cannot repeat on every boot. */
+    int want = fs_format_request_get();
+    if (want) { (void)storage_delete_file(FS_FORMAT_REQ_FILE); serial_puts("[FS] format requested: "); serial_puts(want == FS_FORMAT_EXFAT ? "exFAT\n" : "FAT32\n"); }
+    FRESULT fr = want ? FR_NO_FILESYSTEM : f_mount(&g_fatfs, "", 1);
     if (fr == FR_NO_FILESYSTEM) {
-        serial_puts("[FS] No FAT32 filesystem found on partition; formatting...\n");
+        if (!want) serial_puts("[FS] No FAT32 filesystem found on partition; formatting...\n");
+#ifdef COS_FS_FORMAT_EXFAT               /* test builds: a blank volume becomes exFAT (files over 4 GiB) */
+        if (!want) want = FS_FORMAT_EXFAT;
+#endif
         static uint8_t work[FF_MAX_SS];
         MKFS_PARM opt;
         memset(&opt, 0, sizeof(opt));
-        opt.fmt = FM_FAT32 | FM_SFD;     /* no partition table: the volume starts aligned at sector 0 */
         opt.align = 2048;                /* data area on a 1 MiB boundary (SSD erase blocks, 4K sectors) */
-        opt.au_size = 8192;              /* 8 KiB clusters: far fewer FAT updates for big files than the 4 KiB default */
+        if (want == FS_FORMAT_EXFAT) {
+            opt.fmt = FM_EXFAT | FM_SFD; /* no partition table: the volume starts aligned at sector 0 */
+            opt.au_size = 0;             /* automatic: 128 KiB or more */
+        } else {
+            opt.fmt = FM_FAT32 | FM_SFD;
+            opt.au_size = 8192;          /* 8 KiB clusters: far fewer FAT updates for big files than the 4 KiB default */
+        }
         fr = f_mkfs("", &opt, work, sizeof(work));
         if (fr != FR_OK) {
             serial_puts("[FS] ERROR: f_mkfs failed, filesystem unavailable\n");
@@ -838,7 +909,23 @@ void fs_init(void) {
     }
 
     g_fatfs_mounted = true;
-    serial_puts("[FS] FAT32 filesystem mounted\n");
+    serial_puts(g_fatfs.fs_type == FS_EXFAT ? "[FS] exFAT filesystem mounted\n" : "[FS] FAT32 filesystem mounted\n");
+#ifdef COS_FS_FORMAT_EXFAT
+    if (g_fatfs.fs_type == FS_EXFAT) {            /* a file that crosses 4 GiB: write a marker behind it, read it back, size, delete */
+        static FIL f; UINT n = 0; FRESULT r2; const char mark[8] = {'E','X','F','A','T','4','G','!'}; char back[8];
+        const FSIZE_t at = (FSIZE_t)5 * 1024 * 1024 * 1024;
+        r2 = f_open(&f, "/exfat_big.bin", FA_CREATE_ALWAYS | FA_WRITE | FA_READ);
+        if (r2 == FR_OK) r2 = f_lseek(&f, at);
+        if (r2 == FR_OK && f_tell(&f) != at) r2 = FR_INT_ERR;
+        if (r2 == FR_OK) r2 = f_write(&f, mark, 8, &n);
+        if (r2 == FR_OK) r2 = f_lseek(&f, at);
+        if (r2 == FR_OK) r2 = f_read(&f, back, 8, &n);
+        serial_puts("[EXFATTEST] size "); serial_putdec((uint64_t)f_size(&f));
+        serial_puts(" fr="); serial_putdec((uint64_t)r2);
+        serial_puts(" marker "); serial_puts(r2 == FR_OK && n == 8 && memcmp(back, mark, 8) == 0 ? "OK\n" : "BAD\n");
+        f_close(&f); f_unlink("/exfat_big.bin");
+    }
+#endif
 
     DIR dir;
     bool has_entries = false;

@@ -1,5 +1,6 @@
-float acosf(float x);
 #include <math.h>
+#define acosf(x) ((float)acos(x))
+#define asinf(x) ((float)asin(x))
 #include "cube.h"
 #include "item.h"
 #include "matrix.h"

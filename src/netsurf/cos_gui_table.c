@@ -53,6 +53,11 @@
 #include "netsurf/bitmap.h"
 #include "netsurf/layout.h"
 #include "netsurf/window.h"
+#include "netsurf/download.h"
+#include "desktop/download.h"
+#include "fs.h"
+#include "timer.h"
+extern void gui_notify_simple(const char* msg);
 
 extern struct gui_bitmap_table *cos_netsurf_bitmap_table(void);
 extern struct gui_layout_table *cos_netsurf_layout_table(void);
@@ -425,10 +430,119 @@ static struct gui_fetch_table cos_fetch_table = {
     .mimetype = NULL,
 };
 
+/* ---- downloads: a page whose content NetSurf cannot show (a zip, a PDF, a program ...) is saved to /Downloads ------------------------------------
+ * create() picks a file name from the response (made safe for FAT and exFAT, and unique: "name (1).zip"), data() appends, done() closes and tells the
+ * user, error() removes the part that was written. A full volume stops the download with an error instead of leaving a half file. */
+/* The downloads window (userland/programs/dlprogress) shows what this table says: the kernel writes /tmp/.cosdl ("ID<TAB>STATE<TAB>GOT<TAB>TOTAL<TAB>NAME" per download, STATE 0 running, 1 done, 2 failed,
+ * 3 cancelled) every 400 ms and at every change; the window's Cancel button writes the id to /tmp/.cosdl.cancel, which is read at the same moments. */
+#define DLN 8
+static struct { bool used; int id; char name[100]; unsigned long long got, total; int state; bool cancel; } g_dl[DLN];
+static int g_dl_seq; static uint64_t g_dl_last;
+extern void cos_dlwin_open(void);
+static void dl_publish(void) {
+    static char buf[1400]; size_t n = 0;
+    for (int i = 0; i < DLN; ++i) if (g_dl[i].used) {
+        int k = snprintf(buf + n, sizeof buf - n, "%d\t%d\t%llu\t%llu\t%s\n", g_dl[i].id, g_dl[i].state, g_dl[i].got, g_dl[i].total, g_dl[i].name);
+        if (k < 0 || n + (size_t)k >= sizeof buf) break; n += (size_t)k;
+    }
+    uint64_t sz; bool d; if (!fs_stat_path("/tmp", &sz, &d)) (void)fs_create_dir_at("/", "tmp");
+    (void)fs_write_file_at("/tmp", ".cosdl", buf, n);
+    g_dl_last = get_timer_ticks();
+}
+static void dl_poll_cancel(void) {
+    char b[64]; uint64_t got = 0;
+    if (!fs_read_path_into("/tmp/.cosdl.cancel", b, sizeof b - 1, &got) || !got) return;
+    b[got] = 0; (void)fs_delete_file("/tmp/.cosdl.cancel");
+    for (const char *p = b; *p; ) { int id = 0; while (*p >= '0' && *p <= '9') id = id * 10 + (*p++ - '0'); if (id) for (int i = 0; i < DLN; ++i) if (g_dl[i].used && g_dl[i].id == id) g_dl[i].cancel = true; while (*p && (*p < '0' || *p > '9')) ++p; }
+}
+
+struct gui_download_window {
+    int slot;
+    download_context *ctx;
+    fs_wstream_t *ws;
+    char path[300];
+    unsigned long long got, total;
+    bool failed;
+};
+
+static void dl_notify(const char *what, const char *path) {
+    char m[420]; snprintf(m, sizeof m, "%s: %s", what, path);
+    serial_puts("[DOWNLOAD] "); serial_puts(m); serial_puts("\n");
+    gui_notify_simple(m);
+}
+
+static void dl_safe_name(const char *in, char *out, size_t cap) {
+    size_t n = 0;
+    const char *base = in ? in : "";
+    for (const char *p = base; *p; ++p) if (*p == '/' || *p == '\\') base = p + 1;
+    for (const char *p = base; *p && n + 1 < cap && n < 120; ++p) {
+        unsigned char ch = (unsigned char)*p;
+        if (ch < 32 || strchr("\"*:<>?|", ch)) ch = '_';
+        out[n++] = (char)ch;
+    }
+    while (n && (out[n - 1] == ' ' || out[n - 1] == '.')) --n;       /* FAT drops trailing spaces and dots */
+    out[n] = 0;
+    if (!n || !strcmp(out, ".") || !strcmp(out, "..")) snprintf(out, cap, "download");
+}
+
+static struct gui_download_window *cos_download_create(download_context *ctx, struct gui_window *parent) {
+    (void)parent;
+    struct gui_download_window *dw = (struct gui_download_window *)kmalloc(sizeof *dw);
+    if (dw) memset(dw, 0, sizeof *dw);
+    if (!dw) { download_context_abort(ctx); download_context_destroy(ctx); return NULL; }
+    dw->ctx = ctx; dw->total = download_context_get_total_length(ctx);
+    char name[130]; dl_safe_name(download_context_get_filename(ctx), name, sizeof name);
+    uint64_t sz; bool isdir;
+    if (!fs_stat_path("/Downloads", &sz, &isdir)) (void)fs_create_dir_at("/", "Downloads");
+    char stem[130], ext[40]; const char *dot = strrchr(name, '.');
+    if (dot && dot != name && strlen(dot) < sizeof ext) { size_t sl = (size_t)(dot - name); memcpy(stem, name, sl); stem[sl] = 0; snprintf(ext, sizeof ext, "%s", dot); }
+    else { snprintf(stem, sizeof stem, "%s", name); ext[0] = 0; }
+    snprintf(dw->path, sizeof dw->path, "/Downloads/%s%s", stem, ext);
+    for (int i = 1; i < 1000 && fs_stat_path(dw->path, &sz, &isdir); ++i) snprintf(dw->path, sizeof dw->path, "/Downloads/%s (%d)%s", stem, i, ext);
+    dw->ws = fs_wstream_open(dw->path);
+    if (!dw->ws) {
+        dl_notify("ダウンロードを保存できません / Cannot save the download", dw->path);
+        download_context_abort(ctx); download_context_destroy(ctx); kfree(dw); return NULL;
+    }
+    dw->slot = -1;
+    for (int i = 0; i < DLN; ++i) if (!g_dl[i].used) { dw->slot = i; break; }
+    if (dw->slot < 0) { for (int i = 0; i < DLN && dw->slot < 0; ++i) if (g_dl[i].state != 0) dw->slot = i; }          /* all slots taken: reuse a finished one */
+    if (dw->slot >= 0) { g_dl[dw->slot].used = true; g_dl[dw->slot].id = ++g_dl_seq; g_dl[dw->slot].got = 0; g_dl[dw->slot].total = dw->total; g_dl[dw->slot].state = 0; g_dl[dw->slot].cancel = false; snprintf(g_dl[dw->slot].name, sizeof g_dl[dw->slot].name, "%s", strrchr(dw->path, '/') + 1); dl_publish(); cos_dlwin_open(); }
+    return dw;
+}
+
+static nserror cos_download_data(struct gui_download_window *dw, const char *data, unsigned int size) {
+    if (dw->failed) return NSERROR_SAVE_FAILED;
+    if (dw->slot >= 0 && g_dl[dw->slot].cancel) { dw->failed = true; return NSERROR_SAVE_FAILED; }
+    if (!fs_wstream_write(dw->ws, data, size)) { dw->failed = true; return NSERROR_SAVE_FAILED; }
+    dw->got += size;
+    if (dw->slot >= 0) { g_dl[dw->slot].got = dw->got; if (get_timer_ticks() - g_dl_last > 400) { dl_poll_cancel(); dl_publish(); } }
+    return NSERROR_OK;
+}
+
+static void cos_download_finish(struct gui_download_window *dw, bool ok, const char *why) {
+    fs_wstream_close(dw->ws);
+    if (dw->slot >= 0) { bool cancelled = g_dl[dw->slot].cancel; g_dl[dw->slot].state = ok ? 1 : cancelled ? 3 : 2; if (ok) g_dl[dw->slot].got = dw->got; dl_publish(); }
+    if (ok) dl_notify("ダウンロード完了 / Download finished", dw->path);
+    else {
+        (void)fs_delete_file(dw->path);                                  /* no half file */
+        char m[420]; snprintf(m, sizeof m, "ダウンロード失敗 / Download failed (%s)", why ? why : "?"); dl_notify(m, dw->path);
+    }
+    download_context_destroy(dw->ctx); kfree(dw);
+}
+static void cos_download_error(struct gui_download_window *dw, const char *msg) { cos_download_finish(dw, false, msg); }
+static void cos_download_done(struct gui_download_window *dw) {
+    if (dw->failed) cos_download_finish(dw, false, "disk full or write error");
+    else cos_download_finish(dw, true, NULL);
+}
+static struct gui_download_table cos_download_table = {
+    .create = cos_download_create, .data = cos_download_data, .error = cos_download_error, .done = cos_download_done,
+};
+
 static struct netsurf_table cos_netsurf_table = {
     .misc = &cos_misc_table,
     .window = NULL,
-    .download = NULL,
+    .download = &cos_download_table,
     .clipboard = NULL,
     .fetch = &cos_fetch_table,
     .file = NULL,

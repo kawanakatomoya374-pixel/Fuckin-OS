@@ -39,11 +39,12 @@ extern bool cos_fs_rename(const char *oldp, const char *newp);
 extern uint64_t cos_random_u64(void);
 extern uint64_t rtc_get_seconds_since_epoch(void);
 /* Wall-clock time in ms: the RTC gives whole seconds, so it is read once and the uptime clock supplies the rest. Mixing the two on every call made the time jump back by up to a second. */
-static uint64_t wall_ms(void) {
+static uint64_t wall_base_ms(void) {
     static uint64_t base; static volatile bool set;
     if (!set) { uint64_t b = rtc_get_seconds_since_epoch() * 1000 - hal_timer_get_ms(); base = b; set = true; }
-    return base + hal_timer_get_ms();
+    return base;
 }
+static uint64_t wall_ms(void) { return wall_base_ms() + hal_timer_get_ms(); }
 extern void thread_exit(thread_t *t, int code);
 extern uint32_t smp_online_cpu_count(void);
 #include "cos_futex.h"
@@ -61,6 +62,7 @@ extern bool cos_pcache_is_shared(uint64_t phys);
 #define L_EACCES 13
 #define L_EFAULT 14
 #define L_EEXIST 17
+#define L_ENOTEMPTY 39
 #define L_ENOTDIR 20
 #define L_EISDIR 21
 #define L_EINVAL 22
@@ -138,6 +140,7 @@ typedef struct {
     char out_path[256];                                            /* the COS_STDOUT file (reopened by a forked child) */
     char exe[256];
     uint32_t fpid;                                                 /* whose file-mapping records apply (a forked child uses its parent's) */
+    struct { uint16_t nr; int64_t ret; uint64_t a0; } hist[24]; uint32_t hist_n;        /* the last system calls, printed when the process ends with a non-zero status (verbose log only) */
 } lctx_t;
 #define LX_SIG_DFL 0ull
 #define LX_SIG_IGN 1ull
@@ -222,6 +225,28 @@ static uint64_t shm_frame(lx_shm_t *o, uint64_t idx) {
     if (!f) { f = paging_alloc_physical(); if (f) { memset((void *)(uintptr_t)PHYS_TO_VIRT(f), 0, PAGE); o->frame[idx] = f; } }
     sync_irq_restore(fl);
     return f;
+}
+
+/* A native program maps a named /dev/shm object of the Linux side (the Xvfb screen, started with -fbdir /dev/shm): the same physical frames the X server draws into.
+ * Returns the user address (PML4 slot 10), the size in *size_out; or 0 when there is no such object. A repeated call maps again from the start of the slot. */
+#define LX_NATIVE_SHM_VA  0x0000050000000000ULL
+#define LX_NATIVE_SHM_MAX (64ull << 20)
+uint64_t cos_linux_shm_map(const char *name, uint64_t *size_out) {
+    lx_shm_t *sh = NULL; uint64_t fl = sync_irq_save();
+    for (lx_shm_t *q = s_shm_named; q; q = q->next) if (!strcmp(q->name, name)) { sh = q; break; }
+    if (sh) sh->ref++;
+    sync_irq_restore(fl);
+    if (!sh) return 0;
+    if (!sh->size || sh->size > LX_NATIVE_SHM_MAX) { shm_unref(sh); return 0; }
+    uint64_t np = (sh->size + PAGE - 1) / PAGE;
+    for (uint64_t i = 0; i < np; ++i) {
+        uint64_t f = shm_frame(sh, i); uint64_t va = LX_NATIVE_SHM_VA + i * PAGE;
+        if (!f) { shm_unref(sh); return 0; }
+        paging_unmap_page(va);
+        if (!paging_map_page(va, f, PAGE_PRESENT | PAGE_RW | PAGE_USER)) { shm_unref(sh); return 0; }      /* the reference stays: the frames must outlive the mapping */
+    }
+    *size_out = sh->size;
+    return LX_NATIVE_SHM_VA;
 }
 
 /* index of the first range that ends above `addr` (binary search) */
@@ -453,10 +478,26 @@ bool cos_linux_cow_fault(process_t *proc, uint64_t page) {
     if (!(prot & L_PROT_WRITE)) return false;
     return paging_cow_break(page, page_flags(prot));
 }
+#define LX_FAULT_AROUND 8      /* pages mapped per anonymous-memory fault (32 KiB): fewer exceptions for memory that is used in order */
+extern bool task_alloc_page_run(process_t *proc, uint64_t virt, unsigned n, uint64_t flags);
+static bool fault_run(process_t *proc, uint64_t page, uint64_t limit, uint64_t flags) {
+    uint64_t left = limit > page ? (limit - page) / PAGE : 1;
+    unsigned n = left > LX_FAULT_AROUND ? LX_FAULT_AROUND : (unsigned)left;
+    return task_alloc_page_run(proc, page, n ? n : 1, flags);
+}
+
+static uint64_t s_pfc_cyc, s_pfc_n;                           /* profile: page faults of Linux programs handled, and the cycles they took */
+static bool linux_page_fault_inner(process_t *proc, uint64_t page);
 bool cos_linux_page_fault(process_t *proc, uint64_t page) {
+    uint64_t t0 = __builtin_ia32_rdtsc();
+    bool ok = linux_page_fault_inner(proc, page);
+    __atomic_fetch_add(&s_pfc_cyc, __builtin_ia32_rdtsc() - t0, __ATOMIC_RELAXED); __atomic_fetch_add(&s_pfc_n, 1, __ATOMIC_RELAXED);
+    return ok;
+}
+static bool linux_page_fault_inner(process_t *proc, uint64_t page) {
     if (!proc || !proc->linux_ctx) return false;
     lctx_t *c = ctx_of(proc);
-    if (c->brk_start && page >= c->brk_start && page < pg_up(c->brk_cur)) return task_alloc_page(proc, page, page_flags(L_PROT_READ | L_PROT_WRITE));
+    if (c->brk_start && page >= c->brk_start && page < pg_up(c->brk_cur)) return fault_run(proc, page, pg_up(c->brk_cur), page_flags(L_PROT_READ | L_PROT_WRITE));
     /* the main stack: grows down from stack_end by up to 8 MiB (RLIMIT_STACK); the pages between are mapped on touch */
     if (proc->stack_end && page < proc->stack_end && page >= proc->stack_end - LX_STACK_MAX) {
         uint64_t from = page < proc->stack_start ? page : proc->stack_start;
@@ -472,7 +513,7 @@ bool cos_linux_page_fault(process_t *proc, uint64_t page) {
         uint64_t f = shm_frame(v->shm, (v->shm_off + (page - v->start)) / PAGE); if (!f) return false;
         return paging_map_page(page, f, page_flags(v->prot));
     }
-    return task_alloc_page(proc, page, page_flags(v->prot));
+    return (v->prot & L_PROT_WRITE) ? fault_run(proc, page, v->end, page_flags(v->prot)) : task_alloc_page(proc, page, page_flags(v->prot));
 }
 
 /* ---- paths and descriptors ----------------------------------------------- */
@@ -581,6 +622,10 @@ static void resolve2(lctx_t *c, int dirfd, const char *p, char *out, size_t cap,
     else snprintf(full, sizeof full, "%s/%s", c->cwd, p);
     if (!strncmp(full, "/linux/", 7)) { char t2[320]; snprintf(t2, sizeof t2, "%s", full + 6); snprintf(full, sizeof full, "%s", t2); }     /* a directory descriptor holds a C-OS path: back to the program's */
     char norm[320]; path_normalize(full, norm, sizeof norm);
+    if (norm[0] == '/' && norm[1] == 'c' && norm[2] == 'o' && norm[3] == 's' && (norm[4] == 0 || norm[4] == '/')) {      /* /cos is the C-OS file system itself (its own root: /documents, /downloads ...): a file there can be opened by any Linux program, e.g. Firefox's upload dialog */
+        if (last_link) *last_link = NULL;
+        snprintf(out, cap, "%s", norm[4] ? norm + 4 : "/"); return;
+    }
     lxm_load();
     char fl[320]; lx_follow(norm, fl, sizeof fl, follow_last, last_link);
     char jail[340]; snprintf(jail, sizeof jail, "/linux%s", fl);
@@ -602,9 +647,16 @@ static ofd_t *ofd_new(uint8_t kind, uint32_t flags) {
     memset(o, 0, sizeof *o); o->ref = 1; o->kind = kind; o->flags = flags; o->cosfd = -1; return o;
 }
 static void ofd_unref(ofd_t *o);
+/* A thread of the process may still be inside a read or write of this pipe when the last description closes (its process was ended by a fault while another thread was
+ * copying or waiting): the pipe is not freed at once. It is emptied (nothing to read, no peers: a waiter returns end-of-file or EPIPE) and kept, with its buffer, in a ring,
+ * and freed when 128 later pipes have gone, like the descriptions in ofd_retire(). */
+#define LX_PIPE_RING 128
+static pipe_t *s_pipe_ring[LX_PIPE_RING]; static uint32_t s_pipe_ring_n;
 static void pipe_free(pipe_t *q) {
     for (int i = 0; i < q->nanc; ++i) for (int k = 0; k < q->anc[i].n; ++k) ofd_unref(q->anc[i].f[k]);
-    kfree(q->buf); kfree(q);
+    q->nanc = 0; q->len = 0; q->readers = q->writers = 0;
+    uint64_t fl = sync_irq_save(); pipe_t **slot = &s_pipe_ring[s_pipe_ring_n++ % LX_PIPE_RING]; pipe_t *old = *slot; *slot = q; sync_irq_restore(fl);
+    if (old) { kfree(old->buf); kfree(old); }
 }
 typedef struct ulis { int listening, nq; ofd_t *q[16]; } ulis_t;
 static struct { char name[108]; ulis_t *l; } ubind[64];       /* listening unix sockets by name ('@' + name for the abstract namespace) */
@@ -652,7 +704,7 @@ static void fd_close_slot(lctx_t *c, int fd) { if (fd < 0 || fd >= LX_MAX_FD) re
 static int64_t console_write(process_t *p, lctx_t *c, const char *b, uint64_t n) {
     (void)p;
     if (c->out_fd >= 0) { int64_t w = cos_fd_write(c->out_pid, c->out_fd, b, n); if (w >= 0) return w; }
-    for (uint64_t i = 0; i < n; ++i) serial_putc(b[i]);
+    if (serial_is_verbose()) for (uint64_t i = 0; i < n; ++i) serial_putc(b[i]);      /* a program's own chatter (Firefox warnings by the thousand) is not worth the UART time */
     return (int64_t)n;
 }
 
@@ -758,6 +810,7 @@ static int64_t do_futex(uint64_t uaddr, uint32_t op, uint32_t val, uint64_t a3, 
 }
 
 void cos_linux_release_pages(process_t *proc);
+void cos_linux_release_final(process_t *proc);
 static bool lx_load(process_t *proc, lctx_t *c, const char *path, const uint8_t *image, uint64_t len, const char *const *argv, int argc, const char *const *envp, int envc, uint64_t *out_entry, uint64_t *out_rsp);
 
 /* ---- signals --------------------------------------------------------------- */
@@ -806,9 +859,9 @@ static void end_by_signal(process_t *p, int sig) {
     for (;;) __asm__ volatile("hlt");
 }
 
-typedef struct { uint64_t retaddr; struct regs saved; uint64_t saved_blocked; uint8_t siginfo[128]; uint8_t uc[512]; uint8_t fx[512]; } sigframe_t;   /* fx: FXSAVE image of the interrupted code; a handler may use SSE */
+typedef struct { uint64_t retaddr; struct regs saved; uint64_t saved_blocked; uint8_t siginfo[128]; uint8_t uc[512]; uint8_t fx[COS_FPU_AREA]; } sigframe_t;   /* fx: FXSAVE image of the interrupted code; a handler may use SSE */
 /* where the exception stub (isr.asm) parked the user's FPU/SSE state below this register frame; it is restored when the frame is left */
-static inline uint8_t *fpu_area_of(struct regs *r) { return (uint8_t *)(((uintptr_t)r - 512u) & ~(uintptr_t)15u); }
+static inline uint8_t *fpu_area_of(struct regs *r) { return (uint8_t *)(((uintptr_t)r - COS_FPU_STACK) & ~(uintptr_t)63u); }
 
 /* Delivers the first pending, unblocked signal: a handler runs on the user stack (the frame has the registers to come back to), a default that ends the process
  * does so. res/nr: the system call that is just ending, so one that was interrupted can be restarted. */
@@ -828,7 +881,7 @@ static void deliver_signals(process_t *p, lctx_t *c, struct regs *r, uint64_t nr
         f->saved = *r;
         if (res == -L_EINTR && (c->sig[s].flags & L_SA_RESTART)) { f->saved.rax = nr; f->saved.rip = r->rip - 2; }
         f->saved_blocked = c->sig_blocked;
-        memcpy(f->fx, fpu_area_of(r), 512);
+        memcpy(f->fx, fpu_area_of(r), COS_FPU_AREA);
         *(int32_t *)f->siginfo = s;
         uint64_t *g = (uint64_t *)(f->uc + 40);          /* ucontext.uc_mcontext.gregs */
         const struct regs *q = &f->saved;
@@ -857,7 +910,7 @@ static int64_t do_sigreturn(lctx_t *c, struct regs *r) {
     r->rdi = g[8]; r->rsi = g[9]; r->rbp = g[10]; r->rbx = g[11]; r->rdx = g[12]; r->rax = g[13]; r->rcx = g[14];
     r->rsp = g[15]; r->rip = g[16]; r->rflags = (g[17] & 0x0CD5ull) | 0x202;
     c->sig_blocked = f->saved_blocked & ~(sig_bit(L_SIGKILL));
-    memcpy(fpu_area_of(r), f->fx, 512);
+    cos_fpu_sanitize(f->fx); memcpy(fpu_area_of(r), f->fx, COS_FPU_AREA);
     kfree(f);
     return LX_FRAME_SET;
 }
@@ -1096,7 +1149,14 @@ out:
 #define SC_DEBUG 0
 static const char *s_unknown_logged;
 
-extern uint64_t s_fill_ms, s_fill_pages;
+extern uint64_t s_fill_ms, s_fill_pages, s_fill_read_ms, s_fp_alloc, s_fp_copy, s_fp_prot;
+#define LX_FILL_CHUNK (64u * 1024u)
+/* the cache of read-only file mappings (paging.c): switched off by /linux/etc/cos.nopcache; a file that is modified is forgotten by path */
+static bool pcache_disabled(void) { static int off = -1; if (off < 0) { uint64_t sz; uint8_t d; off = cos_fs_stat("/linux/etc/cos.nopcache", &sz, &d) ? 1 : 0; } return off != 0; }
+static void pcache_path_changed(const char *path) {
+    if (!path || !path[0] || !paging_pcache_has_files()) return;
+    paging_pcache_invalidate_file(lxm_hash(path, strlen(path)));
+}
 static int64_t sys_mmap(process_t *p, lctx_t *c, uint64_t addr, uint64_t len, uint32_t prot, uint32_t flags, int fd, uint64_t off) {
     if (len == 0) return -L_EINVAL;
     uint64_t sz = pg_up(len);
@@ -1142,12 +1202,32 @@ static int64_t sys_mmap(process_t *p, lctx_t *c, uint64_t addr, uint64_t len, ui
         if (!buf) { vma_cut(c, at, at + sz, true); __atomic_sub_fetch(&c->mmap_busy, 1, __ATOMIC_SEQ_CST); return -L_ENOMEM; }
         uint64_t fsz = 0; { uint8_t isd = 0; if (!cos_fs_stat(mo->path, &fsz, &isd)) fsz = ~0ull; }
         uint64_t an_eof = 0, an_zero = 0, an_short = 0, an_first = 0;
+        uint8_t *cbuf = (uint8_t *)kmalloc(LX_FILL_CHUNK); uint64_t cstart = 0, cn = 0, creq = 0;      /* the file is read in big pieces (one seek and one read per piece, not per page) */
         uint64_t fill_t0 = hal_timer_get_ms();       /* what the fill saw: reads that ended early / gave zeros / gave a part of a page */      /* where the file really ends: a read that gives nothing before that is an error */
+        /* The frames of a file that is mapped read-only (a library's code and constants) are shared between the processes that map it (paging.c, the cache of read-only file mappings): a page
+         * another process has already filled is mapped as it is. Writable mappings, and MAP_SHARED, are never cached. /linux/etc/cos.nopcache turns it off. */
+        bool use_pc = !(prot & L_PROT_WRITE) && !(flags & L_MAP_SHARED) && fsz != ~0ull && fsz > 0 && !pcache_disabled();
+        uint64_t pc_fh = use_pc ? lxm_hash(mo->path, strlen(mo->path)) : 0;
         for (uint64_t a = at; a < at + sz; a += PAGE) {
-            if (!task_alloc_page(p, a, page_flags(L_PROT_READ | L_PROT_WRITE))) { kfree(buf); vma_cut(c, at, at + sz, true); __atomic_sub_fetch(&c->mmap_busy, 1, __ATOMIC_SEQ_CST); return -L_ENOMEM; }
+            if (use_pc && off + (a - at) < fsz) {
+                uint64_t fr = paging_pcache_get(pc_fh, fsz, (uint32_t)((off + (a - at)) / PAGE));
+                if (fr) {
+                    if (paging_map_page(a, fr, page_flags(prot) | PAGE_PRESENT | PAGE_USER)) continue;
+                    paging_cow_drop(fr);                                                  /* could not map (no memory for a page table): the normal path reports it */
+                }
+            }
+            bool was_mapped = paging_virt_to_phys(a) != 0; uint64_t tsc0 = __builtin_ia32_rdtsc(); bool alloc_ok = task_alloc_page(p, a, page_flags(prot)); s_fp_alloc += __builtin_ia32_rdtsc() - tsc0; if (!alloc_ok) { kfree(buf); if (cbuf) kfree(cbuf); vma_cut(c, at, at + sz, true); __atomic_sub_fetch(&c->mmap_busy, 1, __ATOMIC_SEQ_CST); return -L_ENOMEM; }
             memset(buf, 0, PAGE);
             uint64_t foff = off + (a - at);
-            int64_t n = cos_fd_pread(mo->owner, mo->cosfd, (int64_t)foff, buf, PAGE);
+            int64_t n = -2;
+            if (cbuf) {
+                if (!creq || foff < cstart || foff >= cstart + creq) {
+                    uint64_t want = at + sz - a; if (want > LX_FILL_CHUNK) want = LX_FILL_CHUNK;
+                    uint64_t rt0 = hal_timer_get_ms(); int64_t g = cos_fd_pread(mo->owner, mo->cosfd, (int64_t)foff, cbuf, want); __atomic_add_fetch(&s_fill_read_ms, hal_timer_get_ms() - rt0, __ATOMIC_RELAXED); cstart = foff; creq = want; cn = g > 0 ? (uint64_t)g : 0;
+                }
+                if (foff - cstart + PAGE <= cn) { memcpy(buf, cbuf + (foff - cstart), PAGE); n = PAGE; }
+            }
+            if (n == -2) n = cos_fd_pread(mo->owner, mo->cosfd, (int64_t)foff, buf, PAGE);      /* the end of the file, or a piece that came short: the page alone */
             for (int retry = 0; n < 0 && retry < 5; ++retry) n = cos_fd_pread(mo->owner, mo->cosfd, (int64_t)foff, buf, PAGE);     /* a failed read must not leave a zero page behind: the loader would run on it */
             if (n == (int64_t)PAGE && foff < fsz) {                        /* an all-zero page is read again: a read that "succeeds" with zeros would leave a hole the loader trips over */
                 bool allz = true; for (uint64_t q = 0; q < PAGE; q += 8) if (*(uint64_t *)(buf + q)) { allz = false; break; }
@@ -1161,10 +1241,14 @@ static int64_t sys_mmap(process_t *p, lctx_t *c, uint64_t addr, uint64_t len, ui
             if (n == 0 && foff + PAGE <= fsz + PAGE) { if (!an_eof++) an_first = foff; }
             if (n > 0 && n < (int64_t)PAGE && foff + (uint64_t)n < fsz) { if (!an_short++ && !an_first) an_first = foff; }
             if (n == (int64_t)PAGE) { bool zz = true; for (uint64_t q = 0; q < PAGE; q += 8) if (*(uint64_t *)(buf + q)) { zz = false; break; } if (zz) { if (!an_zero++ && !an_first) an_first = foff; } }
-            if (n < 0 || (n == 0 && foff < fsz)) { serial_puts("[LXE] mmap: reading "); serial_puts(mo->path); serial_puts(" at 0x"); serial_puthex(foff); serial_puts(" failed (got "); serial_putdec((uint64_t)(n < 0 ? 0 : n)); serial_puts(")\n"); kfree(buf); vma_cut(c, at, at + sz, true); __atomic_sub_fetch(&c->mmap_busy, 1, __ATOMIC_SEQ_CST); return -L_EIO; }
-            if (n > 0 && !copy_out(a, buf, (uint64_t)n)) { serial_puts("[LXE] mmap: could not store the page at 0x"); serial_puthex(a); serial_puts("\n"); kfree(buf); vma_cut(c, at, at + sz, true); __atomic_sub_fetch(&c->mmap_busy, 1, __ATOMIC_SEQ_CST); return -L_ENOMEM; }
-            if (!(prot & L_PROT_WRITE) || (prot & L_PROT_EXEC)) paging_protect_page(a, page_flags(prot));
+            if (n < 0 || (n == 0 && foff < fsz)) { serial_puts("[LXE] mmap: reading "); serial_puts(mo->path); serial_puts(" at 0x"); serial_puthex(foff); serial_puts(" failed (got "); serial_putdec((uint64_t)(n < 0 ? 0 : n)); serial_puts(")\n"); kfree(buf); if (cbuf) kfree(cbuf); vma_cut(c, at, at + sz, true); __atomic_sub_fetch(&c->mmap_busy, 1, __ATOMIC_SEQ_CST); return -L_EIO; }
+            uint64_t tsc1 = __builtin_ia32_rdtsc(); bool copy_ok = true; if (n > 0 && was_mapped) copy_ok = copy_out(a, buf, (uint64_t)n); else if (n > 0) { uint64_t fr = paging_virt_to_phys(a) & ~(uint64_t)(PAGE - 1); if (fr) memcpy((void *)(uintptr_t)PHYS_TO_VIRT(fr), buf, (size_t)n); else copy_ok = false; } s_fp_copy += __builtin_ia32_rdtsc() - tsc1; if (!copy_ok) { serial_puts("[LXE] mmap: could not store the page at 0x"); serial_puthex(a); serial_puts("\n"); kfree(buf); if (cbuf) kfree(cbuf); vma_cut(c, at, at + sz, true); __atomic_sub_fetch(&c->mmap_busy, 1, __ATOMIC_SEQ_CST); return -L_ENOMEM; }
+            if (was_mapped && (!(prot & L_PROT_WRITE) || (prot & L_PROT_EXEC))) { uint64_t tsc2 = __builtin_ia32_rdtsc(); paging_protect_page(a, page_flags(prot)); s_fp_prot += __builtin_ia32_rdtsc() - tsc2; }
+            if (use_pc && !was_mapped && foff < fsz && (n == (int64_t)PAGE || (n > 0 && foff + (uint64_t)n >= fsz))) {      /* the page holds what the file has: offer it to the other processes */
+                uint64_t fr = paging_virt_to_phys(a) & ~(uint64_t)(PAGE - 1); if (fr) paging_pcache_put(pc_fh, fsz, (uint32_t)(foff / PAGE), fr);
+            }
         }
+        if (cbuf) kfree(cbuf);
         __atomic_add_fetch(&s_fill_ms, hal_timer_get_ms() - fill_t0, __ATOMIC_RELAXED); __atomic_add_fetch(&s_fill_pages, sz / PAGE, __ATOMIC_RELAXED);
         if (an_eof || an_short || (an_zero > 64)) { serial_puts("[LXE] mmap: "); serial_puts(mo->path); serial_puts(" pid "); serial_putdec(p->pid); serial_puts(" file size per stat "); serial_putdec(fsz); serial_puts(": reads at EOF "); serial_putdec(an_eof);
             serial_puts(" short "); serial_putdec(an_short); serial_puts(" zero pages "); serial_putdec(an_zero); serial_puts(" first at 0x"); serial_puthex(an_first); serial_puts("\n"); }
@@ -1286,6 +1370,20 @@ static int64_t do_open(process_t *p, lctx_t *c, int dirfd, const char *upath, ui
         vo->shm = sh; if (flags & L_O_TRUNC) shm_resize(sh, 0);
         c->fd[slot] = vo; c->cloexec[slot] = (flags & 0x80000) ? 1 : 0; return slot;
     }
+    if (!(flags & (L_O_ACCMODE | L_O_CREAT | L_O_TRUNC)) && (!strcmp(path, "/linux/etc/resolv.conf") || !strcmp(path, "/etc/resolv.conf") || !strcmp(path, "/linux/run/systemd/resolve/stub-resolv.conf") || !strcmp(path, "/run/systemd/resolve/stub-resolv.conf"))) {
+        /* the name server file is made when it is opened, from the resolver the kernel learnt by DHCP: a root file system carries a stub that points at a service
+         * that is not there (/etc/resolv.conf -> /run/systemd/resolve/stub-resolv.conf), and a copy of the builder's file would name a server of somebody else's network */
+        extern void dns_get_server_bytes(uint8_t out[4]);
+        uint8_t d[4]; dns_get_server_bytes(d);
+        ofd_t *vo = ofd_new(FD_MEM, flags); if (!vo) return -L_ENOMEM;
+        char *b = (char *)kmalloc(256); if (!b) { kfree(vo); return -L_ENOMEM; }
+        int n = snprintf(b, 256, "nameserver %d.%d.%d.%d\n", d[0], d[1], d[2], d[3]);
+        if (!(d[0] == 8 && d[1] == 8 && d[2] == 8 && d[3] == 8)) n += snprintf(b + n, 256 - n, "nameserver 8.8.8.8\n");
+        n += snprintf(b + n, 256 - n, "options timeout:2 attempts:2\n");
+        vo->mem = (uint8_t *)b; vo->memlen = (uint32_t)n;
+        snprintf(vo->path, sizeof vo->path, "%s", path);
+        c->fd[slot] = vo; c->cloexec[slot] = (flags & 0x80000) ? 1 : 0; return slot;
+    }
     { int vid, vk = strncmp(path, "/linux", 6) ? vfs_classify(path, &vid) : VFS_NONE;
       if (vk == VFS_DEV || vk == VFS_PROC) {
         ofd_t *vo = ofd_new(vk == VFS_DEV ? FD_DEV : FD_MEM, flags); if (!vo) return -L_ENOMEM;
@@ -1317,6 +1415,7 @@ static int64_t do_open(process_t *p, lctx_t *c, int dirfd, const char *upath, ui
             else mode = COS_O_RDWR_CREATE;
         }
         cos_fd_sync_all();
+        if (acc != 0 || (flags & (L_O_TRUNC | L_O_CREAT))) pcache_path_changed(path);            /* opened to be written: the cached pages of the file are no longer to be trusted */
         int64_t h = cos_fd_open(p->pid, path, mode);
         if (h < 0) return -L_ENOENT;
         o = ofd_new(FD_FILE, flags); if (!o) { cos_fd_close(p->pid, h); return -L_ENOMEM; }
@@ -1436,6 +1535,7 @@ static int64_t ofd_write(process_t *p, lctx_t *c, ofd_t *o, const void *src, uin
     case FD_CON: return console_write(p, c, (const char *)src, n);
     case FD_FILE: {
         int64_t res;
+        pcache_path_changed(o->path);
         if (o->flags & L_O_APPEND) res = cos_fd_write(o->owner, o->cosfd, src, n);
         else { res = cos_fd_pwrite(o->owner, o->cosfd, (int64_t)(use_pos ? pos : o->pos), src, n); }
         if (res < 0) return -L_EBADF;
@@ -1554,7 +1654,7 @@ static uint64_t now_ms(void) { return hal_timer_get_ms(); }
 static int64_t sock_recv(lctx_t *c, ofd_t *o, void *dst, uint64_t n, uint32_t flags, cos_sockaddr6_t *from) {
     if (n > 65536) n = 65536;
     for (;;) {
-        int r = o->counter == COS_SOCK_DGRAM ? cos_sock_recvfrom6((uint32_t)o->owner, (int)o->cosfd, dst, n, from) : cos_sock_recv((uint32_t)o->owner, (int)o->cosfd, dst, n);
+        int r = o->counter == COS_SOCK_DGRAM ? cos_sock_recvfrom6_flags((uint32_t)o->owner, (int)o->cosfd, dst, n, from, (flags & 2) != 0, (flags & 0x20) != 0) : cos_sock_recv((uint32_t)o->owner, (int)o->cosfd, dst, n);
         if (r != -COS_EAGAIN) return r;
         if ((o->flags & L_O_NONBLOCK) || (flags & L_MSG_DONTWAIT)) return -L_EAGAIN;
         if (sig_interrupt(c)) return -L_EINTR;
@@ -1645,7 +1745,7 @@ static int64_t sock_msg(process_t *p, lctx_t *c, ofd_t *o, uint64_t um, uint32_t
         if (!res) {
             res = sock_recv(c, o, buf, tot > 65536 ? 65536 : tot, flags, &peer);
             if (res > 0) {
-                uint64_t left = (uint64_t)res, off = 0;
+                uint64_t left = (uint64_t)res < tot ? (uint64_t)res : tot, off = 0;   /* MSG_TRUNC: res can be the datagram length, past what was read */
                 for (uint64_t i = 0; i < iovn && left; ++i) {
                     uint64_t v[2]; if (!copy_in(v, iov + i * 16, 16)) break;
                     uint64_t k = v[1] < left ? v[1] : left;
@@ -1975,6 +2075,10 @@ static int64_t linux_syscall(process_t *p, lctx_t *c, struct regs *r) {
         size_t n = strlen(c->cwd) + 1; if (a1 < n) return -L_ERANGE;
         return copy_out(a0, c->cwd, n) ? (int64_t)n : -L_EFAULT;
     }
+    case 81: {  /* fchdir */
+        int fd = (int)a0; if (fd < 0 || fd >= LX_MAX_FD || !c->fd[fd]) return -L_EBADF; if (c->fd[fd]->kind != FD_DIR) return -L_ENOTDIR;
+        char norm[320]; path_normalize(c->fd[fd]->path, norm, sizeof norm); snprintf(c->cwd, sizeof c->cwd, "%s", norm); return 0;
+    }
     case 80: {  /* chdir */
         char raw[300], path[256]; if (!copy_str(raw, a0, sizeof raw)) return -L_EFAULT;
         resolve(c, L_AT_FDCWD, raw, path, sizeof path);
@@ -1982,7 +2086,7 @@ static int64_t linux_syscall(process_t *p, lctx_t *c, struct regs *r) {
         char norm[320]; path_normalize(raw[0] == '/' ? raw : path, norm, sizeof norm);
         snprintf(c->cwd, sizeof c->cwd, "%s", raw[0] == '/' ? norm : path); return 0;
     }
-    case 83: { char raw[300], path[256]; if (!fs_ok(p, COS_CAP_FS_WRITE)) return -L_EACCES; if (!copy_str(raw, a0, sizeof raw)) return -L_EFAULT; resolve(c, L_AT_FDCWD, raw, path, sizeof path); return cos_fs_mkdir(path) ? 0 : -L_EEXIST; }
+    case 83: case 258: { char raw[300], path[256]; if (!fs_ok(p, COS_CAP_FS_WRITE)) return -L_EACCES; if (!copy_str(raw, nr == 258 ? a1 : a0, sizeof raw)) return -L_EFAULT; resolve(c, nr == 258 ? (int)a0 : L_AT_FDCWD, raw, path, sizeof path); return cos_fs_mkdir(path) ? 0 : -L_EEXIST; }
     case 87: case 263: { char raw[300], path[256]; if (!fs_ok(p, COS_CAP_FS_WRITE)) return -L_EACCES; if (!copy_str(raw, nr == 263 ? a1 : a0, sizeof raw)) return -L_EFAULT; resolve(c, nr == 263 ? (int)a0 : L_AT_FDCWD, raw, path, sizeof path);
         if (!strncmp(path, "/dev/shm/", 9)) {                                          /* shm_unlink() */
             lx_shm_t *sh = NULL; uint64_t fl = sync_irq_save();
@@ -1991,6 +2095,7 @@ static int64_t linux_syscall(process_t *p, lctx_t *c, struct regs *r) {
             if (!sh) return -L_ENOENT;
             shm_unref(sh); return 0;
         }
+        pcache_path_changed(path);
         return cos_fs_unlink(path) ? 0 : -L_ENOENT; }
     case 84: { char raw[300], path[256]; if (!fs_ok(p, COS_CAP_FS_WRITE)) return -L_EACCES; if (!copy_str(raw, a0, sizeof raw)) return -L_EFAULT; resolve(c, L_AT_FDCWD, raw, path, sizeof path); return cos_fs_unlink(path) ? 0 : -L_ENOENT; }   /* rmdir */
     case 88: case 266: return -L_EPERM;   /* symlink: a FAT volume has none (programs fall back) */
@@ -2110,12 +2215,18 @@ static int64_t linux_syscall(process_t *p, lctx_t *c, struct regs *r) {
         ofd_t *f = F(c, (int)a0); if (!f) return -L_EBADF;
         if (a1 == 0x5413 /* TIOCGWINSZ */ && f->kind == FD_CON) { uint16_t ws[4] = { 25, 80, 0, 0 }; return copy_out(a2, ws, 8) ? 0 : -L_EFAULT; }
         if (a1 == 0x5421 /* FIONBIO */) { int v; if (!copy_in(&v, a2, 4)) return -L_EFAULT; if (v) f->flags |= L_O_NONBLOCK; else f->flags &= ~L_O_NONBLOCK; return 0; }
-        if (a1 == 0x541B /* FIONREAD */) { int v = f->kind == FD_PIPE_R ? (int)f->pipe->len : 0; return copy_out(a2, &v, 4) ? 0 : -L_EFAULT; }
+        if (a1 == 0x541B /* FIONREAD */) {
+            int v = f->kind == FD_PIPE_R ? (int)f->pipe->len : 0;
+            /* a datagram socket: the size of the next datagram. glibc's resolver starts the second answer of an A+AAAA lookup with no buffer and asks this how large to make
+             * it; an answer of 0 made it read the datagram into nothing and lose it */
+            if (f->kind == FD_SOCK && f->counter == COS_SOCK_DGRAM) { int n = cos_sock_recvfrom6_flags((uint32_t)f->owner, (int)f->cosfd, NULL, 0, NULL, 1, 1); v = n > 0 ? n : 0; }
+            return copy_out(a2, &v, 4) ? 0 : -L_EFAULT;
+        }
         return -L_ENOTTY;
     }
     case 137: case 138: {   /* statfs, fstatfs: a large tmpfs-like volume (4 KiB blocks) */
         uint64_t sf[15]; memset(sf, 0, sizeof sf);
-        sf[0] = 0x01021994; sf[1] = 4096; sf[2] = 1u << 20; sf[3] = 1u << 19; sf[4] = 1u << 19; sf[5] = 1u << 20; sf[6] = 1u << 19; sf[9] = 255; sf[10] = 4096;
+        sf[0] = 0x01021994; sf[1] = 4096; sf[2] = 1u << 20; sf[3] = 1u << 19; sf[4] = 1u << 19; sf[5] = 1u << 20; sf[6] = 1u << 19; sf[8] = 255; sf[9] = 4096;
         return copy_out(a1, sf, sizeof sf) ? 0 : -L_EFAULT;
     }
     case 140: case 141: return 0;                                                        /* getpriority, setpriority */
@@ -2129,9 +2240,11 @@ static int64_t linux_syscall(process_t *p, lctx_t *c, struct regs *r) {
     case 77: case 285: {  /* ftruncate, fallocate */
         ofd_t *f = F(c, (int)a0); if (!f) return -L_EBADF;
         uint64_t nsz = nr == 77 ? a1 : a2 + a3;                          /* fallocate(fd, mode, offset, len) */
+        if (nr == 285 && (a1 & 3)) return 0;                             /* KEEP_SIZE / PUNCH_HOLE: the size stays; the blocks are not given back */
         if (f->kind == FD_MEMFD) { if (nr == 285 && nsz < f->shm->size) return 0; return shm_resize(f->shm, nsz) ? 0 : -L_ENOMEM; }
         if (f->kind == FD_FILE) {
             uint64_t size = 0; uint8_t isdir = 0; cos_fs_stat(f->path, &size, &isdir);
+            pcache_path_changed(f->path);
             if (nsz > size) { uint8_t z[4096]; memset(z, 0, sizeof z); cos_fd_lseek(f->owner, f->cosfd, (int64_t)size); for (uint64_t at = size; at < nsz; ) { uint64_t m = nsz - at < sizeof z ? nsz - at : sizeof z; if (cos_fd_write(f->owner, f->cosfd, z, m) < 0) return -L_ENOMEM; at += m; } }
             return 0;
         }
@@ -2147,6 +2260,7 @@ static int64_t linux_syscall(process_t *p, lctx_t *c, struct regs *r) {
         case 2: c->cloexec[a0] = (a2 & 1) != 0; return 0;
         case 3: return f->flags;
         case 4: f->flags = (f->flags & ~(uint32_t)(L_O_NONBLOCK | L_O_APPEND)) | ((uint32_t)a2 & (L_O_NONBLOCK | L_O_APPEND)); return 0;
+        case 5: case 36: { uint16_t unlck = 2; return copy_out(a2, &unlck, 2) ? 0 : -L_EFAULT; }   /* F_GETLK, F_OFD_GETLK: no other holder (l_type = F_UNLCK; left as it came it would read as a conflicting lock, and SQLite then sees a held lock) */
         default: return 0;
         }
     }
@@ -2377,7 +2491,25 @@ static int64_t linux_syscall(process_t *p, lctx_t *c, struct regs *r) {
     case 95: return 022;                                                       /* umask */
     case 157: return 0;                                                        /* prctl */
     case 90: case 91: case 92: case 93: case 94: case 268: case 260: case 74: case 75: return 0;   /* chmod, chown, fsync: nothing to do here */
-    case 82: { char ra[200], rb[200], pa[256], pb[256]; if (!fs_ok(p, COS_CAP_FS_WRITE)) return -L_EACCES; if (!copy_str(ra, a0, sizeof ra) || !copy_str(rb, a1, sizeof rb)) return -L_EFAULT; resolve(c, L_AT_FDCWD, ra, pa, sizeof pa); resolve(c, L_AT_FDCWD, rb, pb, sizeof pb); return cos_fs_rename(pa, pb) ? 0 : -L_ENOENT; }
+    case 82: case 264: case 316: {   /* rename, renameat, renameat2: an existing destination file is replaced (rename(2); FatFs alone refuses), RENAME_NOREPLACE keeps the refusal */
+        char ra[200], rb[200], pa[256], pb[256]; if (!fs_ok(p, COS_CAP_FS_WRITE)) return -L_EACCES;
+        int oldfd = L_AT_FDCWD, newfd = L_AT_FDCWD; uint64_t pa0 = a0, pb0 = a1;
+        if (nr != 82) { oldfd = (int)a0; pa0 = a1; newfd = (int)a2; pb0 = a3; }
+        if (!copy_str(ra, pa0, sizeof ra) || !copy_str(rb, pb0, sizeof rb)) return -L_EFAULT;
+        resolve(c, oldfd, ra, pa, sizeof pa); resolve(c, newfd, rb, pb, sizeof pb);
+        pcache_path_changed(pa); pcache_path_changed(pb);
+        uint64_t osz = 0, nsz2 = 0; uint8_t odir = 0, ndir = 0;
+        if (!cos_fs_stat(pa, &osz, &odir)) return -L_ENOENT;
+        if (cos_fs_stat(pb, &nsz2, &ndir)) {
+            if (nr == 316 && (a4 & 1)) return -L_EEXIST;
+            if (!strcmp(pa, pb)) return 0;
+            if (ndir && !odir) return -L_EISDIR;
+            if (!ndir && odir) return -L_ENOTDIR;
+            if (!cos_fs_unlink(pb)) return -L_ENOTEMPTY;
+        }
+        return cos_fs_rename(pa, pb) ? 0 : -L_ENOENT;
+    }
+    case 73: return 0;   /* flock: one program at a time touches these files; nothing to arbitrate here */
     case 1000000: break;
     case 435: {  /* clone3: struct clone_args mapped onto clone's arguments */
         if (a1 < 64) return -L_EINVAL;
@@ -2400,7 +2532,12 @@ static int64_t linux_syscall(process_t *p, lctx_t *c, struct regs *r) {
     case 99: { uint8_t si[112]; memset(si, 0, sizeof si); *(uint64_t *)(si + 32) = 128ull << 20; *(uint64_t *)(si + 40) = 64ull << 20; si[104] = 1; return copy_out(a0, si, sizeof si) ? 0 : -L_EFAULT; }   /* sysinfo */
     case 60: case 231: {  /* exit (this thread), exit_group (all of them) */
         if (nr == 60 && p->thread_count > 1) thread_end(p, c, (int)a0);
-        serial_puts("[LINUX] pid "); serial_putdec(p->pid); serial_puts(" exit "); serial_putdec((uint64_t)(int64_t)(int)a0); serial_puts("\n");
+        if ((int)a0 != 0 && serial_is_verbose()) {                       /* what a program that failed was doing: its name and its last calls */
+            serial_puts("[LXH] pid "); serial_putdec(p->pid); serial_puts(" "); serial_puts(c->exe); serial_puts(" status "); serial_putdec((uint64_t)(int64_t)(int)a0); serial_puts(" last calls:");
+            uint32_t hn = c->hist_n; for (uint32_t k = hn > 24 ? hn - 24 : 0; k < hn; ++k) { serial_puts(" "); serial_putdec(c->hist[k % 24].nr); serial_puts("="); if (c->hist[k % 24].ret < 0) { serial_puts("-"); serial_putdec((uint64_t)(-c->hist[k % 24].ret)); } else serial_putdec((uint64_t)c->hist[k % 24].ret); }
+            serial_puts("\n");
+        }
+        serial_puts("[LINUX] pid "); serial_putdec(p->pid); serial_puts(" exit "); serial_putdec((uint64_t)(int64_t)(int)a0); serial_puts(" (free pages "); serial_putdec(phys_memory_get_stats()->free_pages); serial_puts(")\n");
         notify_parent(p);
         process_exit(p, (int)a0);
         thread_exit(scheduler_get_current_thread(), (int)a0);
@@ -2480,7 +2617,8 @@ static int64_t linux_syscall(process_t *p, lctx_t *c, struct regs *r) {
         uint64_t n = a2 > 65536 ? 65536 : a2; uint8_t *b = (uint8_t *)kmalloc(n ? n : 1); if (!b) return -L_ENOMEM;
         cos_sockaddr6_t from; memset(&from, 0, sizeof from);
         int64_t r = sock_recv(c, o, b, n, (uint32_t)a3, &from);
-        if (r > 0) { if (!copy_out(a1, b, (uint64_t)r)) r = -L_EFAULT; else if (a4 && o->counter == COS_SOCK_DGRAM) sa_put(o, a4, a5, &from); }
+        if (r >= 0 && s_trace_all > 0 && o->counter == COS_SOCK_DGRAM) { serial_puts("[LXD] recvfrom n="); serial_putdec(n); serial_puts(" flags=0x"); serial_puthex(a3); serial_puts(" r="); serial_putdec((uint64_t)r); serial_puts(" head="); for (int i = 0; i < 12 && (uint64_t)i < (uint64_t)r && (uint64_t)i < n; ++i) serial_puthex(b[i]); serial_puts("\n"); }
+        if (r >= 0) { uint64_t keep = (uint64_t)r < n ? (uint64_t)r : n; if (keep && !copy_out(a1, b, keep)) r = -L_EFAULT; else if (a4 && o->counter == COS_SOCK_DGRAM) sa_put(o, a4, a5, &from); }   /* MSG_TRUNC: r is the datagram's length, only what fits is copied */
         kfree(b); return r;
     }
     case 46: case 47: {  /* sendmsg, recvmsg */
@@ -2572,19 +2710,25 @@ void cos_linux_dbg_thread(uint32_t tid) {
 static int s_trace_all = -1;      /* /linux/etc/cos.trace present: print process, socket and wait calls as they finish */
 static void trace_note(process_t *p, struct regs *r, int64_t res) {
     if (res < 0 && res >= -133 && r->rax < 400 && s_fail[r->rax][-res] < 65535) s_fail[r->rax][-res]++;
+    { lctx_t *hc = ctx_of(p); if (hc) { uint32_t hi = hc->hist_n++ % 24; hc->hist[hi].nr = (uint16_t)r->rax; hc->hist[hi].ret = res; hc->hist[hi].a0 = r->rdi; } }
     lx_trace_t *t = &s_trace[s_trace_n++ & 63];
     t->nr = r->rax; t->a0 = r->rdi; t->a1 = r->rsi; t->a2 = r->rdx; t->ret = (uint64_t)res; t->pid = (uint32_t)p->pid; t->tid = (uint32_t)cur_tid(); t->s[0] = 0;
     uint64_t sp = 0; switch (t->nr) { case 2: case 4: case 6: case 21: case 59: case 80: case 89: case 83: case 84: case 87: sp = r->rdi; break; case 257: case 262: case 267: case 269: case 258: case 263: sp = r->rsi; break; default: break; }
     if (sp) copy_str(t->s, sp, sizeof t->s);
     { static int memfail_n; uint64_t n = r->rax; if (res < 0 && res > -4096 && (n == 9 || n == 10 || n == 11 || n == 12 || n == 25 || n == 56 || n == 57 || n == 319) && memfail_n < 60) { memfail_n++; serial_puts("[LXE] memory call "); serial_putdec(n); serial_puts(" failed with "); serial_putdec((uint64_t)-res); serial_puts(" a0=0x"); serial_puthex(r->rdi); serial_puts(" a1=0x"); serial_puthex(r->rsi); serial_puts(" a2=0x"); serial_puthex(r->rdx); serial_puts(" a3=0x"); serial_puthex(r->r10); serial_puts("\n"); } }
     { static int efault_n; if (res == -14 && efault_n < 40) { efault_n++; serial_puts("[LXE] EFAULT from system call "); serial_putdec(r->rax); serial_puts(" a0=0x"); serial_puthex(r->rdi); serial_puts(" a1=0x"); serial_puthex(r->rsi); serial_puts(" a2=0x"); serial_puthex(r->rdx); serial_puts(" a3=0x"); serial_puthex(r->r10); serial_puts("\n"); } }
+    { static int ft = -1; static uint32_t ftn;                                               /* /linux/etc/cos.failtrace: every failed call (not the everyday ENOENT / EAGAIN), with the path where there is one */
+      if (ft < 0) { uint64_t sz; uint8_t d; ft = cos_fs_stat("/linux/etc/cos.failtrace", &sz, &d) ? 1 : 0; }
+      if (ft && res < 0 && res >= -133 && ftn < 4000 && r->rax != 202 && !(r->rax == 16 && res == -25) && !((res == -11 || res == -2 || res == -4) && !strstr(t->s, "storage"))) {
+          ftn++; serial_puts("[LXF] "); serial_putdec(p->pid); serial_puts("/"); serial_putdec(cur_tid()); serial_puts(" nr "); serial_putdec(r->rax); serial_puts(" "); serial_puthex(r->rdi); serial_puts(" "); serial_puthex(r->rsi);
+          serial_puts(" "); serial_puthex(r->rdx); serial_puts(" = -"); serial_putdec((uint64_t)(-res)); if (t->s[0]) { serial_puts(" \""); serial_puts(t->s); serial_puts("\""); } serial_puts("\n"); } }
     if (s_trace_all < 0) { uint64_t sz; uint8_t d; s_trace_all = cos_fs_stat("/linux/etc/cos.trace", &sz, &d) ? 1 : 0; }
     if (s_trace_all) {
         uint64_t n = r->rax;
         static int all = -1; if (all < 0) { uint64_t sz2; uint8_t d2; all = cos_fs_stat("/linux/etc/cos.traceall", &sz2, &d2) ? 1 : 0; }
         if (all || (n >= 41 && n <= 55) || n == 288 || n == 53 || n == 7 || n == 232 || n == 281 || n == 56 || n == 57 || n == 58 || n == 59 || n == 435 || n == 61 || n == 60 || n == 231 || n == 247 || n == 271 || n == 17 || n == 0 || n == 1 || n == 3 || n == 22 || n == 293 || n == 290 || n == 284) {
             serial_puts("[LXT] "); serial_putdec(p->pid); serial_puts("/"); serial_putdec(cur_tid()); serial_puts(" nr "); serial_putdec(n);
-            serial_puts(" "); serial_puthex(r->rdi); serial_puts(" "); serial_puthex(r->rsi); serial_puts(" "); serial_puthex(r->rdx); serial_puts(" = "); serial_puthex((uint64_t)res);
+            serial_puts(" "); serial_puthex(r->rdi); serial_puts(" "); serial_puthex(r->rsi); serial_puts(" "); serial_puthex(r->rdx); if (n == 45 || n == 44 || n == 46 || n == 47) { serial_puts(" f"); serial_puthex(r->r10); } serial_puts(" = "); serial_puthex((uint64_t)res);
             if (n == 7 && r->rsi <= 4) {                                                   /* poll: which descriptors, what kind, what came back */
                 struct { int32_t fd; int16_t ev, rev; } pf[4];
                 if (copy_in(pf, r->rdi, r->rsi * 8)) for (uint64_t i = 0; i < r->rsi; ++i) {
@@ -2651,12 +2795,19 @@ static void code_watch_step(process_t *p, lctx_t *c) {
 }
 
 /* ---- profiling aid: every 60 s of uptime, the busiest threads and system calls since the last report (/linux/etc/cos.prof) ---- */
-uint32_t s_epdbg_n; uint32_t s_epdbg[8][5]; uint64_t s_fill_ms, s_fill_pages;
+uint32_t s_epdbg_n; uint32_t s_epdbg[8][5]; uint64_t s_fill_ms, s_fill_pages, s_fill_read_ms, s_fp_alloc, s_fp_copy, s_fp_prot;
 static uint32_t s_pf_tid[512], s_pf_nr[400]; static uint64_t s_pf_last, s_pf_total; static int s_pf_on = -1;
 
 /* ---- profiling aid (/linux/etc/cos.prof): where the user code of a Linux program spends its time, sampled by the timer interrupts ---- */
 static struct { char name[56]; uint32_t n; } s_ps[48]; static uint32_t s_ps_total;
+static uint64_t s_tk[4];                                       /* profile: timer ticks seen on all CPUs: Linux program in user mode, another program in user mode, kernel, idle */
+static uint64_t s_cyc_nr[400];                                 /* profile: cycles (wall clock, blocked time included) spent inside each Linux system call */
 void cos_linux_prof_sample(struct regs *r) {
+    if (s_pf_on > 0) {
+        process_t *q = process_get_current(); int k;
+        if ((r->cs & 3) == 3) k = (q && q->linux_ctx) ? 0 : 1; else k = (q && q->type == TASK_TYPE_IDLE) ? 3 : 2;
+        __atomic_fetch_add(&s_tk[k], 1, __ATOMIC_RELAXED);
+    }
     if (s_pf_on <= 0 || (r->cs & 3) != 3) return;
     process_t *p = process_get_current(); if (!p || !p->linux_ctx) return;
     lctx_t *c = ctx_of(p); uint32_t fp = c->fpid ? c->fpid : (uint32_t)p->pid; const char *nm = "(anonymous: JIT, heap, stack)";
@@ -2671,7 +2822,11 @@ static void prof_sample_report(void) {
     serial_puts(" of "); serial_putdec(s_ps_total); serial_puts("\n"); s_ps_total = 0; memset(s_ps, 0, sizeof s_ps);
 }
 static void prof_note(uint32_t tid, uint64_t nr) {
-    if (s_pf_on < 0) { uint64_t sz; uint8_t d; s_pf_on = cos_fs_stat("/linux/etc/cos.prof", &sz, &d) ? 1 : 0; s_pf_last = hal_timer_get_ms(); }
+    if (s_pf_on < 0) { uint64_t sz; uint8_t d; s_pf_on = cos_fs_stat("/linux/etc/cos.prof", &sz, &d) ? 1 : 0;
+#ifdef COS_SERIAL_VERBOSE
+        s_pf_on = 1;                                                  /* the test build (make SERIAL_VERBOSE=1) always profiles */
+#endif
+        s_pf_last = hal_timer_get_ms(); }
     if (!s_pf_on) return;
     s_pf_tid[tid & 511]++; if (nr < 400) s_pf_nr[nr]++; s_pf_total++;
     if ((s_pf_total & 255) || hal_timer_get_ms() - s_pf_last < 60000) return;
@@ -2679,7 +2834,17 @@ static void prof_note(uint32_t tid, uint64_t nr) {
     serial_puts("[PROF] syscalls in the last minute: "); serial_putdec(s_pf_total); serial_puts("\n[PROF]  by thread:");
     for (int k = 0; k < 6; ++k) { int b = -1; uint32_t bv = 0; for (int i = 0; i < 512; ++i) if (s_pf_tid[i] > bv) { bv = s_pf_tid[i]; b = i; } if (b < 0) break; serial_puts(" "); serial_putdec((uint64_t)b); serial_puts("="); serial_putdec(bv); s_pf_tid[b] = 0; }
     serial_puts("\n"); prof_sample_report();
-    serial_puts("[PROF]  file fill so far: "); serial_putdec(s_fill_ms); serial_puts(" ms for "); serial_putdec(s_fill_pages); serial_puts(" pages");
+    {   /* where the time goes: ticks by mode, page fault time, the system calls that took the most wall time (blocked time included: futex/poll waits are idle time) */
+        static uint64_t tsc_last, ms_last; uint64_t tsc = __builtin_ia32_rdtsc(), ms = hal_timer_get_ms();
+        uint64_t per_ms = (ms > ms_last && tsc_last) ? (tsc - tsc_last) / (ms - ms_last) : 0; if (!per_ms) per_ms = 2000000; tsc_last = tsc; ms_last = ms;
+        uint64_t tt = s_tk[0] + s_tk[1] + s_tk[2] + s_tk[3]; if (!tt) tt = 1;
+        serial_puts("[PROF]  timer ticks (all CPUs, %): linux user "); serial_putdec(s_tk[0] * 100 / tt); serial_puts(", other user "); serial_putdec(s_tk[1] * 100 / tt); serial_puts(", kernel "); serial_putdec(s_tk[2] * 100 / tt); serial_puts(", idle "); serial_putdec(s_tk[3] * 100 / tt); serial_puts(" of "); serial_putdec(tt); serial_puts("\n");
+        serial_puts("[PROF]  page faults of Linux programs: "); serial_putdec(s_pfc_n); serial_puts(" taking "); serial_putdec(s_pfc_cyc / per_ms); serial_puts(" ms\n");
+        serial_puts("[PROF]  by wall time (nr=ms):");
+        for (int k = 0; k < 8; ++k) { int b = -1; uint64_t bv = 0; for (int i = 0; i < 400; ++i) if (s_cyc_nr[i] > bv) { bv = s_cyc_nr[i]; b = i; } if (b < 0) break; serial_puts(" "); serial_putdec((uint64_t)b); serial_puts("="); serial_putdec(bv / per_ms); s_cyc_nr[b] = 0; }
+        serial_puts("\n"); memset(s_tk, 0, sizeof s_tk); memset(s_cyc_nr, 0, sizeof s_cyc_nr); s_pfc_cyc = 0; s_pfc_n = 0;
+    }
+    serial_puts("[PROF]  file fill so far: "); serial_putdec(s_fill_ms); serial_puts(" ms (reads "); serial_putdec(s_fill_read_ms); serial_puts(", Mcycles alloc/copy/protect "); serial_putdec(s_fp_alloc >> 20); serial_puts("/"); serial_putdec(s_fp_copy >> 20); serial_puts("/"); serial_putdec(s_fp_prot >> 20); serial_puts(" ms) for "); serial_putdec(s_fill_pages); serial_puts(" pages");
     serial_puts("\n[PROF]  by call:");
     for (int k = 0; k < 8; ++k) { int b = -1; uint32_t bv = 0; for (int i = 0; i < 400; ++i) if (s_pf_nr[i] > bv) { bv = s_pf_nr[i]; b = i; } if (b < 0) break; serial_puts(" "); serial_putdec((uint64_t)b); serial_puts("="); serial_putdec(bv); s_pf_nr[b] = 0; }
     serial_puts("\n[PROF]  last epoll hits (tid fd kind watch ready):");
@@ -2694,8 +2859,11 @@ bool cos_linux_try_syscall(struct regs *r) {
     if (!copy_in(op, r->rip, 2) || op[0] != 0x0F || op[1] != 0x05) return false;
     lctx_t *c = ctx_of(p);
     uint64_t nr = r->rax;
+    { extern void sync_lock_set_site(uint64_t); sync_lock_set_site(0x1000000ull + nr); }        /* the lock profile (sync.c): "system call nr" */
     { lx_cur_t *cu = &s_cur[cur_tid() & 511]; cu->nr = r->rax; cu->a0 = r->rdi; cu->a1 = r->rsi; cu->a2 = r->rdx; cu->tid = (uint32_t)cur_tid(); }
+    uint64_t sc_t0 = __builtin_ia32_rdtsc();
     int64_t res = linux_syscall(p, c, r);
+    if (nr < 400) __atomic_fetch_add(&s_cyc_nr[nr], __builtin_ia32_rdtsc() - sc_t0, __ATOMIC_RELAXED);
     prof_note((uint32_t)cur_tid(), nr);
     { static uint32_t cwn; if ((++cwn & 31) == 0) code_watch_step(p, c); }
     if (res != LX_FRAME_SET) trace_note(p, r, res);
@@ -2732,9 +2900,20 @@ void cos_linux_release_pages(process_t *proc) {
     cos_linux_audit_parent(proc);
 }
 
+/* At the exit of a program: its descriptors are closed now. The table of its ranges (the context) stays while the address space is still there: the frames of its mmap
+ * and brk ranges are given back by cos_linux_release_pages() later (the reaper, or at once), and that walks this table. It used to be freed here first, so those frames were never
+ * returned: every Linux program that ended (or was killed) kept all of its mmap memory for good. */
 void cos_linux_release(process_t *proc) {
     if (!proc || !proc->linux_ctx) return;
-    { lctx_t *cc = ctx_of(proc); for (int i = 0; i < LX_MAX_FD; ++i) fd_close_slot(cc, i); if (cc->vma) kfree(cc->vma); }
+    { lctx_t *cc = ctx_of(proc); for (int i = 0; i < LX_MAX_FD; ++i) fd_close_slot(cc, i); }
+    if (proc->page_dir) return;
+    cos_linux_release_final(proc);
+}
+/* the frames are back (or there never were any): the table and the context go */
+void cos_linux_release_final(process_t *proc) {
+    if (!proc || !proc->linux_ctx) return;
+    lctx_t *cc = ctx_of(proc);
+    if (cc->vma) kfree(cc->vma);
     kfree(proc->linux_ctx);
     proc->linux_ctx = NULL;
 }
@@ -2747,6 +2926,54 @@ static const char *env_get(const char *const *envp, int envc, const char *name) 
     size_t n = strlen(name);
     for (int i = 0; i < envc; ++i) if (envp && envp[i] && !strncmp(envp[i], name, n) && envp[i][n] == '=') return envp[i] + n + 1;
     return NULL;
+}
+
+/* ---- the vDSO ----------------------------------------------------------------------------------------------------------------------------------------
+ * Two pages every Linux process maps at LX_VDSO_ADDR: an ELF shared object (tools/vdso/vdso.c: clock_gettime, gettimeofday, time, clock_getres) and, right after
+ * it, the data page the timer tick fills (cos_vdso_tick; one shared page, the same frame everywhere). glibc finds the object through AT_SYSINFO_EHDR and calls it
+ * instead of the system call: a read of the clock no longer traps into the kernel. The object's page is a private copy per process: the dynamic loader adds the
+ * load address to the entries of its dynamic section in place, which a page shared by all processes would take twice. */
+#include "cos_vdso_blob.h"
+#define LX_VDSO_ADDR 0x00007FFF00000000ull
+struct lx_vdso_data { volatile uint32_t seq; uint32_t pad; volatile uint64_t hz, base_tsc, base_ms, tick_ms, wall_base; };
+static lx_shm_t *s_vdso_shm; static volatile struct lx_vdso_data *s_vdso_data; static volatile uint32_t s_vdso_busy;
+extern void timer_vdso_snapshot(uint64_t *hz, uint64_t *base_tsc, uint64_t *base_ms, uint64_t *tick_ms);
+void cos_vdso_tick(void) {                                                   /* from the timer interrupt: no locks, no allocation */
+    volatile struct lx_vdso_data *d = s_vdso_data; if (!d) return;
+    if (__atomic_exchange_n(&s_vdso_busy, 1u, __ATOMIC_ACQUIRE)) return;
+    uint64_t hz, bt, bm, tm; timer_vdso_snapshot(&hz, &bt, &bm, &tm);
+    d->seq = d->seq + 1u; __asm__ volatile("" ::: "memory");
+    d->hz = hz; d->base_tsc = bt; d->base_ms = bm; d->tick_ms = tm;
+    __asm__ volatile("" ::: "memory"); d->seq = d->seq + 1u;
+    __atomic_store_n(&s_vdso_busy, 0u, __ATOMIC_RELEASE);
+}
+static bool vdso_init(void) {
+    if (s_vdso_shm) return true;
+    uint64_t fl = sync_irq_save();
+    if (s_vdso_shm) { sync_irq_restore(fl); return true; }
+    bool ok = false; lx_shm_t *sh = shm_new("vdso");
+    if (sh && shm_resize(sh, PAGE) && cos_vdso_blob_len <= PAGE) {
+        uint64_t f = shm_frame(sh, 0);
+        if (f) {
+            volatile struct lx_vdso_data *d = (volatile struct lx_vdso_data *)(uintptr_t)PHYS_TO_VIRT(f);
+            d->wall_base = wall_base_ms();
+            s_vdso_shm = sh; __asm__ volatile("" ::: "memory"); s_vdso_data = d; ok = true;
+        }
+    }
+    sync_irq_restore(fl);
+    if (ok) cos_vdso_tick();
+    else serial_puts("[LINUX] the vDSO could not be set up; clock calls stay system calls\n");
+    return ok;
+}
+/* (the address space of `proc` is the active one) */
+static bool vdso_map(process_t *proc, lctx_t *c) {
+    if (!vdso_init()) return false;
+    const uint32_t code_prot = L_PROT_READ | L_PROT_WRITE | L_PROT_EXEC;
+    if (!vma_insert(c, LX_VDSO_ADDR, LX_VDSO_ADDR + PAGE, code_prot)) return false;
+    if (!task_alloc_page(proc, LX_VDSO_ADDR, page_flags(code_prot))) { vma_cut(c, LX_VDSO_ADDR, LX_VDSO_ADDR + PAGE, false); return false; }
+    memcpy((void *)(uintptr_t)LX_VDSO_ADDR, cos_vdso_blob, cos_vdso_blob_len);
+    if (!vma_insert_shm(c, LX_VDSO_ADDR + PAGE, LX_VDSO_ADDR + 2 * PAGE, L_PROT_READ, s_vdso_shm, 0)) { vma_cut(c, LX_VDSO_ADDR, LX_VDSO_ADDR + PAGE, true); return false; }
+    return true;
 }
 
 /* Maps `image` and its interpreter into the address space of `proc` (this switches to it) and builds the initial stack. The ranges of `c` must be empty. */
@@ -2790,6 +3017,7 @@ static bool lx_load(process_t *proc, lctx_t *c, const char *path, const uint8_t 
         sp.at_phdr = obj->phdr; sp.at_phent = obj->phentsize; sp.at_phnum = obj->phnum;
         sp.at_entry = obj->entry; sp.at_base = iobj ? iobj->base : 0;
         sp.execfn = path;
+        if (vdso_map(proc, c)) sp.at_sysinfo_ehdr = LX_VDSO_ADDR;
         sp.at_random_seed[0] = cos_random_u64(); sp.at_random_seed[1] = cos_random_u64();
         ok = cos_elf_setup_stack_ex((page_directory_t *)proc->page_dir, proc->stack_end, &sp, &rsp);
         entry = iobj ? iobj->entry : obj->entry;

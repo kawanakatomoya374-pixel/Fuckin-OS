@@ -1,6 +1,6 @@
 /**
- * bios.c - C-OS 4.0.8 alpha BIOS Implementation (Working Version)
- * Basic Input/Output System for C-OS 4.0.8 alpha
+ * bios.c - C-OS 4.1.0 BIOS Implementation (Working Version)
+ * Basic Input/Output System for C-OS 4.1.0
  */
 
 #include "bios.h"
@@ -91,7 +91,9 @@ void bios_get_system_info_copy(bios_system_info_t* out) {
     memcpy(out, &sys_info, sizeof(sys_info));
 }
 
+extern void cos_bootupd_confirm_now(void) __attribute__((weak));
 void bios_shutdown(void) {
+    if (cos_bootupd_confirm_now) cos_bootupd_confirm_now();
     /* Try ACPI/ACPICA first, then common emulator power-off ports, then halt. */
     (void)acpi_power_poweroff();
     outw(0x604, 0x2000);
@@ -101,6 +103,7 @@ void bios_shutdown(void) {
 }
 
 void bios_reboot(void) {
+    if (cos_bootupd_confirm_now) cos_bootupd_confirm_now();
     /* Try keyboard-controller reset first, then fall back to halt. */
     outb(0x64, 0xFE);
     for (volatile int i = 0; i < 1000000; ++i) {
@@ -184,7 +187,7 @@ void bios_post_display(const bios_post_status_t* status) {
     vga_clear(0);
     vga_set_color(VGA_COLOR_WHITE);
     
-    vga_printf("C-OS 4.0.8 alpha\n");
+    vga_printf("C-OS 4.1.0\n");
     vga_printf("==================\n");
     
     if (status->cpu_test) {
@@ -272,7 +275,7 @@ void bios_detect_disks(void) {
     disk_count = 0;
     
     // Add virtual storage disk
-    strcpy(disks[0].model, "C-OS 4.0.8 alpha VFS Disk");
+    strcpy(disks[0].model, "C-OS 4.1.0 VFS Disk");
     strcpy(disks[0].serial, "VFS001");
     disks[0].type = 0x80;  // HDD type
     disks[0].size_mb = 32;  // 32MB VFS
@@ -312,7 +315,7 @@ int bios_get_system_info(void) {
     sys_info.available_memory_kb = (total_memory_kb > 1024) ? (total_memory_kb - 1024) : total_memory_kb;
 
     // BIOS information
-    strcpy(sys_info.bios_vendor, "C-OS 4.0.8 alpha BIOS");
+    strcpy(sys_info.bios_vendor, "C-OS 4.1.0 BIOS");
     strcpy(sys_info.bios_version, "4.0.5");
     strcpy(sys_info.bios_date, "2026-05-10");
 

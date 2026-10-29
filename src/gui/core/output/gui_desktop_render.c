@@ -19,6 +19,7 @@
 #include "timer.h"
 #include "gui_render_engine.h"
 #include "gui_utils.h"
+#include "../apps/common/gui_apps_common.h"
 #include "../apps/system/password_screen.h"
 #include "../components/boot_animation.h"
 #include "notification_center.h"
@@ -758,6 +759,49 @@ void gui_draw_app_icon(int kind, int x, int y, int size, bool hov) {
     }
 }
 
+/* ".app" shortcuts: the icon is a PNG named by the shortcut's icon= line,
+ * decoded once per shortcut (a handful of 64..128 px images) and cached. */
+#define APPICON_CACHE 24
+static struct { char path[128]; uint32_t* px; uint64_t w, h; bool tried; } s_appicon[APPICON_CACHE];
+
+static bool gui_draw_app_shortcut_icon(const desktop_icon_t* ic, int x, int y, int size, bool hov) {
+    extern bool png_decode(const uint8_t* data, uint64_t size, uint8_t* out_bgra,
+                           uint64_t max_out_w, uint64_t max_out_h, uint64_t* out_w, uint64_t* out_h);
+    int slot = -1;
+    for (int i = 0; i < APPICON_CACHE; ++i) if (s_appicon[i].path[0] && !strcmp(s_appicon[i].path, ic->path)) { slot = i; break; }
+    if (slot < 0) {
+        for (int i = 0; i < APPICON_CACHE; ++i) if (!s_appicon[i].path[0]) { slot = i; break; }
+        if (slot < 0) return false;
+        strncpy(s_appicon[slot].path, ic->path, sizeof(s_appicon[slot].path) - 1);
+        char icon[128], exec_[128];
+        uint64_t sz = 0; bool dir = false;
+        icon[0] = '\0';
+        (void)gui_app_shortcut_read(ic->path, NULL, 0, exec_, sizeof(exec_), icon, sizeof(icon));
+        s_appicon[slot].tried = true;
+        if (icon[0] && fs_stat_path(icon, &sz, &dir) && !dir && sz > 0 && sz < (2u << 20)) {
+            uint8_t* file = (uint8_t*)kmalloc((size_t)sz);
+            uint32_t* px = (uint32_t*)kmalloc(128 * 128 * 4);
+            uint64_t got = 0, w = 0, h = 0;
+            if (file && px && fs_read_path_into(icon, file, sz, &got) && got == sz &&
+                png_decode(file, sz, (uint8_t*)px, 128, 128, &w, &h) && w && h) {
+                s_appicon[slot].px = px; s_appicon[slot].w = w; s_appicon[slot].h = h; px = NULL;
+            }
+            if (file) kfree(file);
+            if (px) kfree(px);
+        }
+    }
+    if (!s_appicon[slot].px) return false;
+    (void)hov;
+    int inset = size / 12, ds = size - inset * 2;
+    uint32_t* px = s_appicon[slot].px;
+    int w = (int)s_appicon[slot].w, h = (int)s_appicon[slot].h;
+    if (vga_gpu_draw_image_scaled(px, px, w, h, w, 1, true, x + inset, y + inset, ds, ds)) return true;
+    gfx_surface_t src = gfx_surface_make(px, w, h, w);
+    gfx_surface_t dst = gfx_surface_make(backbuffer, (int)SCREEN_W, (int)SCREEN_H, (int)SCREEN_W);
+    gfx_blit_scaled(&dst, x + inset, y + inset, ds, ds, &src, 0, 0, w, h, GFX_BLIT_ALPHA, 0);
+    return true;
+}
+
 /* Dynamic desktop file/folder icons reuse gui_draw_app_icon() for
  * every case except "a file that isn't recognized as text", which
  * gets a neutral badge (kind -1 falls through to the default color)
@@ -766,6 +810,7 @@ static void gui_draw_desktop_icon_art(const desktop_icon_t* ic, int x, int y, in
     if (!ic) return;
     if (ic->is_dynamic) {
         if (ic->is_file) {
+            if (fm_is_app_shortcut(ic->path) && gui_draw_app_shortcut_icon(ic, x, y, size, hov)) return;
             if (ic->win_kind == WIN_TEXT_EDITOR) {
                 if (gui_desktop_path_looks_text(ic->path)) {
                     gui_draw_app_icon(WIN_TEXT_EDITOR, x, y, size, hov);

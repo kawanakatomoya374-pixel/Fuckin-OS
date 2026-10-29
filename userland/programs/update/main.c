@@ -29,6 +29,7 @@
 #define IMAGE_PATH UPD_DIR "/image.txt"
 #define URL_PATH UPD_DIR "/url.txt"
 #define BACKUP_DIR UPD_DIR "/backup"
+#define LATEST_PATH UPD_DIR "/latest.txt"        /* the kernel serial and OS label of the newest manifest seen */
 #define AVAIL_PATH UPD_DIR "/available.txt"      /* what the taskbar and Settings show: serial, os label, notes, items, bytes */
 #define PROGRESS_PATH UPD_DIR "/progress.txt"    /* an install in progress / its result (the taskbar shows it) */
 #define NOTIFIED_PATH UPD_DIR "/notified.txt"    /* the serial a toast was shown for */
@@ -334,8 +335,10 @@ static void progress(const char *state, int step, int total, const char *name, i
     write_new(PROGRESS_PATH, b, strlen(b));
 }
 static void now_text(char *out, size_t cap) { cos_datetime_t t; if (cos_rtc_now(&t) == 0) snprintf(out, cap, "%04d-%02d-%02d %02d:%02d", (int)t.year, (int)t.month, (int)t.day, (int)t.hour, (int)t.minute); else snprintf(out, cap, "unknown"); }
+static bool g_reinstall;      /* cosupdate reinstall: forget what is recorded as installed (and a failed kernel start) so the whole release is downloaded again */
 static int cmd_install(const char *url, char **names, int nn) {
     state_load();
+    if (g_reinstall) { for (int i = 0; i < nst; ++i) st[i].version = 0; if (cos_kernel_update_clear_bad() == 0) printf("[UPDATE] the failed kernel start is forgotten\n"); }
     progress("running", 0, 0, "", 0, "checking for updates");
     if (!fetch_manifest(url)) { progress("failed", 0, 0, "", 0, last_err); cos_notify("C-OS", "アップデートに失敗しました", 2); return 1; }
     int want[MAX_ITEMS], nw = 0;
@@ -379,6 +382,10 @@ static int cmd_poll(const char *url) {
     bool kn = kernel_needs(); if (kn) { avail++; bytes += kern.size; }
     char b[500];
     snprintf(b, sizeof b, "time %s\nresult ok %d\n", when, avail); write_new(LAST_PATH, b, strlen(b));
+    {   /* the newest release the server has, whether or not it is installed here: Settings offers "download again" when the running kernel is older than this */
+        char lb[200]; snprintf(lb, sizeof lb, "kernel %lld\nos %s\n", kern.present ? (long long)kern.serial : 0ll, os_label);
+        write_new(LATEST_PATH, lb, strlen(lb));
+    }
     if (avail == 0) { cos_unlink(AVAIL_PATH); return 0; }
     snprintf(b, sizeof b, "serial %ld\n%s%s%snotes %s\nitems %d\nbytes %lu\n%s", man_serial, os_label[0] ? "os " : "", os_label, os_label[0] ? "\n" : "", os_notes, avail, bytes, kn ? "kernel 1\n" : "");
     write_new(AVAIL_PATH, b, strlen(b));
@@ -444,7 +451,13 @@ int main(int argc, char **argv) {
         if (argc > 2 && strstr(argv[2], "://")) { url = argv[2]; first = 3; }
         return cmd_install(url, argv + first, argc > first ? argc - first : 0);
     }
+    if (!strcmp(c, "reinstall")) {
+        const char *url = NULL; int first = 2;
+        if (argc > 2 && strstr(argv[2], "://")) { url = argv[2]; first = 3; }
+        g_reinstall = true;
+        return cmd_install(url, argv + first, argc > first ? argc - first : 0);
+    }
     if (!strcmp(c, "rollback") && argc > 2) return cmd_rollback(argv[2]);
-    printf("usage: cosupdate status | url [URL] | check [URL] | poll | auto [on|off|MINUTES] | install [URL] [NAME...] | rollback PATH\n");
+    printf("usage: cosupdate status | url [URL] | check [URL] | poll | auto [on|off|MINUTES] | install [URL] [NAME...] | reinstall [URL] | rollback PATH\n");
     return 1;
 }

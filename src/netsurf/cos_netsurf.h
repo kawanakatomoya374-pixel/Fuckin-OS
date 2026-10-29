@@ -3,7 +3,7 @@
  * (cos_netsurf.c, cos_fetch.c). See cos_netsurf.c's file header for
  * what this does and doesn't do yet.
  *
- * C-OS 4.0.8 alpha additions:
+ * C-OS 4.1.0 additions:
  *   cos_netsurf_is_ready()             - query engine state (no side effects)
  *   cos_netsurf_load_url_sync_nowait() - fire-and-forget GUI variant
  *   cos_netsurf_eval_script()          - direct JS evaluation (javascript: URLs)

@@ -31,6 +31,7 @@ int  cos_sock_create6(uint32_t pid, int type);
 int  cos_sock_connect6(uint32_t pid, int sd, const uint8_t addr[16], uint16_t port);
 int  cos_sock_sendto6(uint32_t pid, int sd, const void* buf, size_t len, const uint8_t addr[16], uint16_t port);
 int  cos_sock_recvfrom6(uint32_t pid, int sd, void* buf, size_t len, cos_sockaddr6_t* from);
+int  cos_sock_recvfrom6_flags(uint32_t pid, int sd, void* buf, size_t len, cos_sockaddr6_t* from, int peek, int full_len);   /* MSG_PEEK / MSG_TRUNC on a datagram socket */
 int  cos_sock_accept6(uint32_t pid, int sd, cos_sockaddr6_t* peer);
 int  cos_sock_name6(uint32_t pid, int sd, int peer, cos_sockaddr6_t* out);
 int  cos_sock_shutdown(uint32_t pid, int sd, int how);       /* how: 0 read, 1 write, 2 both (read side is accepted and ignored) */

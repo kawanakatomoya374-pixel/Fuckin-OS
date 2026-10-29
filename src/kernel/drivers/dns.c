@@ -208,6 +208,13 @@ static dns_request_t* dns_allocate_request_locked(const char* hostname) {
 static volatile bool dns_server_from_dhcp = false;
 bool dns_server_configured(void) { return dns_server_from_dhcp; }
 
+/* The resolver the kernel uses (learnt from DHCP, 8.8.8.8 without one): the Linux layer offers it to Linux programs as /etc/resolv.conf. */
+void dns_get_server_bytes(uint8_t out[4]) {
+    dns_lock_acquire();
+    for (int i = 0; i < 4; ++i) out[i] = dns_server.addr[i];
+    dns_lock_release();
+}
+
 void dns_set_server(const ip_addr_t* server) {
     if (!server || (server->addr[0] == 0 && server->addr[1] == 0 &&
                     server->addr[2] == 0 && server->addr[3] == 0)) {

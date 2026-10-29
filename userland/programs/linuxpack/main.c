@@ -22,7 +22,8 @@
 #define STATE_PATH PACK_DIR "/state.txt"
 #define PROGRESS_PATH PACK_DIR "/progress.txt"
 #define URL_PATH PACK_DIR "/url.txt"
-#define ROOT "/linux"
+#define ROOT_LINUX "/linux"
+#define ROOT root                       /* "/linux", or "/apps/NAME" for an app pack of C-OS Apps (root= in the signed pack line) */
 #define MAX_MANIFEST (64u * 1024u)
 #define MAX_CHUNKS 512
 #define MAX_DL (9u * 1024u * 1024u + 512u * 1024u)
@@ -30,6 +31,7 @@
 
 typedef struct { char file[64]; uint32_t size, raw; char sha[65]; } chunk_t;
 static chunk_t chunks[MAX_CHUNKS]; static int nchunks;
+static char root[96] = ROOT_LINUX, pk_exec[64], pk_icon[64];
 static char pk_name[32], pk_title[48], pk_version[32]; static long pk_serial; static uint64_t pk_bytes, pk_download;
 static uint64_t bytes_done; static int chunks_done;
 
@@ -93,6 +95,7 @@ static bool manifest_parse(char *m, size_t len, char *why, size_t whycap) {
     br_ec_public_key pk = { BR_EC_secp256r1, (unsigned char *)cos_update_pubkey, sizeof cos_update_pubkey };
     if (br_ecdsa_i31_vrfy_raw(&br_ec_prime_i31, dg, 32, &pk, sig, 64) != 1) { snprintf(why, whycap, "the signature does not match (not made with this system's key)"); return false; }
     m[body_len] = 0;                                                  /* from here the body is trusted */
+    snprintf(root, sizeof root, "%s", ROOT_LINUX); pk_exec[0] = pk_icon[0] = 0;
     nchunks = 0; pk_name[0] = pk_title[0] = pk_version[0] = 0; pk_serial = -1; pk_bytes = pk_download = 0; bool header = false, pack = false;
     for (char *line = m; line && *line; ) {
         char *nl = strchr(line, '\n'); if (nl) *nl = 0;
@@ -106,6 +109,9 @@ static bool manifest_parse(char *m, size_t len, char *why, size_t whycap) {
                 else if (!strcmp(tok, "serial")) pk_serial = atol(v);
                 else if (!strcmp(tok, "bytes")) pk_bytes = strtoull(v, NULL, 10);
                 else if (!strcmp(tok, "download")) pk_download = strtoull(v, NULL, 10);
+                else if (!strcmp(tok, "root")) snprintf(root, sizeof root, "%s", v);
+                else if (!strcmp(tok, "exec")) snprintf(pk_exec, sizeof pk_exec, "%s", v);
+                else if (!strcmp(tok, "icon")) snprintf(pk_icon, sizeof pk_icon, "%s", v);
             }
             pack = true;
         } else if (!strncmp(line, "chunk ", 6)) {
@@ -123,6 +129,9 @@ static bool manifest_parse(char *m, size_t len, char *why, size_t whycap) {
         }
         line = nl ? nl + 1 : NULL;
         if (nl && !line[0]) break;
+    }
+    if (strcmp(root, ROOT_LINUX) != 0) {                                 /* an app pack: /apps/NAME only, and exec/icon plain file names */
+        if (strncmp(root, "/apps/", 6) != 0 || !name_ok(root + 6) || strchr(root + 6, '/') || (pk_exec[0] && !name_ok(pk_exec)) || (pk_icon[0] && !name_ok(pk_icon))) { snprintf(why, whycap, "the install location is not allowed"); return false; }
     }
     if (!header || !pack || pk_serial < 0 || !name_ok(pk_name) || nchunks == 0) { snprintf(why, whycap, "not a pack manifest"); return false; }
     return true;
@@ -148,7 +157,7 @@ static bool apply_chunk(const uint8_t *raw, size_t n, char *why, size_t whycap) 
         if (!rel_ok(path, pl)) { snprintf(why, whycap, "a path in the pack is not allowed"); return false; }
         uint8_t kind = raw[pos]; uint64_t size, off; uint32_t len; memcpy(&size, raw + pos + 1, 8); memcpy(&off, raw + pos + 9, 8); memcpy(&len, raw + pos + 17, 4); pos += 21;
         if (kind != 0 || pos + len > n || off > size || (uint64_t)len > size - off) goto bad;
-        char full[400]; snprintf(full, sizeof full, "%s/%.*s", ROOT, (int)pl, path);
+        char full[400]; snprintf(full, sizeof full, "%s/%.*s", root, (int)pl, path);
         const char *slash = strrchr(full, '/'); size_t dl = (size_t)(slash - full);
         if (dl != strlen(last_dir) || strncmp(full, last_dir, dl)) { mkdirs(full); snprintf(last_dir, sizeof last_dir, "%.*s", (int)dl, full); }
         int fd = off == 0 ? cos_open(full, COS_O_WRONLY_CREATE) : cos_open(full, COS_O_RDWR_CREATE);      /* the first piece starts the file, later ones are put at their offset */
@@ -176,7 +185,7 @@ static void state_save(int next) { char b[160]; int n = snprintf(b, sizeof b, "n
 static int cmd_status(void) {
     char b[320]; ssize_t n = cos_read_file(PROGRESS_PATH, b, sizeof b - 1);
     if (n > 0) { b[n] = 0; printf("[LINUXPACK] last: %s", b); } else printf("[LINUXPACK] nothing has been installed by this program yet\n");
-    cos_stat_t st; printf("[LINUXPACK] Firefox under /linux: %s\n", cos_stat(ROOT "/usr/lib/firefox/firefox", &st) == 0 ? "present" : "not present");
+    cos_stat_t st; printf("[LINUXPACK] Firefox under /linux: %s\n", cos_stat(ROOT_LINUX "/usr/lib/firefox/firefox", &st) == 0 ? "present" : "not present");
     return 0;
 }
 
@@ -195,10 +204,16 @@ int main(int argc, char **argv) {
     bool ok = manifest_parse((char *)m, mlen, why, sizeof why); free(m);
     if (!ok) { printf("[LINUXPACK] manifest refused: %s\n", why); progress("error", "the list of files is not trusted"); return 1; }
     printf("[LINUXPACK] %s %s: %d chunk(s), download %llu MiB, installed %llu MiB\n", pk_title, pk_version, nchunks, (unsigned long long)(pk_download >> 20), (unsigned long long)(pk_bytes >> 20));
+    { uint64_t tot = 0, fr = 0;                                          /* room for what is still to come: better to say so now than to fail half way */
+      if (cos_fs_space(&tot, &fr) == 0) {
+          uint64_t need = pk_bytes + (64u << 20);
+          if (fr < need) { printf("[LINUXPACK] not enough free disk space: %llu MiB free, %llu MiB needed\n", (unsigned long long)(fr >> 20), (unsigned long long)(need >> 20)); progress("error", "not enough free disk space"); return 1; }
+      } }
     int start = state_next(); chunks_done = start;
     for (int i = 0; i < start; ++i) bytes_done += chunks[i].raw;
     if (start) printf("[LINUXPACK] continuing with chunk %d\n", start + 1);
-    cos_mkdir(ROOT);
+    if (strcmp(root, ROOT_LINUX) != 0) { cos_mkdir("/apps"); }
+    cos_mkdir(root);
     for (int i = start; i < nchunks; ++i) {
         chunk_t *k = &chunks[i]; char msg[120]; snprintf(msg, sizeof msg, "downloading %s", k->file); progress("running", msg);
         snprintf(full, sizeof full, "%s%s", url, k->file);
@@ -215,6 +230,17 @@ int main(int argc, char **argv) {
         if (!wrote) { printf("[LINUXPACK] chunk %d: %s\n", i + 1, why); progress("error", why); return 1; }
         bytes_done += k->raw; chunks_done = i + 1; state_save(i + 1);
         printf("[LINUXPACK] chunk %d/%d done (%llu MiB)\n", i + 1, nchunks, (unsigned long long)(bytes_done >> 20));
+    }
+    if (strcmp(root, ROOT_LINUX) != 0) {      /* an app: remember what was installed and put its shortcut (name, program, icon) on the desktop */
+        char b[400], sp[200]; int n = snprintf(b, sizeof b, "name %s\nserial %ld\nversion %s\n", pk_name, pk_serial, pk_version); char pp[140]; snprintf(pp, sizeof pp, "%s/pack.txt", root); cos_write_file(pp, b, (size_t)n);
+        if (pk_exec[0]) {      /* a pack without exec= (a language, a library) gets no desktop icon */
+        n = snprintf(b, sizeof b, "# C-OS app shortcut\nname=%s\nexec=%s/%s\nicon=%s/%s\n", pk_title, root, pk_exec, root, pk_icon[0] ? pk_icon : "icon.png");
+        cos_mkdir("/desktop"); snprintf(sp, sizeof sp, "/desktop/%s.app", pk_title); cos_write_file(sp, b, (size_t)n); }
+        progress("done", "installed"); printf("[LINUXPACK] %s is installed\n", pk_title); return 0;
+    }
+    {   /* the empty directories a Linux program expects (a pack carries files only) */
+        static const char *const dirs[] = { "root", "tmp", "run", "dev", "proc", "sys", "var/tmp", "var/log", "var/cache", "mnt", "home" };
+        for (size_t d = 0; d < sizeof dirs / sizeof dirs[0]; ++d) { char pth[96]; snprintf(pth, sizeof pth, "%s/%s", ROOT, dirs[d]); mkdirs(pth); cos_mkdir(pth); }
     }
     progress("done", "installed");
     printf("[LINUXPACK] %s is installed\n", pk_title);

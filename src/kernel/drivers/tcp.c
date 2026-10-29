@@ -878,7 +878,7 @@ static void tcp_input(const tcp_peer_t* peerp, tcp_hdr_t* tcp, void* data, size_
                 size_t take = n < room ? n : room;
                 if (take > 0) { memcpy(s->rx_buffer + s->rx_len, p + skip, take); s->rx_len += take; s->rcv_nxt += (uint32_t)take; }
                 if (take < n) {
-                    serial_puts("[TCP] RX buffer full; segment trimmed\n");
+                    { static uint32_t trimmed; if ((trimmed++ & 1023u) == 0) serial_puts("[TCP] RX buffer full; segment trimmed (every 1024th is logged)\n"); }   /* the serial port is slow: a line per segment cost more than the transfer */
                     fin_in_order = false;
                 }
                 if (s->ooo_len && (int32_t)(s->ooo_seq - s->rcv_nxt) <= 0) {

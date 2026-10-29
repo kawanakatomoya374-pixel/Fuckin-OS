@@ -1,6 +1,6 @@
 /**
  * kernel.c - Kernel Main Entry Point
- * C-OS 4.0.8 alpha - All Features Enabled
+ * C-OS 4.1.0 - All Features Enabled
  */
 #include <stdbool.h>
 #include <stdint.h>
@@ -436,6 +436,15 @@ static void demo_heartbeat_thread(void* arg) {
             serial_putdec(beat);
             serial_puts("\n");
         }
+        { extern void sync_lock_report(void); sync_lock_report(); }
+        {   /* where the memory is: the heap in use, the frames still free, and what the kernel image itself keeps (its static arrays are reserved from the first byte) */
+            extern uint64_t memory_get_heap_used(void), memory_get_heap_total(void), memory_get_heap_peak(void); extern char _kernel_end[];
+            phys_mem_stats_t *ms = phys_memory_get_stats();
+            serial_puts("[MEM] heap in use "); serial_putdec(memory_get_heap_used() >> 20); serial_puts(" of "); serial_putdec(memory_get_heap_total() >> 20);
+            serial_puts(" MiB (peak "); serial_putdec(memory_get_heap_peak() >> 20); serial_puts("), free frames "); serial_putdec(ms ? (ms->free_pages * 4) >> 10 : 0); serial_puts(" MiB, kernel image reserves "); serial_putdec((uint64_t)(uintptr_t)_kernel_end >> 20); serial_puts(" MiB\n");
+            { extern void paging_pcache_stats(uint64_t *, uint64_t *, uint64_t *, uint64_t *); uint64_t pl, ph, pm, pp; paging_pcache_stats(&pl, &ph, &pm, &pp);
+              if (pp || ph) { serial_puts("[PCACHE] file pages cached "); serial_putdec(pl); serial_puts(" ("); serial_putdec(pl >> 8); serial_puts(" MiB), mapped from the cache "); serial_putdec(ph); serial_puts(" pages ("); serial_putdec(ph >> 8); serial_puts(" MiB not read or copied), filled "); serial_putdec(pp); serial_puts("\n"); } }
+        }
     }
 }
 
@@ -457,7 +466,7 @@ static void kernel_draw_status_screen(const char* headline, const char* detail) 
     vga_clear(0x000A1020);
     vga_fill_rect(0, 0, (int)SCREEN_W, 48, 0x00203090);
     vga_fill_rect(0, 48, (int)SCREEN_W, 3, 0x00FFFFFF);
-    vga_draw_string(20, 14, headline ? headline : "C-OS 4.0.8 alpha", 0x00FFFFFF, 0x00203090);
+    vga_draw_string(20, 14, headline ? headline : "C-OS 4.1.0", 0x00FFFFFF, 0x00203090);
     vga_draw_string(20, 74, detail ? detail : "Serial debug console active", 0x00D8E8FF, 0x000A1020);
     vga_draw_string(20, 104, "Fallbacks: serial debug console, status overlay, panic screen", 0x00C0FFC0, 0x000A1020);
     vga_draw_string(20, 134, "Use the serial log if the GUI stays black.", 0x00FFFFFF, 0x000A1020);
@@ -472,7 +481,7 @@ static void kernel_draw_panic_overlay(const char* reason) {
     vga_fill_rect(0, 0, (int)SCREEN_W, (int)SCREEN_H, 0x00200000);
     vga_fill_rect(0, 0, (int)SCREEN_W, 56, 0x00600000);
     vga_fill_rect(0, 56, (int)SCREEN_W, 2, 0x00FFFFFF);
-    vga_draw_string(20, 16, "C-OS 4.0.8 alpha - KERNEL PANIC", 0x00FFFFFF, 0x00600000);
+    vga_draw_string(20, 16, "C-OS 4.1.0 - KERNEL PANIC", 0x00FFFFFF, 0x00600000);
     vga_draw_string(20, 84, reason ? reason : "unknown error", 0x00FFFFFF, 0x00200000);
     vga_draw_string(20, 114, "Serial console still carries the full log.", 0x00FFD0D0, 0x00200000);
     vga_draw_string(20, 144, "This screen is the fallback overlay.", 0x00FFD0D0, 0x00200000);
@@ -800,7 +809,7 @@ void kernel_main(uint64_t magic, uint64_t addr) {
     { extern void cos_stack_guard_init(void); cos_stack_guard_init(); }
     serial_init();
     serial_puts("\n[KERNEL] ================================\n");
-    serial_puts("[KERNEL] C-OS 4.0.8 alpha (64-bit)\n");
+    serial_puts("[KERNEL] C-OS 4.1.0 (64-bit)\n");
     serial_puts("[KERNEL] Boot path: VirtualBox-compatible full mode\n");
     serial_puts("[KERNEL] Multiboot magic=0x");
     serial_puthex(magic);
@@ -849,6 +858,13 @@ void kernel_main(uint64_t magic, uint64_t addr) {
 
     serial_puts("[KERNEL] Initializing memory...\n");
     memory_init();
+    {   /* The heap array is part of the kernel image and its frames are reserved whether used or not (512 MiB; about 40 MiB are in use at idle). Keep an eighth of the RAM, between
+         * 128 and 256 MiB, and give the rest back to the programs. */
+        uint64_t avail = cos_runtime_available_bytes(), keep = avail / 8;
+        if (keep < (128ULL << 20)) keep = 128ULL << 20;
+        if (keep > (256ULL << 20)) keep = 256ULL << 20;
+        if (avail) memory_trim_heap(keep);
+    }
 
     /* NOTE: paging_init() was never being called anywhere in this
      * codebase before this change. Without it, kernel_pml4/
@@ -894,6 +910,8 @@ void kernel_main(uint64_t magic, uint64_t addr) {
     serial_puts("[KERNEL] Enabling NX (execute-disable) if supported...\n");
     cos_elf_nx_enable();
     { extern void cos_security_harden_cpu(void); cos_security_harden_cpu(); }
+    { extern void cos_xsave_init_cpu(void); cos_xsave_init_cpu(); }                /* AVX state is saved at every switch from here on (gdt.c) */
+    { extern void cos_syscall_init_cpu(void); cos_syscall_init_cpu(); }          /* the SYSCALL instruction of the Linux layer (gdt.c) */
 
     serial_puts("[KERNEL] Initializing VGA/Framebuffer...\n");
     vga_init(magic, addr);
@@ -902,7 +920,7 @@ void kernel_main(uint64_t magic, uint64_t addr) {
 
     if (kernel_graphics_ready()) {
         serial_puts("[KERNEL] Drawing framebuffer status screen...\n");
-        kernel_draw_status_screen("C-OS 4.0.8 alpha", "Framebuffer graphics ready");
+        kernel_draw_status_screen("C-OS 4.1.0", "Framebuffer graphics ready");
         vga_flip();
         serial_puts("[KERNEL] Framebuffer status screen drawn\n");
 
@@ -1001,7 +1019,7 @@ void kernel_main(uint64_t magic, uint64_t addr) {
         if (vga_set_render_backend(VGA_RENDER_BACKEND_GPU)) {
             serial_puts("[KERNEL] VirtIO-GPU GUI scanout active\n");
             gui_boot_progress("Starting VirtIO-GPU GUI");
-            kernel_draw_status_screen("C-OS 4.0.9 alpha", "VirtIO-GPU display active");
+            kernel_draw_status_screen("C-OS 4.1.0", "VirtIO-GPU display active");
             vga_flip();
         } else {
             serial_puts("[KERNEL] VirtIO-GPU activation failed; retaining legacy display fallback\n");
@@ -2197,7 +2215,7 @@ void kernel_main(uint64_t magic, uint64_t addr) {
     }
 
     serial_puts("[KERNEL] Entering text-console fallback loop...\n");
-    kernel_draw_status_screen("C-OS 4.0.8 alpha", "GUI unavailable - text fallback active");
+    kernel_draw_status_screen("C-OS 4.1.0", "GUI unavailable - text fallback active");
     if (kernel_graphics_ready()) {
         vga_flip();
     }
@@ -2216,7 +2234,7 @@ void kernel_main(uint64_t magic, uint64_t addr) {
     }
 #else
     serial_puts("[KERNEL] GUI disabled - text fallback active\n");
-    kernel_draw_status_screen("C-OS 4.0.8 alpha", "GUI disabled - serial/text fallback active");
+    kernel_draw_status_screen("C-OS 4.1.0", "GUI disabled - serial/text fallback active");
     if (kernel_graphics_ready()) {
         vga_flip();
     }

@@ -411,7 +411,7 @@ static void draw(void) {
         ime_x = ix + 8 + cui_text_width(f_t, pin); ime_y = py + 4;
     }
     cui_fill(&c, 0, win_h - STATUS_H, win_w, STATUS_H, PANEL);
-    const char *hint = "Enter edit/commit   Tab next   Del clear   Ctrl+C/V copy/paste   Ctrl+S save   Ctrl+Space Japanese input";
+    const char *hint = "Enter edit/commit   Tab next   Del clear   Ctrl+C/V copy/paste   Ctrl+S save   Ctrl+Shift+J or Ctrl+Space Japanese input";
     cui_text(&c, f_s, 12, win_h - STATUS_H + 5, hint, MUTED);
     if (status[0]) cui_text(&c, f_s, win_w - cui_text_width(f_s, status) - 12, win_h - STATUS_H + 5, status, confirm_discard ? WARN : ACCENT);
     imeui_indicator(&c, f_s, 12 + cui_text_width(f_s, hint) + 14, win_h - STATUS_H + 2);

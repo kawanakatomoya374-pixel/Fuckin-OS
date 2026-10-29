@@ -3,7 +3,7 @@
 
 #include "types.h"
 
-/* Module interface standards for C-OS 4.0.8 alpha */
+/* Module interface standards for C-OS 4.1.0 */
 
 /* Module types */
 #define MODULE_TYPE_STORAGE    1

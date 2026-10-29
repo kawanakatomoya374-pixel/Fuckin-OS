@@ -37,7 +37,8 @@ extern char g_boot_cmdline[];                       /* kernel.c: the multiboot2 
 #define SLOT_A     "1:/boot/kernel.elf.gz"
 #define SLOT_B     "1:/boot/kernel.b.gz"
 #define MAX_BLOB   (64u << 20)
-#define CONFIRM_MS 45000u
+#define CONFIRM_MS 30000u            /* a trial kernel that is still running after this long confirms itself; a user-initiated restart or shutdown after CONFIRM_EARLY_MS confirms it at once */
+#define CONFIRM_EARLY_MS 10000u
 #define TRAILER    81u                               /* "COSKSIG1" + serial(8) + key id(1) + signature(64) */
 
 static FATFS g_esp;
@@ -201,18 +202,28 @@ int cos_bootupd_install(const uint8_t *blob, size_t len, char *why, size_t whyca
 }
 
 /* ---------------------------------------------------------------- at every start */
-static void confirm_thread(void *arg) {
-    (void)arg;
-    thread_sleep(CONFIRM_MS);                                   /* still running after this long: the new kernel is good */
+static bool g_trial_pending;                                    /* this kernel is a trial kernel that has not confirmed itself yet */
+static void do_confirm(void) {
     lock();
     env_t e;
-    if (esp_ready() && env_load(&e) && g_running && slot_of(env_get(&e, "trial")) == g_running) {
+    if (g_trial_pending && esp_ready() && env_load(&e) && g_running && slot_of(env_get(&e, "trial")) == g_running) {
         char sl[2] = { g_running, 0 };
         env_set(&e, "active", sl); env_set(&e, "trial", ""); env_set(&e, "trial_seen", ""); env_set(&e, "trial_serial", ""); env_set(&e, "failed", "");
-        if (env_store(&e)) { serial_puts("[BOOTUPD] confirmed: slot "); serial_puts(sl); serial_puts(" is the active kernel now\n"); }
+        if (env_store(&e)) { g_trial_pending = false; serial_puts("[BOOTUPD] confirmed: slot "); serial_puts(sl); serial_puts(" is the active kernel now\n"); }
         else serial_puts("[BOOTUPD] cannot write grubenv to confirm the new kernel\n");
     }
     unlock();
+}
+static void confirm_thread(void *arg) {
+    (void)arg;
+    thread_sleep(CONFIRM_MS);                                   /* still running after this long: the new kernel is good */
+    do_confirm();
+}
+/* Called when the user restarts or shuts down (bios.c): a kernel that got as far as a person asking it to restart is a working kernel. Without this, restarting soon after the first start of an
+ * update (to see it work, or to start again) was read as "the new kernel never started": GRUB went back to the old kernel, the serial was marked bad and the update was lost. */
+void cos_bootupd_confirm_now(void) {
+    if (!g_trial_pending || get_timer_ticks() < CONFIRM_EARLY_MS) return;
+    do_confirm();
 }
 
 void cos_bootupd_boot(void) {
@@ -240,9 +251,22 @@ void cos_bootupd_boot(void) {
     if (confirm) { serial_puts("[BOOTUPD] trial kernel (test build: never confirms)\n"); confirm = false; }
 #endif
     if (confirm) {
+        g_trial_pending = true;
         serial_puts("[BOOTUPD] this is a trial kernel: it confirms itself after it has run for a while\n");
         thread_create_kernel("bootupd_confirm", (void *)confirm_thread, NULL);
     }
+}
+
+/* "Download the update again" (Settings): the serial of a start that failed is forgotten, so the same kernel update can be staged once more. */
+int cos_bootupd_clear_bad(void) {
+    lock();
+    int rc = -1; env_t e;
+    if (esp_ready() && env_load(&e) && !slot_of(env_get(&e, "trial"))) {            /* not while a staged trial kernel waits for its restart */
+        env_set(&e, "bad_serial", ""); env_set(&e, "failed", "");
+        rc = env_store(&e) ? 0 : -1;
+    }
+    unlock();
+    return rc;
 }
 
 const char *cos_bootupd_last_why(void) { return g_last_why; }          /* the reason the last install was refused / how it went, for the program that asked */

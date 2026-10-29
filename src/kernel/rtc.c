@@ -1,6 +1,6 @@
 /**
  * rtc.c - Real Time Clock Implementation
- * C-OS 4.0.8 alpha Full CMOS RTC read implementation
+ * C-OS 4.1.0 Full CMOS RTC read implementation
  *
  * Reads actual time from CMOS chip via I/O ports 0x70/0x71.
  * Handles BCD-to-binary conversion and 12/24-hour mode.

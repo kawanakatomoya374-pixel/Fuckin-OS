@@ -307,13 +307,15 @@ int cos_sock_sendto6(uint32_t pid, int sd, const void* buf, size_t len, const ui
     return udp6_send(&a, ((udp_socket_t*)c->obj)->local_port, port, buf, len) == 0 ? (int)len : -COS_ENETUNREACH;
 }
 
-int cos_sock_recvfrom6(uint32_t pid, int sd, void* buf, size_t len, cos_sockaddr6_t* from) {
+int cos_sock_recvfrom6(uint32_t pid, int sd, void* buf, size_t len, cos_sockaddr6_t* from) { return cos_sock_recvfrom6_flags(pid, sd, buf, len, from, 0, 0); }
+
+int cos_sock_recvfrom6_flags(uint32_t pid, int sd, void* buf, size_t len, cos_sockaddr6_t* from, int peek, int full_len) {
     cs_t* c = cs_get(sd, pid);
     if (!c) return -COS_EBADF;
     if (c->type != CS_UDP) return cos_sock_recv(pid, sd, buf, len);
     net_poll();
     ip_addr_t a4; ip6_addr_t a6; uint16_t port = 0; int v6 = 0;
-    int n = udp_socket_recvfrom(c->obj, buf, len, &a4, &a6, &port, &v6);
+    int n = udp_socket_recvfrom_flags(c->obj, buf, len, &a4, &a6, &port, &v6, peek, full_len);
     if (n < 0) return -COS_EAGAIN;
     if (from) { memset(from, 0, sizeof *from); from->port = port; from->v6 = (uint8_t)v6; if (v6) memcpy(from->a, a6.b, 16); else memcpy(from->a, a4.addr, 4); }
     return n;

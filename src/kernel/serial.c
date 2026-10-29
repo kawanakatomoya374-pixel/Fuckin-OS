@@ -3,7 +3,13 @@
 
 #define SERIAL_PORT 0x3F8
 
+static volatile int g_serial_verbose;
+int serial_is_verbose(void) { return g_serial_verbose; }
+
 void serial_init(void) {
+#ifdef COS_SERIAL_VERBOSE
+    g_serial_verbose = 1;      /* make SERIAL_VERBOSE=1: the development/test build logs everything; releases do not (see k_chatter below) */
+#endif
     outb(SERIAL_PORT + 1, 0x00);
     outb(SERIAL_PORT + 3, 0x80);
     /* Divisor latch: 115200 / divisor = baud.
@@ -43,17 +49,41 @@ static inline void serial_unlock(uint64_t f) {
     __asm__ volatile("push %0; popfq" :: "r"(f) : "memory", "cc");
 }
 
+/* Hot-path chatter. Every byte is a busy wait on the UART (and the lines are mirrored by VMs and serial-to-file setups, which are slower still), and Firefox
+ * produces thousands of these lines (a demand-page line per 256 faults per process, a fork line, the periodic statistics). They are dropped unless the file
+ * /system/serial_verbose exists (serial_set_verbose, called at boot): start of a line decides, the rest of the line follows it. Everything else is logged as before. */
+static const char *const k_chatter[] = {
+    "[TASK] demand page", "[LINUX] fork copied", "[TERMINAL] out:", "[PCACHE]", "[LOCK]", "[MEM]", "[GFXPERF]", "[GUIPERF]", "[SCHED-DBG]", "[MEMPERF]", "[NSPERF]", "[PF]   resolved", "[PF] RIP:", 0
+};
+static int g_line_start = 1, g_line_drop;
+void serial_set_verbose(int on) { g_serial_verbose = on; }
+
+static int chatter_line(const char *s) {
+    for (int i = 0; k_chatter[i]; ++i) {
+        const char *t = k_chatter[i], *u = s;
+        while (*t && *u == *t) { ++t; ++u; }
+        if (!*t) return 1;
+    }
+    return 0;
+}
+static void serial_put_filtered(char c) {                  /* the caller holds the serial lock */
+    if (g_line_drop) { if (c == '\n') { g_line_drop = 0; g_line_start = 1; } return; }
+    serial_putc(c); g_line_start = (c == '\n');
+}
+
 void serial_puts(const char* s) {
     uint64_t f = serial_lock();
-    while (*s) {
-        serial_putc(*s++);
-    }
+    if (!g_serial_verbose && g_line_start && !g_line_drop && chatter_line(s)) g_line_drop = 1;
+    if (g_serial_verbose) { while (*s) serial_putc(*s++); }
+    else while (*s) serial_put_filtered(*s++);
     serial_unlock(f);
 }
 
 void serial_puthex(uint64_t val) {
     const char* hex = "0123456789ABCDEF";
     uint64_t f = serial_lock();
+    if (!g_serial_verbose && g_line_drop) { serial_unlock(f); return; }
+    g_line_start = 0;
     for (int i = 60; i >= 0; i -= 4) {
         serial_putc(hex[(val >> i) & 0xF]);
     }
@@ -61,6 +91,8 @@ void serial_puthex(uint64_t val) {
 }
 
 void serial_putdec(uint64_t val) {
+    if (!g_serial_verbose && g_line_drop) return;
+    g_line_start = 0;
     if (val == 0) {
         serial_putc('0');
         return;

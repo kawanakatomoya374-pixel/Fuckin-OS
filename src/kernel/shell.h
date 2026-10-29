@@ -1,5 +1,5 @@
 /**
- * shell.h - C-OS 4.0.8 alpha Shell Header
+ * shell.h - C-OS 4.1.0 Shell Header
  */
 #ifndef SHELL_H
 #define SHELL_H

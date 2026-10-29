@@ -392,7 +392,7 @@ void ip_flush_pending(ip_addr_t* hop, eth_addr_t* mac) {
 
 /* ---- loopback: a packet addressed to our own IP never reaches the NIC (the LAN would not send it back). It waits in this ring
  * and is delivered by net_poll(), never from inside ip_send(), so no socket lock is re-entered. ---------------------------- */
-#define IP_LOOP 32
+#define IP_LOOP 128
 static struct { uint16_t len; uint8_t pkt[1500]; } g_ip_loop[IP_LOOP];
 static volatile uint32_t g_ip_loop_lock; static uint32_t g_ip_loop_head, g_ip_loop_tail;
 static void ip_loop_lock(void) { cos_spin_lock(&g_ip_loop_lock); }

@@ -31,6 +31,7 @@
 #include "sync.h"
 #include "gui.h"
 #include "vga.h"
+#include "timer.h"
 
 extern void gui_bring_to_front(int idx);
 
@@ -125,6 +126,14 @@ typedef struct {
     uint8_t       *yuv_y, *yuv_u, *yuv_v;
     uint64_t       yuv_y_capacity, yuv_u_capacity, yuv_v_capacity;
     bool           closed_by_user;
+    /* "not responding": a v2 app that has neither polled its window nor presented for a while (and is not parked in SYS_WIN2_WAIT) gets a notice drawn over it with Wait / End program */
+    uint64_t       last_alive_ms, hung_ignore_until;
+    bool           hung, kill_req;
+    int8_t         hung_hover;
+    /* the window's client area changed (maximize, restore, tiling): the app gets COS_EV_RESIZE and may cos_win2_resize() its surface (app_sized); until it does, the surface is stretched over the client area */
+    bool           app_sized;
+    int32_t        last_cw, last_ch;
+    char           title_saved[64];
     cos_win_event_t events[COS_APP_MAX_INPUT_QUEUE];
     uint32_t       ev_head, ev_tail, ev_dropped;
     thread_t      *waiter;          /* the thread sleeping in SYS_WIN2_WAIT on this surface, woken by ev_push_locked */
@@ -424,6 +433,68 @@ void cos_app_window_clear(int64_t handle, uint32_t caller_pid)
 }
 
 /* Called from the GUI render loop, on the owner thread. */
+
+/* ---- "not responding" ----------------------------------------------------------------------------------------------------------------------------- */
+#define HUNG_AFTER_MS 8000u
+typedef struct { int px, py, pw, ph, bx[2], by, bw, bh; bool strip; } hung_layout_t;
+static void hung_layout(int cx, int cy, int cw, int ch, hung_layout_t *L)
+{
+    L->strip = cw < 340 || ch < 170;
+    if (L->strip) {                                   /* a small window: a bar along its top edge with the two buttons in it */
+        L->px = cx; L->py = cy; L->pw = cw; L->ph = 28; L->bw = 70; L->bh = 22; L->by = cy + 3;
+        L->bx[0] = cx + cw - 2 * L->bw - 10; L->bx[1] = cx + cw - L->bw - 4;
+        return;
+    }
+    L->pw = cw - 24 < 480 ? cw - 24 : 480; L->ph = 150;
+    L->px = cx + (cw - L->pw) / 2; L->py = cy + (ch - L->ph) / 2;
+    L->bw = (L->pw - 60) / 2 < 190 ? (L->pw - 60) / 2 : 190; L->bh = 32; L->by = L->py + L->ph - L->bh - 14;
+    L->bx[0] = L->px + 20; L->bx[1] = L->px + L->pw - L->bw - 20;
+}
+static void draw_hung_overlay(cos_app_surface_t *s, int cx, int cy, int cw, int ch)
+{
+    hung_layout_t L; hung_layout(cx, cy, cw, ch, &L);
+    const char *lab[2] = { gui_text("Wait", "待機"), gui_text("End", "終了") };
+    if (L.strip) {
+        vga_fill_rect(cx, cy, cw, 28, 0x00402020);
+        vga_draw_string(cx + 6, cy + 6, gui_text("Not responding", "応答なし"), 0x00FFFFFF, 0x00402020);
+    } else {
+        vga_fill_rect(L.px - 1, L.py - 1, L.pw + 2, L.ph + 2, 0x00B0B8C8);
+        vga_fill_rect(L.px, L.py, L.pw, L.ph, 0x00F4F6FA);
+        vga_fill_rect(L.px, L.py, L.pw, 4, 0x00E5484D);
+        vga_draw_string(L.px + 20, L.py + 18, gui_text("This program is not responding", "このプログラムは応答していません"), 0x00182030, 0x00F4F6FA);
+        vga_draw_string(L.px + 20, L.py + 46, gui_text("It may be busy, or it may have stopped.", "処理が長引いているか、停止している可能性があります。"), 0x00505A70, 0x00F4F6FA);
+        vga_draw_string(L.px + 20, L.py + 66, gui_text("Wait a little longer, or end the program.", "もう少し待つか、プログラムを終了してください。"), 0x00505A70, 0x00F4F6FA);
+        lab[0] = gui_text("Wait", "待機する"); lab[1] = gui_text("End program", "プログラムを終了");
+    }
+    for (int b = 0; b < 2; ++b) {
+        uint64_t bg = b == 1 ? (s->hung_hover == 1 ? 0x00F06A6E : 0x00E5484D) : (s->hung_hover == 0 ? 0x00D0D6E4 : 0x00E1E6F0);
+        uint64_t fg = b == 1 ? 0x00FFFFFF : 0x00182030;
+        vga_fill_rect(L.bx[b], L.by, L.bw, L.bh, bg);
+        vga_draw_string(L.bx[b] + (L.strip ? 8 : 14), L.by + (L.strip ? 3 : 8), lab[b], fg, bg);
+    }
+}
+/* an app that does not size its own surface has it stretched over the window's client area when the two differ (a maximized window shows no black margin) */
+static bool surf_scaled(const cos_app_surface_t *s, const window_t *win)
+{
+    int cw = win->w, ch = win->h - TITLEBAR_H;
+    return !win->fullscreen && !s->app_sized && s->pix_w > 0 && s->pix_h > 0 && cw > 0 && ch > 0 && (cw != s->pix_w || ch != s->pix_h);
+}
+/* the mouse over a hung window: returns true when the event was taken (nothing reaches the frozen app) */
+static bool hung_mouse(cos_app_surface_t *s, window_t *win, int32_t mx, int32_t my, uint8_t buttons)
+{
+    int cx = win->x, cy = win->y + TITLEBAR_H, cw = win->w, ch = win->h - TITLEBAR_H;
+    hung_layout_t L; hung_layout(cx, cy, cw, ch, &L);
+    int ax = mx + cx, ay = my + cy;                      /* mx, my are client coordinates */
+    int8_t hv = -1;
+    for (int b = 0; b < 2; ++b) if (ax >= L.bx[b] && ax < L.bx[b] + L.bw && ay >= L.by && ay < L.by + L.bh) hv = (int8_t)b;
+    if (hv != s->hung_hover) { s->hung_hover = hv; gui_request_redraw(); }
+    bool was = (s->last_buttons & 1) != 0, now = (buttons & 1) != 0;
+    if (now && !was && hv == 0) { s->hung = false; s->hung_ignore_until = get_timer_ticks() + 30000; s->last_alive_ms = get_timer_ticks(); gui_request_redraw(); }
+    else if (now && !was && hv == 1) { s->kill_req = true; gui_request_redraw(); }
+    s->last_buttons = buttons;
+    return true;
+}
+
 void cos_app_window_draw(int window_index)
 {
     if (window_index < 0 || window_index >= MAX_WINDOWS) return;
@@ -441,7 +512,14 @@ void cos_app_window_draw(int window_index)
     int ch = w->h - TITLEBAR_H;
     if (cw <= 0 || ch <= 0) return;
 
-    if (s->present_pixels) {
+    if (!w->fullscreen && s->pixels && (cw != s->last_cw || ch != s->last_ch)) {            /* the client area changed: tell the app */
+        if (s->last_cw) { cos_win_event_t rev; memset(&rev, 0, sizeof rev); rev.type = COS_EV_RESIZE; rev.x = cw; rev.y = ch; uint64_t fl = sync_irq_save(); ev_push_locked(s, &rev); sync_irq_restore(fl); }
+        s->last_cw = cw; s->last_ch = ch;
+    }
+    if (s->present_pixels && surf_scaled(s, w)) {
+        if (!vga_gpu_draw_image_scaled(s, s->present_pixels, s->pix_w, s->pix_h, s->pix_w, s->present_version, false, cx, cy, cw, ch))
+            vga_blit_scaled_nearest(cx, cy, cw, ch, s->present_pixels, s->pix_w, s->pix_h, s->pix_w);
+    } else if (s->present_pixels) {
         /* v2: the app's presented pixels - see present_pixels' own comment
          * on why this is a separate buffer from s->pixels (the app's own,
          * live, possibly-mid-write one) rather than that buffer directly.
@@ -472,6 +550,7 @@ void cos_app_window_draw(int window_index)
                                     s->video_pixels, s->video_w, s->video_h, s->video_stride);
         }
     }
+    if (s->hung) draw_hung_overlay(s, cx, cy, cw, ch);
     if (s->pixels) return;
 
     /* Snapshot the queue under IRQ-disable so a syscall landing mid-paint
@@ -694,10 +773,43 @@ static void cos_app_pending_gui_close(uint32_t uid)
     gui_request_redraw();
 }
 
+static void hung_tick(void)
+{
+    uint64_t now = get_timer_ticks();
+    for (int i = 0; i < COS_APP_MAX_WINDOWS; ++i) {
+        cos_app_surface_t *s = &g_surfaces[i];
+        if (!s->used || !s->pixels || s->shell_layer || s->win_uid == 0) continue;
+        process_t *p = process_get_by_pid(s->owner_pid);
+        if (!p || p->state == TASK_ZOMBIE || p->state == TASK_UNUSED) continue;
+        bool h = !s->waiter && now > s->hung_ignore_until && now - s->last_alive_ms > HUNG_AFTER_MS;
+        if (h != s->hung) {
+            s->hung = h; s->hung_hover = -1;
+            serial_puts(h ? "[HUNG] not responding: pid " : "[HUNG] responding again: pid "); serial_putdec(s->owner_pid); serial_puts(" "); serial_puts(p->name); serial_puts("\n");
+            window_t *w = surf_win(s);
+            if (w) {
+                if (h) { strncpy(s->title_saved, w->title, sizeof s->title_saved - 1); size_t l = strlen(w->title); const char *suf = gui_text(" (Not responding)", " (応答なし)"); if (l + strlen(suf) < sizeof w->title) strcat(w->title, suf); }
+                else if (s->title_saved[0]) { strncpy(w->title, s->title_saved, sizeof w->title - 1); s->title_saved[0] = 0; }
+            }
+            gui_request_redraw();
+        }
+        if (!s->hung && s->title_saved[0]) {                                                   /* "Wait" was chosen: the title loses its suffix */
+            window_t *w2 = surf_win(s);
+            if (w2) { strncpy(w2->title, s->title_saved, sizeof w2->title - 1); w2->title[sizeof w2->title - 1] = 0; }
+            s->title_saved[0] = 0; gui_request_redraw();
+        }
+        if (s->kill_req) {
+            s->kill_req = false;
+            serial_puts("[HUNG] ending pid "); serial_putdec(s->owner_pid); serial_puts(" "); serial_puts(p->name); serial_puts(" at the user's request\n");
+            process_exit(p, -9);
+        }
+    }
+}
+
 /* GUI thread, once per frame. Closes windows whose app closed them, and
  * any WIN_COS_APP window whose surface no longer exists (owner exited). */
 void cos_app_window_gui_tick(void)
 {
+    hung_tick();
     uint32_t todo[COS_APP_PENDING_CLOSE];
     int n = 0;
     uint64_t flags = sync_irq_save();
@@ -751,6 +863,7 @@ static int64_t surface_setup(int64_t handle, int32_t w, int32_t h, uint32_t owne
     uint32_t *pix = (uint32_t *)kmalloc_aligned(bytes, PAGE_SIZE);
     if (!pix) { cos_app_window_close(handle, owner_pid); return -1; }
     memset(pix, 0xF4, bytes);                       /* light neutral until the app draws */
+    s->last_alive_ms = get_timer_ticks(); s->hung = false; s->kill_req = false; s->hung_hover = -1; s->hung_ignore_until = 0;
     /* The compositor's own copy (see present_pixels' struct comment) -
      * same neutral fill, so the window shows the same "nothing drawn yet"
      * placeholder it always has up to the app's first SYS_WIN2_PRESENT,
@@ -1157,6 +1270,7 @@ bool cos_app_window_present(int64_t handle, uint32_t caller_pid)
 {
     cos_app_surface_t *s = surface_from_handle(handle);
     if (!s || s->owner_pid != caller_pid || !s->pixels) return false;
+    s->last_alive_ms = get_timer_ticks();
     shell_commit_icons(s);
     /* Snapshot the app's buffer into the compositor's own copy before
      * advancing present_version - see present_pixels' struct comment.
@@ -1179,6 +1293,7 @@ bool cos_app_window_present(int64_t handle, uint32_t caller_pid)
  * surface without a snapshot falls back to a whole-window present. */
 bool cos_app_window_present_rects(int64_t handle, uint32_t caller_pid, const cos_win_rect_t *r, uint32_t n)
 {
+    { cos_app_surface_t *sa = surface_from_handle(handle); if (sa && sa->owner_pid == caller_pid) sa->last_alive_ms = get_timer_ticks(); }
     cos_app_surface_t *s = surface_from_handle(handle);
     if (!s || s->owner_pid != caller_pid || !s->pixels) return false;
     if (s->shell_layer) return cos_app_window_present(handle, caller_pid);
@@ -1209,11 +1324,13 @@ int cos_app_window_wait_event(int64_t handle, uint32_t caller_pid, cos_win_event
     cos_app_surface_t *s = surface_from_handle(handle);
     if (!s || s->owner_pid != caller_pid) return -1;
     int got = 0;
+    s->last_alive_ms = get_timer_ticks();
     uint64_t flags = sync_irq_save();
     if (s->ev_head == s->ev_tail && ms > 0) {
         s->waiter = thread_get_current();
         scheduler_sleep(ms);
         s->waiter = NULL;
+        s->last_alive_ms = get_timer_ticks();
     }
     if (s->ev_head != s->ev_tail) {
         *out = s->events[s->ev_head];
@@ -1228,6 +1345,7 @@ int cos_app_window_poll_event(int64_t handle, uint32_t caller_pid, cos_win_event
 {
     cos_app_surface_t *s = surface_from_handle(handle);
     if (!s || s->owner_pid != caller_pid) return -1;
+    s->last_alive_ms = get_timer_ticks();
     int got = 0;
     uint64_t flags = sync_irq_save();
     if (s->ev_head != s->ev_tail) {
@@ -1369,6 +1487,8 @@ void cos_app_window_mouse_state(void *win_ptr, int32_t cx, int32_t cy, uint8_t b
     for (int i = 0; i < COS_APP_MAX_WINDOWS; ++i) {
         cos_app_surface_t *s = &g_surfaces[i];
         if (!s->used || !s->pixels || s->win_uid != win->uid) continue;
+        if (s->hung) { hung_mouse(s, win, cx, cy, buttons); break; }
+        if (surf_scaled(s, win)) { cx = (int32_t)((int64_t)cx * s->pix_w / (win->w > 0 ? win->w : 1)); cy = (int32_t)((int64_t)cy * s->pix_h / (win->h - TITLEBAR_H > 0 ? win->h - TITLEBAR_H : 1)); }
         cos_win_event_t ev;
         memset(&ev, 0, sizeof(ev));
         ev.x = cx; ev.y = cy; ev.buttons = buttons;
@@ -1397,6 +1517,7 @@ bool cos_app_window_user_close(void *win_ptr)
     for (int i = 0; i < COS_APP_MAX_WINDOWS; ++i) {
         cos_app_surface_t *s = &g_surfaces[i];
         if (!s->used || s->win_uid != win->uid) continue;
+        if (s->pixels && s->hung) { s->hung_hover = 1; gui_request_redraw(); handled = true; break; }        /* a frozen app cannot answer a close request: the notice offers "End program" */
         if (s->pixels) {
             /* v2 app: ask it to close (it may want to save). A second
              * click while the request is pending closes the window anyway,
@@ -1605,6 +1726,7 @@ int cos_app_window_resize(int64_t handle, uint32_t caller_pid, int32_t w, int32_
         }
     }
     uint32_t *old_pix = s->pixels, *old_present = s->present_pixels;
+    s->app_sized = true;
     int idx = (int)(s - g_surfaces);
     uint64_t flags = sync_irq_save();
     bool grow = bytes >= s->present_capacity;

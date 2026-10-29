@@ -1,6 +1,6 @@
 /**
  * mk_window.h - Advanced Window System Header
- * C-OS 4.0.8 alpha Advanced Window Manager
+ * C-OS 4.1.0 Advanced Window Manager
  */
 #ifndef MK_WINDOW_H
 #define MK_WINDOW_H

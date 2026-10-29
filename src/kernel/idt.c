@@ -1,6 +1,6 @@
 /**
  * idt.c - Interrupt Descriptor Table (64-bit)
- * C-OS 4.0.8 alpha x86-64 IDT Management
+ * C-OS 4.1.0 x86-64 IDT Management
  * 
  * Fixed: Removed legacy remnants, proper 64-bit IDT structure - fully converted to 64-bit
  */
@@ -134,6 +134,7 @@ static void default_handler(struct regs *r) {
             serial_putdec((uint64_t)r->int_no);
             serial_puts(" - terminating process, kernel continues\n");
             { extern void cos_linux_crash_report(process_t *p, uint64_t rip, uint64_t addr); cos_linux_crash_report(proc, r->rip, r->rip); }
+            { extern void cos_crash_note(process_t *p, uint32_t vector, uint64_t err, uint64_t rip, uint64_t addr); cos_crash_note(proc, (uint32_t)r->int_no, r->err_code, r->rip, r->rip); }
             process_exit(proc, -(int)(r->int_no + 128));
             return;
         }
@@ -164,6 +165,9 @@ static void default_handler(struct regs *r) {
       else serial_puts("none");
       serial_puts("\n[EXCEPTION] stack words:");
       for (int i = -4; i < 20; ++i) { serial_puts(" "); serial_puthex(*(volatile uint64_t *)(uintptr_t)(r->rsp + (int64_t)i * 8)); }
+      serial_puts("\n[EXCEPTION] xsave header at rsp+512:");
+      for (int i = 0; i < 8; ++i) { serial_puts(" "); serial_puthex(*(volatile uint64_t *)(uintptr_t)(r->rsp + 512 + (int64_t)i * 8)); }
+      { uint32_t xl = 0, xh = 0; uint64_t c4; __asm__ volatile("mov %%cr4, %0" : "=r"(c4)); if (c4 & (1ull << 18)) __asm__ volatile("xgetbv" : "=a"(xl), "=d"(xh) : "c"(0)); serial_puts(" cr4=0x"); serial_puthex(c4); serial_puts(" xcr0=0x"); serial_puthex(((uint64_t)xh << 32) | xl); }
       serial_puts("\n"); }
     serial_puts("[EXCEPTION] rsp=0x");
     serial_puthex(r->rsp);
@@ -181,10 +185,19 @@ static void default_handler(struct regs *r) {
     serial_puthex(r->rdi);
     serial_puts("\n");
 
+    { extern void cos_panic_screen(uint32_t vector, uint64_t err, uint64_t rip, uint64_t addr, const char *where); cos_panic_screen((uint32_t)r->int_no, r->err_code, r->rip, r->rip, "kernel"); }
     __asm__ volatile("cli");
     for (;;) {
         __asm__ volatile("hlt");
     }
+}
+
+/* NMI: the panic screen sends one to every other CPU to stop it. Any other NMI is noted and ignored. */
+extern volatile int cos_panic_active;
+static void nmi_handler(struct regs *r) {
+    (void)r;
+    if (cos_panic_active) { __asm__ volatile("cli"); for (;;) __asm__ volatile("hlt"); }
+    serial_puts("[IDT] NMI (ignored)\n");
 }
 
 /* Install the IDT */
@@ -253,6 +266,7 @@ void idt_init(void) {
     /* Register page fault handler wrapper for interrupt 14.
        The page fault entry itself must still use the ISR stub isr14. */
     register_interrupt_handler(14, page_fault_handler_wrapper);
+    register_interrupt_handler(2, nmi_handler);
 
     /* Install hardware IRQ handlers (32-47) - use irq.asm stubs */
     idt_set_gate(32, (uint64_t)irq0,  0x08, 0x8E);  /* Timer */
@@ -285,9 +299,14 @@ void idt_init(void) {
      * the time these gates can ever actually fire. */
     /* #UD is how a Linux program's `syscall` arrives (cos_linux.c), and a system call may block or end the thread: it needs the thread's own kernel stack, which a task switch can leave and come back to, not the shared emergency stack. A ring-3 #UD gets that stack from the CPU anyway (TSS.rsp0). */
     idt_set_gate(6,  (uint64_t)isr6,  0x08, 0x8E);
+    /* #GP and #PF are NOT on IST1: IST1 is one stack per CPU, and a handler that runs on it must never block - but these handlers do (a page fault reads a file and waits for the
+     * disk DMA, takes the file system mutex, and the crash report of a dying program opens files). When such a handler was switched away from, the next exception on that CPU wrote over
+     * its frames, and when it ran again it returned through garbage or wrote over the frames of another thread (random register values, a kernel halt after several programs
+     * died at once). A fault from ring 3 now runs on the thread's own kernel stack (TSS.rsp0), where blocking is fine. Only #DF keeps IST1: a double fault is what a kernel stack
+     * overflow into its guard page ends in, and it only prints and halts. */
     idt_set_gate_ist(8,  (uint64_t)isr8,  0x08, 0x8E, 1);
-    idt_set_gate_ist(13, (uint64_t)isr13, 0x08, 0x8E, 1);
-    idt_set_gate_ist(14, (uint64_t)isr14, 0x08, 0x8E, 1);
+    idt_set_gate(13, (uint64_t)isr13, 0x08, 0x8E);
+    idt_set_gate(14, (uint64_t)isr14, 0x08, 0x8E);
 
     {   /* vectors 0x40-0x5F: Local APIC interrupts of devices; 0xFF: spurious */
         extern const uint64_t cos_apic_stubs[32];
@@ -320,6 +339,7 @@ void register_interrupt_handler(uint8_t n, void (*handler)(struct regs *)) {
 void _isr_handler(struct regs *r) {
     uint64_t int_no = r->int_no;
     uint64_t lock_flags = sync_irq_save();       /* exceptions and system calls too: see _irq_handler */
+    { extern void sync_lock_set_site(uint64_t); sync_lock_set_site(0x2000000ull + int_no); }     /* the lock profile: "exception int_no" (14: page fault, 6: #UD) */
     if (int_no < IDT_ENTRIES && interrupt_handlers[int_no]) {
         interrupt_handlers[int_no](r);
     } else {
@@ -362,7 +382,14 @@ void _irq_handler(struct regs *r) {
         if (interrupt_handlers[irq_no]) interrupt_handlers[irq_no](r);
         return;
     }
+    /* The tick of a CPU's own timer (smp_timer_irq) works on that CPU's own state, and its scheduler step takes the kernel lock itself when there is something to do: an idle CPU
+     * (nothing ready for it) returns from the tick without the lock. Taking it here for every tick of every CPU was a large part of the lock's traffic. */
+    if (irq_no == SMP_VEC_TIMER) {
+        if (interrupt_handlers[irq_no]) interrupt_handlers[irq_no](r);
+        return;
+    }
     uint64_t lock_flags = sync_irq_save();
+    { extern void sync_lock_set_site(uint64_t); sync_lock_set_site(0x3000000ull + irq_no); }     /* the lock profile: "interrupt irq_no" */
     if (irq_no < IDT_ENTRIES && interrupt_handlers[irq_no]) {
         interrupt_handlers[irq_no](r);
     }
@@ -396,10 +423,12 @@ void page_fault_handler_wrapper(struct regs *r) {
             if (COS_SMAP_AUDIT) { r->rflags |= (1ull << 18); return; }
         }
     }
-    static uint32_t pf_user_np_count;
+    static uint32_t pf_user_np_count, pf_user_prot_count;
     extern const char *page_fault_kind;
     bool user_np = (r->err_code & 5u) == 4u;     /* user mode, page not present */
-    bool sample = !user_np || ++pf_user_np_count <= 32u || (pf_user_np_count & 0x3FFu) == 0u;
+    bool user_prot = (r->err_code & 5u) == 5u;   /* user mode, protection: a write to a shared (copy-on-write) page, an everyday event after fork */
+    bool sample = user_np ? (++pf_user_np_count <= 32u || (pf_user_np_count & 0x3FFu) == 0u)
+                : user_prot ? (++pf_user_prot_count <= 32u || (pf_user_prot_count & 0x3FFu) == 0u) : true;
     if (sample) {
         serial_puts("[PF] RIP: 0x");
         serial_puthex(r->rip);

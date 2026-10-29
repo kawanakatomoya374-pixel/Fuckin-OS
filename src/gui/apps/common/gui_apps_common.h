@@ -33,6 +33,10 @@ bool fm_is_jpeg_file(const char* name);
 bool fm_is_image_file(const char* name);
 bool fm_is_html_file(const char* name);
 bool fm_is_cos_executable(const char* name);
+bool fm_is_app_shortcut(const char* name);
+bool gui_app_shortcut_args(const char* path, char* out, size_t n);
+bool gui_app_shortcut_read(const char* path, char* name, size_t name_n,
+                           char* exec, size_t exec_n, char* icon, size_t icon_n);
 void cos_launch_elf_file(const char* path);
 void fm_open_image_viewer(const char* filename);
 void fm_open_text_editor(const char* filename);

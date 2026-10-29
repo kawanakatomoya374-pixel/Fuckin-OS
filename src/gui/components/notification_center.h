@@ -1,7 +1,7 @@
 /**
  * notification_center.h - Notification Center
  * 
- * C-OS 4.0.8 alpha 通知センター
+ * C-OS 4.1.0 通知センター
  */
 
 #ifndef NOTIFICATION_CENTER_H

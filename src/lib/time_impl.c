@@ -109,7 +109,7 @@ struct tm *localtime_r(const time_t *timer, struct tm *result)
 }
 
 /* mktime() - convert struct tm to time_t.
- * C-OS 4.0.8 alpha: added for QuickJS's getTimezoneOffset() which uses
+ * C-OS 4.1.0: added for QuickJS's getTimezoneOffset() which uses
  * mktime() + difftime() in the NO_TM_GMTOFF path.
  * Since C-OS has no timezone database, local time == UTC, so mktime()
  * is the inverse of gmtime_r(): convert the broken-down UTC time back

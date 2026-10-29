@@ -1,5 +1,5 @@
 /**
- * Keyboard driver for C-OS 4.0.8 alpha
+ * Keyboard driver for C-OS 4.1.0
  *
  * PS/2 set 1 scancode handling with a small event queue,
  * modifier tracking, and compatibility helpers for older GUI code.

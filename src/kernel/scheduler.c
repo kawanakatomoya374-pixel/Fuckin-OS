@@ -40,19 +40,44 @@ static void scheduler_ap_watchdog(void);
 /* current_process is managed by task.c */
 static thread_t* sleep_list = NULL;
 
+uint8_t *cos_fpu_area(thread_t *t) { return (uint8_t *)(((uintptr_t)t->fpu_state + 63u) & ~(uintptr_t)63u); }
+
+static inline void fpu_save_to(uint8_t *a) {
+    if (cos_xsave_on) __asm__ volatile("xsave64 %0" : "=m"(*(uint8_t (*)[COS_FPU_AREA])a) : "a"(0xFFFFFFFFu), "d"(0xFFFFFFFFu) : "memory");
+    else __asm__ volatile("fxsave64 %0" : "=m"(*(uint8_t (*)[512])a) :: "memory");
+}
+static inline void fpu_load_from(const uint8_t *a) {
+    if (cos_xsave_on) __asm__ volatile("xrstor64 %0" :: "m"(*(const uint8_t (*)[COS_FPU_AREA])a), "a"(0xFFFFFFFFu), "d"(0xFFFFFFFFu) : "memory");
+    else __asm__ volatile("fxrstor64 %0" :: "m"(*(const uint8_t (*)[512])a) : "memory");
+}
+
+void cos_fpu_init_area(uint8_t *a) {
+    static const uint32_t mxcsr_default = 0x1F80u;
+    memset(a, 0, COS_FPU_AREA);
+    __asm__ volatile("fninit\n\tldmxcsr %0" :: "m"(mxcsr_default) : "memory");
+    fpu_save_to(a);
+}
+
+/* An image that came from user memory (a signal frame) must not make xrstor/fxrstor fault in the kernel: only the components in XCR0, no compaction, no reserved MXCSR bits. */
+void cos_fpu_sanitize(uint8_t *a) {
+    uint32_t mask = *(uint32_t *)(a + 28); if (!mask) mask = 0xFFBFu;
+    *(uint32_t *)(a + 24) &= mask;
+    if (cos_xsave_on) { *(uint64_t *)(a + 512) &= 7u; memset(a + 520, 0, 56); }
+}
+
 static inline void scheduler_fpu_init(thread_t* thread) {
     if (!thread) return;
-    __asm__ volatile("fninit\n\tfxsave64 %0" : "=m"(thread->fpu_state) :: "memory");
+    cos_fpu_init_area(cos_fpu_area(thread));
 }
 
 static inline void scheduler_fpu_save(thread_t* thread) {
     if (!thread) return;
-    __asm__ volatile("fxsave64 %0" : "=m"(thread->fpu_state) :: "memory");
+    fpu_save_to(cos_fpu_area(thread));
 }
 
 static inline void scheduler_fpu_restore(const thread_t* thread) {
     if (!thread) return;
-    __asm__ volatile("fxrstor64 %0" :: "m"(thread->fpu_state) : "memory");
+    fpu_load_from(cos_fpu_area((thread_t *)thread));
 }
 
 /* ---- thread-local storage base -------------------------------------------
@@ -426,6 +451,9 @@ static thread_t* pick_next_task(void) {
  */
 void scheduler_capture_interrupt_context(struct regs* r) {
     if (!r || !current_thread) return;
+    { extern bool gdt_rsp_on_ist1(uint64_t); static uint32_t ist_pre;       /* diagnostic: a timer tick that interrupted an exception handler running on the shared IST1 stack */
+      if (gdt_rsp_on_ist1(r->rsp) && ist_pre++ < 20) { serial_puts("[SCHED] WARNING: preempting a thread inside an IST1 exception handler: tid "); serial_putdec(current_thread->tid);
+          serial_puts(" pid "); serial_putdec(current_thread->pid); serial_puts(" rip 0x"); serial_puthex(r->rip); serial_puts(" rsp 0x"); serial_puthex(r->rsp); serial_puts(" cs 0x"); serial_puthex(r->cs); serial_puts("\n"); } }
 
     current_thread->context.r15 = r->r15;
     current_thread->context.r14 = r->r14;
@@ -456,10 +484,10 @@ void scheduler_capture_interrupt_context(struct regs* r) {
      * preempted this way is resumed by iretq straight to its interrupted
      * user context (skipping the stub's fxrstor), so hand it the pristine
      * snapshot instead. Must mirror the stub's arithmetic exactly:
-     * area = (frame - 512) & ~15. */
+     * area = (frame - COS_FPU_STACK) & ~63. */
     {
-        const uint8_t* area = (const uint8_t*)(((uintptr_t)r - 512u) & ~(uintptr_t)15u);
-        memcpy(current_thread->fpu_state, area, sizeof(current_thread->fpu_state));
+        const uint8_t* area = (const uint8_t*)(((uintptr_t)r - COS_FPU_STACK) & ~(uintptr_t)63u);
+        memcpy(cos_fpu_area(current_thread), area, COS_FPU_AREA);
     }
     current_thread_ctx_precaptured = true;
 }
@@ -667,6 +695,10 @@ void scheduler_schedule(void) {
     uint64_t flags = sync_irq_save();
     thread_t* next = pick_next_task();
     if (!next || next == current_thread) {
+        /* The running thread was put back in its queue as READY by whoever asked for the reschedule (the time slice ran out, a yield) and it is still the one to run: it
+         * is RUNNING again. Left READY, the tick below would never count its slice down again (it only looks at RUNNING threads) and a thread that never sleeps
+         * (a program in a loop) would keep its CPU for good - on the boot CPU that froze the whole desktop. */
+        if (next && next == current_thread && current_thread->state == TASK_READY) current_thread->state = TASK_RUNNING;
         sync_irq_restore(flags);
         return;  /* No switch needed */
     }
@@ -1053,7 +1085,7 @@ uint64_t scheduler_get_uptime(void) {
 }
 /**
  * scheduler_enhanced.c - Enhanced Scheduler with Real Context Switching
- * C-OS 4.0.8 alpha
+ * C-OS 4.1.0
  * 
  * Implements true preemptive multitasking with proper context switching
  */
@@ -1124,6 +1156,7 @@ void scheduler_remove_process(process_t* proc) {
         if (th->state != TASK_UNUSED) {
             scheduler_remove_task(th);
             th->state = TASK_ZOMBIE;
+            { extern void task_reap_note(void); task_reap_note(); }
         }
         th = next;
     }
@@ -1277,6 +1310,19 @@ void scheduler_verify_queues(void) {
 
 static void scheduler_do_context_switch(thread_t* prev, thread_t* next) {
     if (!next) return;
+    /* Never run a thread that is dead or that was saved on an exception stack: its frames are gone. Logged (the first few) so the path that queued it can be found. */
+    if (next != prev) {
+        extern bool gdt_rsp_on_ist1(uint64_t);
+        bool dead = next->state == TASK_ZOMBIE || next->state == TASK_UNUSED;
+        bool on_ist = (next->context.cs & 3) == 0 && gdt_rsp_on_ist1(next->context.rsp);
+        if (dead || on_ist) {
+            static uint32_t bad_n;
+            if (bad_n++ < 20) { serial_puts("[SCHED] ERROR: not switching to tid "); serial_putdec(next->tid); serial_puts(" pid "); serial_putdec(next->pid); serial_puts(dead ? " (dead, state " : " (saved on an IST1 stack, state ");
+                serial_putdec((uint64_t)next->state); serial_puts(") rip 0x"); serial_puthex(next->context.rip); serial_puts(" rsp 0x"); serial_puthex(next->context.rsp); serial_puts(" on_cpu "); serial_putdec(next->on_cpu); serial_puts("\n"); }
+            if (!dead) next->state = TASK_ZOMBIE;
+            return;
+        }
+    }
 
     /* Update process states and address space before the CPU switch so
      * the outgoing thread does not continue running with stale CR3
@@ -1365,6 +1411,13 @@ static void scheduler_do_context_switch(thread_t* prev, thread_t* next) {
         /* The kernel lock is given up by cos_switch_finish(), which hal_context_switch() runs after it has left prev's kernel stack and saved prev's registers: until
          * then another CPU must neither take the lock and pick prev (half saved) nor reuse its stack. The depth is a local, so it lives on prev's own stack
          * and is read back when prev is switched in again, possibly on another CPU. */
+        { extern bool gdt_rsp_on_ist1(uint64_t); uint64_t rsp_now; __asm__ volatile("mov %%rsp, %0" : "=r"(rsp_now));
+          static uint32_t ist_sw; if (prev && gdt_rsp_on_ist1(rsp_now) && ist_sw++ < 20) {
+              serial_puts("[SCHED] WARNING: switching away from a thread on an IST1 (exception) stack: tid "); serial_putdec(prev->tid); serial_puts(" pid "); serial_putdec(prev->pid);
+              serial_puts(" rsp 0x"); serial_puthex(rsp_now); serial_puts(" callers 0x"); serial_puthex((uint64_t)(uintptr_t)__builtin_return_address(0));
+              serial_puts("\n  return addresses on the stack:");
+              { extern char _text_end[]; const uint64_t *w = (const uint64_t *)(uintptr_t)rsp_now; int shown = 0; for (int i = 0; i < 512 && shown < 24; ++i) { uint64_t v = w[i]; if (v >= 0x100000 && v < (uint64_t)(uintptr_t)_text_end) { serial_puts(" 0x"); serial_puthex(v); ++shown; } } }
+              serial_puts("\n"); } }
         uint32_t kernel_lock_depth = sync_kernel_lock_depth();
         cpu_local()->switch_prev = prev;
         hal_context_switch(prev_ctx, (const hal_context_t*)&next->context);

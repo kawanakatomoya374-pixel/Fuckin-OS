@@ -1,5 +1,5 @@
 /*
- * cos_build.h - C-OS 4.0.8 alpha Build Configuration and Feature Flags
+ * cos_build.h - C-OS 4.1.0 Build Configuration and Feature Flags
  * Centralized build configuration for all subsystems
  */
 

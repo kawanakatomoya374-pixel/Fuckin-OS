@@ -47,7 +47,7 @@ extern int ime_x, ime_y;            /* where the Japanese input window goes (the
 #define PATHN      512
 
 enum { V_DETAILS, V_LIST, V_ICONS, V_THUMBS };
-enum { K_FOLDER, K_IMAGE, K_AUDIO, K_VIDEO, K_CODE, K_ARCHIVE, K_EXEC, K_TEXT, K_DOC, K_OTHER };
+enum { K_FOLDER, K_IMAGE, K_AUDIO, K_VIDEO, K_CODE, K_ARCHIVE, K_EXEC, K_TEXT, K_DOC, K_OTHER, K_ZIP, K_TAR, K_GZ };   /* K_ZIP / K_TAR / K_GZ: archives that cosarc opens (own icons) */
 enum { S_NAME, S_SIZE, S_DATE, S_TYPE };
 
 typedef struct { char name[256]; uint64_t size, mtime; uint8_t is_dir, attr, kind, sel; } Ent;
@@ -115,6 +115,7 @@ typedef struct {
     int menu_open, menu_hover;
     bool ctx_open; int ctx_x, ctx_y, ctx_hover, ctx_kind;   /* 0 item, 1 background, 2 place chip, 3 tree node */
     int ctx_target;
+    int ctx_sub, ctx_sub_hover;                              /* the "Compress" submenu of the item menu: open (1) and the row under the pointer */
     int tip_btn; uint64_t tip_t;
 
     /* dialogs */
@@ -125,6 +126,10 @@ typedef struct {
     uint64_t props_files, props_dirs, props_bytes; Ent props_ent; char props_path[PATHN];
 
     Job job;
+    struct {                                                   /* compress / extract: cosarc.c-os runs in the background, polled by arc_tick() */
+        int64_t pid; bool active; char verb[24]; char name[256]; char result[PATHN]; char outfile[40]; uint64_t t0; bool select_result;
+        char progfile[48]; uint64_t done, total, prog_t; char cur[200]; bool compress, to_folder; char dest[PATHN];
+    } arc;
     char pg_title[64], pg_text[1500];       /* a plugin command's result (D_TEXT) */
 
     char status[160]; uint64_t status_t;
@@ -196,6 +201,12 @@ Thumb *preview_image(const Ent *e);
 const char *preview_text(const Ent *e);
 void   blit_argb(cui_canvas *c, int x, int y, const uint32_t *px, int w, int h);
 void   open_entry(int vi);
+bool   arc_is_extractable(const char *name);       /* .zip .tar .tar.gz .tgz .gz */
+bool   arc_busy(void);
+void   arc_compress(int action);                   /* A_COMPRESS_ZIP / TAR / TGZ / GZ on the selection */
+void   arc_extract(int vi, bool to_folder);        /* the archive at visible index vi: into a folder named after it, or into this folder */
+void   arc_tick(void);
+void   arc_cancel(void);                           /* stops the job and removes what it had made (the new archive, or the new folder) */
 void   open_path_external(const char *path);
 void   fm_set_title(void);
 void   dir_poll(void);
@@ -245,6 +256,7 @@ enum {
     A_GO_ROOT, A_GO_STUDIO, A_GO_DESKTOP, A_GO_DOCS, A_GO_MUSIC, A_GO_PICTURES, A_GO_DOWNLOADS, A_GO_BIN,
     A_ABOUT, A_SEP,
     A_OPEN_STUDIO_HERE, A_PLUGINS, A_NEW_WINDOW,
+    A_COMPRESS_MENU, A_COMPRESS_ZIP, A_COMPRESS_TAR, A_COMPRESS_TGZ, A_COMPRESS_GZ, A_EXTRACT_HERE, A_EXTRACT_TO,
     A_PLUGIN_BASE = 1000                      /* + slot of a plugin command */
 };
 
