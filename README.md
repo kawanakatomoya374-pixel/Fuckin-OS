@@ -1,1 +1,1 @@
-Firefoxが動作します
+Firefoxが動作します。完全Linux互換ではありません
